@@ -11,6 +11,7 @@ namespace PokemonManager.Ui;
 public sealed class MinUi : IUi
 {
     private const int ExitSelected = 0;
+    private const int MaxCrashRetries = 3;
 
     private readonly string _tmp;
     private Process? _busy;
@@ -35,6 +36,20 @@ public sealed class MinUi : IUi
         if (items.Count == 0)
             return null;
 
+        // minui-list 0.15.4 reads one past the end of its list when down is pressed on the last
+        // item, and with some list lengths (6, 10, 14...) that crashes it. The crash only happens on
+        // that wrap-around, so reopen the list at the top as the wrap would have.
+        for (int attempt = 0; ; attempt++)
+        {
+            int? result = ChooseOnce(title, items, selected, background, out bool crashed);
+            if (!crashed || attempt == MaxCrashRetries)
+                return result;
+            selected = 0;
+        }
+    }
+
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, out bool crashed)
+    {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
         var array = new JsonArray();
@@ -61,6 +76,10 @@ public sealed class MinUi : IUi
         if (background is not null && File.Exists(background))
             args = [.. args, "--background-image", background];
         int code = Run("minui-list", args);
+        // Killed by a signal: .NET reports 128 + the signal number (139 = SIGSEGV).
+        crashed = code > 128;
+        if (crashed)
+            Console.Error.WriteLine($"minui-list crashed (exit {code}); reopening the list.");
         if (code != ExitSelected || !File.Exists(output))
             return null;
 
