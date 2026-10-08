@@ -20,6 +20,7 @@ public sealed class App
     private readonly SaveLibrary _library;
     private readonly AppSettings _settings;
     private List<SaveEntry>? _saves;
+    private List<OfficialRomFilter.Hidden> _hidden = [];
 
     public App(IUi ui, AppPaths paths)
     {
@@ -43,6 +44,9 @@ public sealed class App
         {
             var saves = GetSaves();
             var items = saves.Select(s => s.Label).ToList();
+            int hidden = _hidden.Count == 0 ? -1 : items.Count;
+            if (hidden >= 0)
+                items.Add($"[{_hidden.Count} hidden: not official ROMs]");
             int rescan = items.Count; items.Add("[Rescan SD card]");
             int settings = items.Count; items.Add("[Settings]");
             int help = items.Count; items.Add("[Help]");
@@ -50,6 +54,7 @@ public sealed class App
             var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items);
             if (choice is null)
                 return 0;
+            if (choice == hidden) { ShowHidden(); continue; }
             if (choice == rescan) { _saves = null; continue; }
             if (choice == settings) { SettingsMenu(); continue; }
             if (choice == help) { _ui.Message(HelpText); continue; }
@@ -62,8 +67,25 @@ public sealed class App
         if (_saves is not null)
             return _saves;
         _ui.Busy("Looking for Pokémon saves...");
-        _saves = SaveLibrary.Scan(_paths.SaveRoots);
+        var all = SaveLibrary.Scan(_paths.SaveRoots);
+        _hidden = [];
+        if (_settings.OnlyOfficialRoms && all.Count != 0)
+        {
+            _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
+            (all, _hidden) = OfficialRomFilter.Apply(all, _paths.RomRoots, _paths.RomCheckCache, _paths.ExtraSavesDir);
+        }
+        _saves = all;
         return _saves;
+    }
+
+    private void ShowHidden()
+    {
+        var lines = _hidden.Select(h => $"- {h.Save.FileName}: {h.Check.Describe()}");
+        _ui.Message(
+            "Only saves made with unmodified, official Pokémon ROMs are shown. Hidden:\n" +
+            string.Join('\n', lines) +
+            "\n\nTo manage these anyway, turn off Settings > Official ROMs only, " +
+            "or copy the save into PokemonManager/Saves.");
     }
 
     // ---------------------------------------------------------------- save menu
@@ -598,6 +620,7 @@ public sealed class App
             var items = new List<string>
             {
                 $"Unofficial transfers: {(_settings.AllowUnofficialTransfers ? "ON" : "OFF")}",
+                $"Official ROMs only: {(_settings.OnlyOfficialRoms ? "ON" : "OFF")}",
                 "Show welcome screen again",
             };
             var choice = _ui.Choose("Settings", items);
@@ -610,6 +633,15 @@ public sealed class App
                         "(for example Gen 4 back to Gen 3). Those Pokémon are usually flagged as illegal. Turn on?", "TURN ON", "CANCEL"))
                     continue;
                 _settings.AllowUnofficialTransfers = !_settings.AllowUnofficialTransfers;
+            }
+            else if (choice == 1)
+            {
+                if (_settings.OnlyOfficialRoms && !_ui.Confirm(
+                        "Show saves from ROM hacks and other unofficial ROMs too? PKHeX may misread a hack's save, " +
+                        "and editing it can corrupt it. Backups are still made before every change.", "SHOW ALL", "CANCEL"))
+                    continue;
+                _settings.OnlyOfficialRoms = !_settings.OnlyOfficialRoms;
+                _saves = null; // rescan with the new rule
             }
             else
             {

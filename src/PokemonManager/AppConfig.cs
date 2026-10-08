@@ -7,6 +7,7 @@ namespace PokemonManager;
 public sealed class AppPaths
 {
     public required IReadOnlyList<string> SaveRoots { get; init; }
+    public required IReadOnlyList<string> RomRoots { get; init; }
     public required string DataDir { get; init; }
     public required string TempDir { get; init; }
 
@@ -16,6 +17,7 @@ public sealed class AppPaths
     public string BackupDir => Path.Combine(DataDir, "Backups");
     public string ExtraSavesDir => Path.Combine(DataDir, "Saves");
     public string SettingsFile => Path.Combine(DataDir, "settings.txt");
+    public string RomCheckCache => Path.Combine(DataDir, "rom-check-cache.txt");
 
     public void EnsureCreated()
     {
@@ -31,6 +33,7 @@ public sealed class AppPaths
         return new AppPaths
         {
             SaveRoots = [Path.Combine(sd, "Saves"), Path.Combine(data, "Saves")],
+            RomRoots = [Path.Combine(sd, "Roms")],
             DataDir = data,
             TempDir = tmp,
         };
@@ -40,6 +43,8 @@ public sealed class AppPaths
 public sealed class AppSettings
 {
     public bool AllowUnofficialTransfers { get; set; }
+    /// <summary>Only list saves whose ROM is an unmodified retail Pokémon game (on by default).</summary>
+    public bool OnlyOfficialRoms { get; set; } = true;
     public bool SeenWelcome { get; set; }
 
     public static AppSettings Load(string path)
@@ -57,6 +62,7 @@ public sealed class AppSettings
             {
                 case "allow_unofficial_transfers": s.AllowUnofficialTransfers = on; break;
                 case "seen_welcome": s.SeenWelcome = on; break;
+                case "only_official_roms": s.OnlyOfficialRoms = on; break;
             }
         }
         return s;
@@ -70,6 +76,7 @@ public sealed class AppSettings
             [
                 $"allow_unofficial_transfers={AllowUnofficialTransfers.ToString().ToLowerInvariant()}",
                 $"seen_welcome={SeenWelcome.ToString().ToLowerInvariant()}",
+                $"only_official_roms={OnlyOfficialRoms.ToString().ToLowerInvariant()}",
             ]);
         }
         catch (IOException)

@@ -42,7 +42,19 @@ dotnet test                   # run the test suite
 
 ## Using it
 
-Open **Tools → Pokemon Manager**. The app scans `Saves/` for anything PKHeX recognizes and lists it as *Game - Trainer (file)*. Pick a save, then:
+Open **Tools → Pokemon Manager**. The app scans `Saves/` for anything PKHeX recognizes whose ROM is official (see below) and lists it as *Game - Trainer (file)*. Pick a save, then:
+
+### Official ROMs only (default)
+
+By default the app only lists saves made with **unmodified, official Pokémon ROMs**. ROM hacks, translations and other modified ROMs are hidden. Hack saves often look like normal FireRed/Emerald saves to PKHeX, and editing them as if they were can corrupt them.
+
+- A save is matched to its ROM by name, the way NextUI names saves: `Roms/.../Pokemon Emerald.gba` ↔ `Saves/GBA/Pokemon Emerald.gba.sav`, `Pokemon Emerald.sav` or `Pokemon Emerald.srm`. Zipped ROMs work too.
+- The ROM's CRC32 is compared with the 175 retail dumps of the main-series games (Red/Green/Blue/Yellow through Black 2/White 2, all regions and revisions) from the No-Intro database. Zipped ROMs are checked without unzipping, and trimmed DS ROMs are recognised.
+- Each ROM is hashed once and the result is cached in `PokemonManager/rom-check-cache.txt`, so only the first scan is slow.
+- Hidden saves appear as **[N hidden: not official ROMs]** in the main menu. Select it to see each file and the reason.
+- To manage other saves anyway, turn off **Settings → Official ROMs only**, or copy the save into `PokemonManager/Saves`. Saves there have no ROM on the card and are always shown.
+
+To refresh the ROM list from a newer No-Intro database, run `scripts/update-vanilla-roms.py <libretro-database>/metadat/no-intro`.
 
 | Menu | What it does |
 | --- | --- |
@@ -66,7 +78,8 @@ SDCARD/
     ├── Import/                ← .pk1 – .pk9 files to import
     ├── Export/                ← exported Pokémon land here (one folder per save)
     ├── Backups/               ← automatic backups (last 20 per save)
-    └── Saves/                 ← optional: extra saves to manage (e.g. copied from another device)
+    ├── Saves/                 ← optional: extra saves to manage (always shown, even with "Official ROMs only")
+    └── rom-check-cache.txt    ← cached ROM checks
 ```
 
 Gift and event files are widely shared by the community, for example in Project Pokémon's event gallery. Pokémon Manager doesn't ship any.
@@ -134,6 +147,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 - [minui-list / minui-presenter](https://github.com/josegonzalez) by Jose Diaz-Gonzalez (MIT)
 - The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event file formats and import procedure
 - [NextUI](https://github.com/LoveRetro/NextUI)
+- ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
 
 Pokémon is © Nintendo / Creatures Inc. / GAME FREAK inc. This project is not affiliated with or endorsed by them.
 

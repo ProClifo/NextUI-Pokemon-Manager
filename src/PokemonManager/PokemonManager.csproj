@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="PKHeX.Core" Version="26.8.26" />
+    <PackageReference Include="System.IO.Hashing" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

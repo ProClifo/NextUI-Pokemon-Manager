@@ -65,8 +65,12 @@ int SelfTest()
 int Scan()
 {
     var paths = AppPaths.FromEnvironment(sd, data);
-    foreach (var s in SaveLibrary.Scan(paths.SaveRoots))
-        Console.WriteLine($"{s.Path}\t{s.Label}");
+    var saves = SaveLibrary.Scan(paths.SaveRoots);
+    var (shown, hidden) = OfficialRomFilter.Apply(saves, paths.RomRoots, paths.RomCheckCache, paths.ExtraSavesDir);
+    foreach (var s in shown)
+        Console.WriteLine($"{s.Path}\t{s.Label}\tofficial");
+    foreach (var h in hidden)
+        Console.WriteLine($"{h.Save.Path}\t{h.Save.Label}\thidden: {h.Check.Describe()}");
     return 0;
 }
 
@@ -241,7 +245,7 @@ static int Usage(int code)
         Usage: pkmgr [--sd <sdcard>] [--data <dir>] <command> [args]
 
           ui                                   on-device menus (default)
-          scan                                 list Pokémon saves under <sd>/Saves
+          scan                                 list Pokémon saves under <sd>/Saves and whether their ROM is official
           list <save>                          list Pokémon (slots: p:1 = party 1, 3:12 = box 3 slot 12)
           show <save> <slot>                   show one Pokémon
           transfer <src> <slot> <dst> [--copy] [--unofficial]
