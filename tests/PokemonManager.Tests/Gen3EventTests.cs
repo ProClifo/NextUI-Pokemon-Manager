@@ -111,14 +111,43 @@ public sealed class Gen3EventTests : IDisposable
     }
 
     [Fact]
-    public void DamagedWonderCardIsRefused()
+    public void StaleChecksumsAreRecalculatedLikeThePlugin()
+    {
+        var entry = _saves.Create(GameVersion.E, "Emerald.sav");
+        var data = MakeWonderCard("EDITED");
+        data[0x20] ^= 0x01; // hand-edited text, old CRC
+        data[^1] ^= 0x01;   // and an edited script
+
+        var result = Gen3Events.Inject((SAV3)entry.Sav, WriteFile("edited.wc3", data));
+        Assert.True(result.Ok, result.Message);
+        Assert.Contains("Recalculated", result.Message);
+
+        entry = _saves.Roundtrip(entry);
+        var sav = (SAV3)entry.Sav;
+        Assert.True(((SaveBlock3LargeE)sav.LargeBlock).GetWonderCard(false).IsChecksumValid());
+        Assert.True(sav.LargeBlock.MysteryData.IsChecksumValid());
+    }
+
+    [Fact]
+    public void WonderCardWithoutFlagIsRefused()
     {
         var sav = (SAV3)_saves.Create(GameVersion.E, "Emerald.sav").Sav;
-        var data = MakeWonderCard("BROKEN");
-        data[0x20] ^= 0xFF;
-        var result = Gen3Events.Inject(sav, WriteFile("broken.wc3", data));
-        Assert.False(result.Ok);
-        Assert.Contains("damaged", result.Message);
+        var data = MakeWonderCard("NO FLAG");
+        data[4] = data[5] = 0;
+        Assert.False(Gen3Events.Inject(sav, WriteFile("noflag.wc3", data)).Ok);
+    }
+
+    [Fact]
+    public void LinkStatCardKeepsItsMetadata()
+    {
+        var sav = (SAV3)_saves.Create(GameVersion.FR, "FireRed.sav").Sav;
+        var data = MakeWonderCard("LINK CARD");
+        var card = new WonderCard3(data.AsMemory(0, Gen3Events.CardSize)) { Type = 2 };
+        card.FixChecksum();
+        BinaryPrimitives.WriteUInt16LittleEndian(data.AsSpan(Gen3Events.CardSize + 4), 12); // wins
+
+        Assert.True(Gen3Events.Inject(sav, WriteFile("link.wc3", data)).Ok);
+        Assert.Equal(12, ((SaveBlock3LargeFRLG)sav.LargeBlock).GetWonderCardExtra(false).Wins);
     }
 
     [Fact]
@@ -161,6 +190,39 @@ public sealed class Gen3EventTests : IDisposable
     }
 
     [Fact]
+    public void MysteryEventSharesItsRecordMixingItemAndClearsTheWonderCard()
+    {
+        var entry = _saves.Create(GameVersion.E, "Emerald.sav");
+        var sav = (SAV3)entry.Sav;
+        Assert.True(Gen3Events.Inject(sav, WriteFile("card.wc3", MakeWonderCard("OLD CARD"))).Ok);
+
+        var me3 = new byte[Gen3Events.ME3Size];
+        MakeScript(rubySapphire: false).CopyTo(me3, 0);
+        var gift = new RecordMixing3Gift(me3.AsMemory(Gen3Events.ScriptSize)) { Max = 1, Count = 0x97, Item = 275 };
+        // left with a stale checksum on purpose
+
+        var result = Gen3Events.Inject(sav, WriteFile("eon.me3", me3));
+        Assert.True(result.Ok, result.Message);
+        Assert.Contains("Eon Ticket", result.Message);
+
+        entry = _saves.Roundtrip(entry);
+        var block = (SaveBlock3LargeE)((SAV3)entry.Sav).LargeBlock;
+        Assert.Equal(275, block.RecordMixingGift.Item);
+        Assert.True(block.RecordMixingGift.IsChecksumValid());
+        Assert.Equal(0, block.GetWonderCard(false).CardID);
+    }
+
+    [Fact]
+    public void ScriptOnlyMysteryEventIsAccepted()
+    {
+        var sav = (SAV3)_saves.Create(GameVersion.S, "Sapphire.sav").Sav;
+        var file = WriteFile("script.me3", MakeScript(rubySapphire: true));
+        Assert.Equal(Gen3EventKind.MysteryEvent, file.Kind);
+        Assert.True(Gen3Events.Inject(sav, file).Ok);
+        Assert.Equal(0x33, sav.LargeBlock.MysteryData.Data[4]);
+    }
+
+    [Fact]
     public void EmeraldMysteryEventNeverSetsTheFlagOnInternationalSaves()
     {
         var me3 = new byte[Gen3Events.ME3Size];
@@ -199,7 +261,7 @@ public sealed class Gen3EventTests : IDisposable
         var entry = _saves.Create(GameVersion.S, "Sapphire.sav");
         Assert.True(((SAV3)entry.Sav).IsEBerryEngima);
 
-        var berry = new byte[Gen3Events.ECBSize];
+        var berry = new byte[Gen3Events.ECBSizeRS];
         StringConverter3.SetString(berry.AsSpan(0, 7), "PUMKIN", 6, false, StringConverterOption.ClearFF);
         berry[0xA] = 3; // max yield
         BinaryPrimitives.WriteUInt32LittleEndian(berry.AsSpan(^4), Gen3Events.BerryChecksum(berry.AsSpan(0, berry.Length - 4)));
@@ -215,7 +277,32 @@ public sealed class Gen3EventTests : IDisposable
         Assert.Equal(1, sav.GetWork(0x2D)); // VAR_ENIGMA_BERRY_AVAILABLE (0x402D)
 
         var em = (SAV3)_saves.Create(GameVersion.E, "Emerald.sav").Sav;
+        Assert.False(Gen3Events.IsApplicable(em, file));
         Assert.False(Gen3Events.Inject(em, file).Ok);
+    }
+
+    [Theory]
+    [InlineData(GameVersion.E, 0x2D)]
+    [InlineData(GameVersion.LG, 0x33)]
+    public void SmallFormatBerryForEmeraldAndFireRedLeafGreen(GameVersion version, int availableVar)
+    {
+        var entry = _saves.Create(version, $"{version}.sav");
+        var berry = new byte[Gen3Events.ECBSizeFRLGE];
+        StringConverter3.SetString(berry.AsSpan(0, 7), "DRASH", 6, false, StringConverterOption.ClearFF);
+        berry[0xA] = 2;
+        BinaryPrimitives.WriteUInt32LittleEndian(berry.AsSpan(48), Gen3Events.ByteSum(berry.AsSpan(0, 48)));
+
+        var file = WriteFile("drash.ecb", berry);
+        Assert.True(Gen3Events.IsApplicable((SAV3)entry.Sav, file));
+        Assert.True(Gen3Events.Inject((SAV3)entry.Sav, file).Ok);
+
+        entry = _saves.Roundtrip(entry);
+        var sav = (SAV3)entry.Sav;
+        Assert.Equal("DRASH", sav.EBerryName);
+        Assert.Equal(1, sav.GetWork(availableVar));
+
+        var rs = (SAV3)_saves.Create(GameVersion.R, "Ruby.sav").Sav;
+        Assert.False(Gen3Events.Inject(rs, file).Ok);
     }
 
     [Fact]

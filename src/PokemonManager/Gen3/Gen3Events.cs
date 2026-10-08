@@ -39,6 +39,7 @@ public sealed class Gen3EventFile
                 Gen3EventKind.WonderCard => Gen3Text(Data.AsSpan(0xE, Japanese ? 18 : 40), Japanese),
                 Gen3EventKind.WonderNews => Gen3Text(Data.AsSpan(8, Japanese ? 20 : 40), Japanese),
                 Gen3EventKind.ECardBerry => Gen3Text(Data.AsSpan(0, 7), false),
+                Gen3EventKind.ECardTrainer => Gen3Text(Data.AsSpan(4, 7), false),
                 _ => "",
             };
             var label = Gen3Events.KindName(Kind);
@@ -62,29 +63,34 @@ public sealed class Gen3EventFile
 
 /// <summary>
 /// Reads Gen 3 event files and writes them into Ruby/Sapphire/Emerald/FireRed/LeafGreen saves.
-/// Offsets and procedure follow suloku's Gen III Mystery Gift Tool (wc-tool), cross-checked against
-/// PKHeX's SAV3 block layout and the pokeemerald/pokeruby decompilations.
+/// File formats and import procedure match the PKHeX WC3 plugin (2.6.0) and suloku's Gen III Mystery Gift
+/// Tool; game-side details (flags, checksums, Wonder Card save routine) follow the pret decompilations.
+/// Data goes through PKHeX's own Gen 3 block accessors so offsets stay in one place.
 /// </summary>
 public static class Gen3Events
 {
     // Sizes of the on-disk formats.
     public const int CardSize = 0x150;           // u32 CRC + 0x14C card
     public const int CardSizeJP = 0xA8;          // u32 CRC + 0xA4 card
-    public const int CardMetadataSize = 0x28;    // u32 CRC + 0x24 metadata (stats/stamps/icon)
-    public const int ScriptSize = 0x3EC;         // u32 CRC + 1000-byte RAM script
+    public const int CardMetadataSize = 0x28;    // u32 CRC + 0x24 metadata (link stats/stamps/icon)
+    public const int ScriptSize = 0x3EC;         // u32 checksum + 1000-byte RAM script
     public const int WC3Size = CardSize + CardMetadataSize + 0x28 + ScriptSize;       // 1420
     public const int WC3SizeJP = CardSizeJP + CardMetadataSize + 0x28 + ScriptSize;   // 1252
     public const int WN3Size = 0x1C0;            // 448
     public const int WN3SizeJP = 0xE4;           // 228
-    public const int ME3Size = ScriptSize + 8;   // 1012: RAM script + record-mixing gift item
+    public const int ME3ScriptOnlySize = ScriptSize;          // 1004: RAM script only
+    public const int ME3Size = ScriptSize + RecordMixing3Gift.SIZE; // 1012: RAM script + record-mixing item
     public const int ECTSize = 188;
-    public const int ECBSize = 0x530;
+    public const int ECBSizeRS = 0x530;          // 1328: R/S berry with sprite, palette and descriptions
+    public const int ECBSizeFRLGE = 0x34;        // 52: FR/LG/E berry
 
-    private const byte RamScriptMagic = 0x33;
+    private const byte RamScriptMagic = 0x33;    // RAM_SCRIPT_MAGIC
+    private const byte CardTypeLinkStat = 2;      // CARD_TYPE_LINK_STAT
+    private const int VarEnigmaBerryAvailableRSE = 0x2D;  // VAR_ENIGMA_BERRY_AVAILABLE (0x402D)
+    private const int VarEnigmaBerryAvailableFRLG = 0x33; // VAR_ENIGMA_BERRY_AVAILABLE (0x4033)
 
-    // Offsets within the "large" block (save sectors 1-4 concatenated, as exposed by SAV3.Large).
+    // Flag bytes within the "large" block (save sectors 1-4 concatenated, as exposed by SAV3.Large).
     private const int Sector2 = 0xF80;
-    private const int Sector4 = 3 * 0xF80;
 
     public static string KindName(Gen3EventKind kind) => kind switch
     {
@@ -116,9 +122,9 @@ public static class Gen3Events
             (".wc3", WC3SizeJP) => new() { Path = path, Kind = Gen3EventKind.WonderCard, Data = data, Japanese = true },
             (".wn3", WN3Size) => new() { Path = path, Kind = Gen3EventKind.WonderNews, Data = data },
             (".wn3", WN3SizeJP) => new() { Path = path, Kind = Gen3EventKind.WonderNews, Data = data, Japanese = true },
-            (".me3", ME3Size) => new() { Path = path, Kind = Gen3EventKind.MysteryEvent, Data = data },
+            (".me3", ME3Size or ME3ScriptOnlySize) => new() { Path = path, Kind = Gen3EventKind.MysteryEvent, Data = data },
             (".ect", ECTSize) => new() { Path = path, Kind = Gen3EventKind.ECardTrainer, Data = data },
-            (".ecb", ECBSize) => new() { Path = path, Kind = Gen3EventKind.ECardBerry, Data = data },
+            (".ecb", ECBSizeRS or ECBSizeFRLGE) => new() { Path = path, Kind = Gen3EventKind.ECardBerry, Data = data },
             _ => null,
         };
     }
@@ -129,79 +135,97 @@ public static class Gen3Events
         Gen3EventKind.WonderCard or Gen3EventKind.WonderNews => sav is SAV3E or SAV3FRLG && file.Japanese == sav.Japanese,
         Gen3EventKind.MysteryEvent => sav is SAV3RS or SAV3E,
         Gen3EventKind.ECardTrainer => true,
-        Gen3EventKind.ECardBerry => sav is SAV3RS,
+        Gen3EventKind.ECardBerry => file.Data.Length == (sav is SAV3RS ? ECBSizeRS : ECBSizeFRLGE),
         _ => false,
     };
 
     /// <summary>
-    /// Validates <paramref name="file"/> and writes it into the save in memory.
+    /// Checks <paramref name="file"/> against the save and writes it in memory. Like the WC3 plugin, stale
+    /// checksums in the file are recalculated (the message says so) rather than refusing the file.
     /// </summary>
-    public static OpResult Inject(SAV3 sav, Gen3EventFile file) => file.Kind switch
+    public static OpResult Inject(SAV3 sav, Gen3EventFile file)
     {
-        Gen3EventKind.WonderCard => InjectWonderCard(sav, file),
-        Gen3EventKind.WonderNews => InjectWonderNews(sav, file),
-        Gen3EventKind.MysteryEvent => InjectMysteryEvent(sav, file),
-        Gen3EventKind.ECardTrainer => InjectECardTrainer(sav, file),
-        Gen3EventKind.ECardBerry => InjectECardBerry(sav, file),
-        _ => OpResult.Fail("Unknown event type."),
-    };
+        var repaired = new List<string>();
+        var result = file.Kind switch
+        {
+            Gen3EventKind.WonderCard => InjectWonderCard(sav, file, repaired),
+            Gen3EventKind.WonderNews => InjectWonderNews(sav, file, repaired),
+            Gen3EventKind.MysteryEvent => InjectMysteryEvent(sav, file, repaired),
+            Gen3EventKind.ECardTrainer => InjectECardTrainer(sav, file, repaired),
+            Gen3EventKind.ECardBerry => InjectECardBerry(sav, file, repaired),
+            _ => OpResult.Fail("Unknown event type."),
+        };
+        if (result.Ok && repaired.Count != 0)
+            return OpResult.Success($"{result.Message}\n(Recalculated the file's {string.Join(", ", repaired)} checksum.)");
+        return result;
+    }
 
-    private static OpResult InjectWonderCard(SAV3 sav, Gen3EventFile file)
+    private static OpResult InjectWonderCard(SAV3 sav, Gen3EventFile file, List<string> repaired)
     {
-        if (sav is not (SAV3E or SAV3FRLG))
+        if (sav.LargeBlock is not ISaveBlock3LargeExpansion block)
             return OpResult.Fail("Wonder Cards only work in FireRed, LeafGreen and Emerald. Ruby/Sapphire use Mystery Events (.me3).");
         if (file.Japanese != sav.Japanese)
             return OpResult.Fail(file.Japanese
                 ? "This is a Japanese Wonder Card; it won't work in a non-Japanese game."
                 : "This is an international Wonder Card; it won't work in a Japanese game.");
 
-        var data = file.Data.AsSpan();
+        var data = file.Data.ToArray();
         int cardSize = file.Japanese ? CardSizeJP : CardSize;
-        var card = data[..cardSize];
-        var meta = data.Slice(cardSize, CardMetadataSize);
-        var script = data[^ScriptSize..];
+        var card = new WonderCard3(data.AsMemory(0, cardSize));
+        if (card.CardID == 0)
+            return OpResult.Fail("This Wonder Card has no event flag set, so the game would reject it.");
+        if (!card.IsChecksumValid())
+        {
+            card.FixChecksum();
+            repaired.Add("card");
+        }
+        var script = new MysteryEvent3(data.AsMemory(data.Length - ScriptSize, ScriptSize));
+        if (!script.IsChecksumValid())
+        {
+            script.FixChecksum();
+            repaired.Add("script");
+        }
 
-        if (!IsCrcValid(card))
-            return OpResult.Fail("The Wonder Card's checksum is wrong; the file is damaged.");
-        if (ReadUInt16(card, 4) == 0)
-            return OpResult.Fail("This Wonder Card has no event flag set, so the game would ignore it.");
-        if (!IsCrcValid(script) || script[4] != RamScriptMagic)
-            return OpResult.Fail("The Wonder Card's script is damaged or missing.");
-
-        var large = sav.Large;
-        int newsOffset = sav is SAV3E ? 0x322C : 0x3120;
-        int cardOffset = newsOffset + (file.Japanese ? WN3SizeJP : WN3Size);
-        int metaOffset = cardOffset + cardSize;
-        int scriptOffset = sav is SAV3E ? 0x3728 : 0x361C;
-
-        // Mirror the game's own SaveWonderCard(): copy the card, reset its metadata, keep the icon species.
-        card.CopyTo(large[cardOffset..]);
-        var saveMeta = large.Slice(metaOffset, CardMetadataSize);
-        saveMeta.Clear();
-        meta.Slice(0xA, 2).CopyTo(saveMeta[0xA..]);
-        script.CopyTo(large[scriptOffset..]);
+        block.SetWonderCard(sav.Japanese, card.Data);
+        if (card.Type == CardTypeLinkStat)
+        {
+            // Link-stat cards carry their battle/trade record in the metadata block; keep it, as the plugin does.
+            block.SetWonderCardExtra(sav.Japanese, data.AsSpan(cardSize, CardMetadataSize));
+        }
+        else
+        {
+            // The game's SaveWonderCard(): clear the metadata, then copy the card's icon species into it.
+            var meta = new byte[CardMetadataSize];
+            BinaryPrimitives.WriteUInt16LittleEndian(meta.AsSpan(0xA), card.Icon);
+            block.SetWonderCardExtra(sav.Japanese, meta);
+        }
+        sav.LargeBlock.MysteryData = script;
 
         bool enabled = EnableMysteryGift(sav);
-        var where = "Talk to the delivery man in green on the 2nd floor of any Pokémon Center.";
-        var msg = $"Wonder Card injected.\n{where}";
+        var msg = $"Wonder Card \"{card.Title.Trim()}\" injected.\nTalk to the delivery man in green on the 2nd floor of any Pokémon Center.";
         if (enabled)
             msg += "\nMystery Gift was also unlocked in the main menu.";
         msg += "\nNote: a game holds one card/event script at a time; this replaced any previous one.";
         return OpResult.Success(msg);
     }
 
-    private static OpResult InjectWonderNews(SAV3 sav, Gen3EventFile file)
+    private static OpResult InjectWonderNews(SAV3 sav, Gen3EventFile file, List<string> repaired)
     {
-        if (sav is not (SAV3E or SAV3FRLG))
+        if (sav.LargeBlock is not ISaveBlock3LargeExpansion block)
             return OpResult.Fail("Wonder News only works in FireRed, LeafGreen and Emerald.");
         if (file.Japanese != sav.Japanese)
             return OpResult.Fail("This Wonder News is for a different language/region than this save.");
-        var data = file.Data.AsSpan();
-        if (!IsCrcValid(data))
-            return OpResult.Fail("The Wonder News checksum is wrong; the file is damaged.");
 
-        int newsOffset = sav is SAV3E ? 0x322C : 0x3120;
-        data.CopyTo(sav.Large[newsOffset..]);
+        var news = new WonderNews3(file.Data.ToArray());
+        if (news.NewsID == 0)
+            return OpResult.Fail("This Wonder News has no ID, so the game would reject it.");
+        if (!news.IsChecksumValid())
+        {
+            news.FixChecksum();
+            repaired.Add("news");
+        }
+        block.SetWonderNews(sav.Japanese, news.Data);
+
         bool enabled = EnableMysteryGift(sav);
         var msg = "Wonder News injected. Read it from Mystery Gift > Wonder News on the title menu.";
         if (enabled)
@@ -209,81 +233,103 @@ public static class Gen3Events
         return OpResult.Success(msg);
     }
 
-    private static OpResult InjectMysteryEvent(SAV3 sav, Gen3EventFile file)
+    private static OpResult InjectMysteryEvent(SAV3 sav, Gen3EventFile file, List<string> repaired)
     {
         if (sav is SAV3FRLG)
             return OpResult.Fail("FireRed/LeafGreen don't have Mystery Events. Use a Wonder Card (.wc3) instead.");
-        if (sav is not (SAV3RS or SAV3E))
+        if (sav.LargeBlock is not ISaveBlock3LargeHoenn hoenn)
             return OpResult.Fail("Mystery Events only work in Ruby, Sapphire and Emerald.");
 
-        var data = file.Data.AsSpan();
-        var script = data[..ScriptSize];
+        var data = file.Data.ToArray();
+        var script = data.AsSpan(0, ScriptSize);
         uint stored = BinaryPrimitives.ReadUInt32LittleEndian(script);
-        bool isRS = stored == ByteSum(script[4..]);
-        bool isE = stored == Crc16(script[4..]);
-        if (!isRS && !isE)
-            return OpResult.Fail("The Mystery Event's checksum is wrong; the file is damaged.");
-        if (sav is SAV3RS && !isRS)
-            return OpResult.Fail("This Mystery Event is for Emerald, not Ruby/Sapphire.");
-        if (sav is SAV3E && !isE)
-            return OpResult.Fail("This Mystery Event is for Ruby/Sapphire, not Emerald.");
+        uint rs = ByteSum(script[4..]);
+        uint em = Crc16(script[4..]);
+        bool forRS = sav is SAV3RS;
+        uint expected = forRS ? rs : em;
+        if (stored != expected)
+        {
+            // A checksum that's valid for the *other* game means the file is for that game.
+            if (stored != 0 && stored == (forRS ? em : rs))
+                return OpResult.Fail(forRS ? "This Mystery Event is for Emerald, not Ruby/Sapphire." : "This Mystery Event is for Ruby/Sapphire, not Emerald.");
+            // R/S keep a 32-bit byte sum; Emerald a CRC16 (pokeruby/pokeemerald CalculateRamScriptChecksum).
+            BinaryPrimitives.WriteUInt32LittleEndian(script, expected);
+            repaired.Add("script");
+        }
+        sav.LargeBlock.MysteryData = forRS ? new MysteryEvent3RS(data.AsMemory(0, ScriptSize)) : new MysteryEvent3(data.AsMemory(0, ScriptSize));
 
-        int offset = sav is SAV3E ? 0x3728 : 0x3690;
-        data.CopyTo(sav.Large[offset..]);
+        // A Wonder Card left behind would point at a script that's no longer there (the WC3 plugin does the same).
+        if (sav.LargeBlock is ISaveBlock3LargeExpansion expansion)
+            expansion.SetWonderCard(sav.Japanese, new byte[sav.Japanese ? CardSizeJP : CardSize]);
 
         string msg = "Mystery Event injected.";
+        if (data.Length == ME3Size)
+        {
+            var gift = new RecordMixing3Gift(data.AsMemory(ScriptSize, RecordMixing3Gift.SIZE));
+            if (!gift.IsChecksumValid())
+            {
+                gift.FixChecksum();
+                repaired.Add("record-mixing item");
+            }
+            hoenn.RecordMixingGift = gift;
+            if (gift.Item != 0)
+                msg += $"\nIt also shares {Names.Item(gift.Item, EntityContext.Gen3)} with friends through Record Mixing.";
+        }
+
         if (sav is SAV3RS)
         {
-            SetBit(sav.Large, Sector2 + 0x3A9, 0x10); // FLAG_SYS_MYSTERY_EVENT_ENABLE
+            sav.Large[Sector2 + 0x3A9] |= 0x10; // FLAG_SYS_EXDATA_ENABLE (Mystery Event menu)
             msg += "\nFollow the event's original instructions (for the Eon Ticket: visit your dad at the Petalburg Gym).";
         }
         else if (sav.Japanese)
         {
-            SetBit(sav.Large, Sector2 + 0x405, 0x10); // FLAG_SYS_MYSTERY_EVENT_ENABLE (JPN Emerald only)
+            sav.Large[Sector2 + 0x405] |= 0x10; // FLAG_SYS_MYSTERY_EVENT_ENABLE (Japanese Emerald only)
             msg += "\nThe event is now active in your game.";
         }
         else
         {
-            // Non-Japanese Emerald deletes the save if the Mystery Event flag is set, so never touch it.
+            // Non-Japanese Emerald corrupts the save if the Mystery Event flag is set, so never touch it.
             msg += "\nMystery Events were cut from non-Japanese Emerald; the script was written but the event may not trigger.";
         }
-        msg += "\nNote: this replaced any Wonder Card script already in the save.";
+        msg += "\nNote: this replaced any Wonder Card or event script already in the save.";
         return OpResult.Success(msg);
     }
 
-    private static OpResult InjectECardTrainer(SAV3 sav, Gen3EventFile file)
+    private static OpResult InjectECardTrainer(SAV3 sav, Gen3EventFile file, List<string> repaired)
     {
-        var data = file.Data.AsSpan();
-        uint stored = BinaryPrimitives.ReadUInt32LittleEndian(data[^4..]);
-        if (stored != WordSum(data[..^4]))
-            return OpResult.Fail("The e-Card Trainer's checksum is wrong; the file is damaged.");
-
-        int offset = sav switch
+        var data = file.Data.ToArray();
+        uint stored = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(ECTSize - 4));
+        uint expected = WordSum(data.AsSpan(0, ECTSize - 4));
+        if (stored != expected)
         {
-            SAV3RS => 0x498,
-            SAV3E => 0xBEC,
-            SAV3FRLG => 0x4A0,
-            _ => -1,
-        };
-        if (offset < 0)
-            return OpResult.Fail("e-Card Trainers only work in Ruby, Sapphire, Emerald, FireRed and LeafGreen.");
-        data.CopyTo(sav.Small[offset..]);
-
+            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(ECTSize - 4), expected);
+            repaired.Add("trainer");
+        }
+        data.CopyTo(sav.SmallBlock.EReaderTrainer);
         return OpResult.Success("e-Card Trainer injected. It replaces any e-Reader trainer already stored in the save.");
     }
 
-    private static OpResult InjectECardBerry(SAV3 sav, Gen3EventFile file)
+    private static OpResult InjectECardBerry(SAV3 sav, Gen3EventFile file, List<string> repaired)
     {
-        if (sav is not SAV3RS)
-            return OpResult.Fail("e-Reader Berries (this format) only work in Ruby and Sapphire.");
-        var data = file.Data.AsSpan();
-        uint stored = BinaryPrimitives.ReadUInt32LittleEndian(data[^4..]);
-        if (stored != BerryChecksum(data[..^4]))
-            return OpResult.Fail("The e-Reader Berry's checksum is wrong; the file is damaged.");
+        var target = sav.LargeBlock.EReaderBerry;
+        if (file.Data.Length != target.Length)
+        {
+            return OpResult.Fail(file.Data.Length == ECBSizeRS
+                ? "This e-Reader Berry is in the Ruby/Sapphire format; it won't work in FireRed, LeafGreen or Emerald."
+                : "This e-Reader Berry is in the FireRed/LeafGreen/Emerald format; it won't work in Ruby/Sapphire.");
+        }
 
-        data.CopyTo(sav.Large[0x3160..]);
-        sav.Large[Sector2 + 0x41A] = 0x01; // VAR_ENIGMA_BERRY_AVAILABLE
-        return OpResult.Success("e-Reader Berry injected. It replaces the Enigma Berry data in the save, as scanning the e-Card would.");
+        var data = file.Data.ToArray();
+        var body = data.AsSpan(0, data.Length - 4);
+        uint expected = sav is SAV3RS ? BerryChecksum(body) : ByteSum(body);
+        if (BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(data.Length - 4)) != expected)
+        {
+            BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(data.Length - 4), expected);
+            repaired.Add("berry");
+        }
+        data.CopyTo(target);
+        sav.SetWork(sav is SAV3FRLG ? VarEnigmaBerryAvailableFRLG : VarEnigmaBerryAvailableRSE, 1);
+        return OpResult.Success($"e-Reader Berry {sav.EBerryName} injected. It replaces the Enigma Berry data in the save, as scanning the e-Card would.");
     }
 
     /// <summary>Sets FLAG_SYS_MYSTERY_GIFT_ENABLE on FR/LG/E. Returns true if it was previously off.</summary>
@@ -298,7 +344,7 @@ public static class Gen3Events
         if (offset < 0)
             return false;
         bool was = (sav.Large[offset] & mask) != 0;
-        SetBit(sav.Large, offset, mask);
+        sav.Large[offset] |= mask;
         return !was;
     }
 
@@ -325,10 +371,9 @@ public static class Gen3Events
                 : "Wonder News: none");
         }
         if (sav is SAV3RS)
-        {
             lines.Add($"Mystery Event unlocked: {((large[Sector2 + 0x3A9] & 0x10) != 0 ? "yes" : "no")}");
-            lines.Add($"e-Reader Berry: {(sav.IsEBerryEngima ? "none (Enigma)" : sav.EBerryName)}");
-        }
+        lines.Add($"e-Reader Berry: {(sav.IsEBerryEngima ? "none (Enigma)" : sav.EBerryName)}");
+        lines.Add($"e-Card Trainer: {(sav.SmallBlock.EReaderTrainer.ContainsAnyExcept((byte)0, (byte)0xFF) ? Text(sav.SmallBlock.EReaderTrainer.Slice(4, sav.Japanese ? 5 : 7), sav.Japanese) : "none")}");
 
         int scriptOffset = sav switch { SAV3E => 0x3728, SAV3FRLG => 0x361C, _ => 0x3690 };
         var script = large.Slice(scriptOffset, ScriptSize);
@@ -342,8 +387,6 @@ public static class Gen3Events
         try { return StringConverter3.GetString(data, japanese).Trim(); }
         catch { return "?"; }
     }
-
-    private static void SetBit(Span<byte> data, int offset, byte mask) => data[offset] |= mask;
 
     private static ushort ReadUInt16(ReadOnlySpan<byte> data, int offset)
         => BinaryPrimitives.ReadUInt16LittleEndian(data[offset..]);
