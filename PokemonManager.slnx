@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/PokemonManager/PokemonManager.csproj" />
+  <Project Path="tests/PokemonManager.Tests/PokemonManager.Tests.csproj" />
+</Solution>

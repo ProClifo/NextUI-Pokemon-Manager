@@ -1,0 +1,16 @@
+{
+  "name": "Pokemon Manager",
+  "type": "TOOL",
+  "description": "PKHeX-powered save manager: move Pokémon between games, perform trade evolutions, and inject Mystery Gifts, Mystery Events and e-Reader cards.",
+  "author": "ProClifo",
+  "repo_url": "https://github.com/ProClifo/NextUI-Pokemon-Manager",
+  "release_filename": "PokemonManager.pak.zip",
+  "platforms": [
+    "tg5040",
+    "tg5050",
+    "my355",
+    "h700"
+  ],
+  "launch": "launch.sh",
+  "version": "0.1.0"
+}
