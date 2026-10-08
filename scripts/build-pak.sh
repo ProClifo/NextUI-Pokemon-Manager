@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Builds the NextUI pak.
 #
-#   scripts/build-pak.sh            -> dist/PokemonManager.pak.zip      (pak contents at the zip root, for the Pak Store)
-#                                      dist/PokemonManager-tg5040-sdcard.zip (Tools/tg5040/Pokemon Manager.pak/..., unzip onto the SD card)
+#   scripts/build-pak.sh            -> dist/PokemonManager.pak.zip                (pak contents at the zip root, for the Pak Store)
+#                                      dist/PokemonManager-<platform>-sdcard.zip (Tools/<platform>/Pokemon Manager.pak/..., unzip onto the SD card)
+#                                      for platform in tg5040, tg5050, my355, h700
 #
 # Needs the .NET 10 SDK, curl and zip.
 set -euo pipefail
@@ -52,9 +53,12 @@ chmod +x "$PAK/launch.sh"
 
 echo "==> Zipping"
 (cd "$PAK" && zip -qr9 "$DIST/PokemonManager.pak.zip" .)
-mkdir -p "$BUILD/sdcard/Tools/tg5040"
-cp -a "$PAK" "$BUILD/sdcard/Tools/tg5040/"
-mkdir -p "$BUILD/sdcard/PokemonManager/Gifts" "$BUILD/sdcard/PokemonManager/Import"
-(cd "$BUILD/sdcard" && zip -qr9 "$DIST/PokemonManager-tg5040-sdcard.zip" .)
+# One ready-to-unzip SD card layout per platform, so the pak lands in the right Tools folder.
+for platform in "${PLATFORMS[@]}"; do
+    sdcard="$BUILD/sdcard-$platform"
+    mkdir -p "$sdcard/Tools/$platform" "$sdcard/PokemonManager/Gifts" "$sdcard/PokemonManager/Import"
+    cp -a "$PAK" "$sdcard/Tools/$platform/"
+    (cd "$sdcard" && zip -qr9 "$DIST/PokemonManager-$platform-sdcard.zip" .)
+done
 
 ls -la "$DIST"

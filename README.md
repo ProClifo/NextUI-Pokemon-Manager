@@ -18,9 +18,16 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
 
 ### From a release
 
-1. Download `PokemonManager-tg5040-sdcard.zip` from the [Releases](../../releases) page.
-2. Unzip it onto the root of your SD card. You get `Tools/tg5040/Pokemon Manager.pak` and a `PokemonManager` folder.
-3. On a TrimUI Smart Pro S, Miyoo Flip or Anbernic H700 device, rename `Tools/tg5040` to your platform folder (`tg5050`, `my355`, `h700`). The pak contains the helper binaries for all four.
+1. Download the SD-card zip for your device from the [Releases](../../releases) page:
+
+   | Device | Zip |
+   | --- | --- |
+   | TrimUI Brick, TrimUI Smart Pro | `PokemonManager-tg5040-sdcard.zip` |
+   | TrimUI Smart Pro S | `PokemonManager-tg5050-sdcard.zip` |
+   | Miyoo Flip | `PokemonManager-my355-sdcard.zip` |
+   | Anbernic H700 devices (RG35XX Plus/H/SP/2024, RG40XX, RG CubeXX, RG34XX...) | `PokemonManager-h700-sdcard.zip` |
+
+2. Unzip it onto the root of your SD card. You get `Tools/<platform>/Pokemon Manager.pak` and a `PokemonManager` folder.
 
 `PokemonManager.pak.zip` holds the same pak with its contents at the zip root, for Pak Store–style installers.
 
@@ -29,7 +36,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
 You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl` and `zip`.
 
 ```sh
-scripts/build-pak.sh          # -> dist/PokemonManager.pak.zip and dist/PokemonManager-tg5040-sdcard.zip
+scripts/build-pak.sh          # -> dist/PokemonManager.pak.zip and dist/PokemonManager-<platform>-sdcard.zip
 dotnet test                   # run the test suite
 ```
 
