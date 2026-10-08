@@ -22,8 +22,17 @@ jobs:
       - name: Test
         run: dotnet test tests/PokemonManager.Tests -c Release
 
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Install Pillow (PC box art)
+        run: python3 -m pip install --user pillow
+
       - name: Build pak
         run: scripts/build-pak.sh
+        env:
+          REQUIRE_BOX_VIEWER: "1"
 
       - uses: actions/upload-artifact@v4
         with:

@@ -30,6 +30,7 @@ try
         "events" => Events(rest),
         "redeem-event" => RedeemEvent(rest),
         "gen3-status" => Gen3Status(rest),
+        "box-scene" => BoxSceneCommand(rest),
         "help" or "--help" or "-h" => Usage(0),
         _ => Usage(2),
     };
@@ -190,6 +191,17 @@ int Gen3Status(List<string> a)
     return entry.Sav is SAV3 sav3 ? Print(Gen3Events.Status(sav3)) : Fail("Not a Gen 3 save.");
 }
 
+// Writes the scene the PC box viewer would get, for testing pkmgr-box --screenshot on a PC.
+int BoxSceneCommand(List<string> a)
+{
+    var entry = LoadSave(a, 0);
+    var output = Arg(a, 1, "output file");
+    var assets = a.Count > 2 ? a[2] : AppPaths.FromEnvironment(sd, data).BoxAssetsDir;
+    var start = a.Count > 3 ? ParseSlot(a[3]) : new SlotRef(0, 0);
+    File.WriteAllText(output, new BoxScene(assets).Build(entry.Sav, entry.Label, start).ToJsonString());
+    return 0;
+}
+
 SaveLibrary Library() => new(AppPaths.FromEnvironment(sd, data).BackupDir);
 
 static SaveEntry LoadSave(List<string> a, int index)
@@ -254,6 +266,7 @@ static int Usage(int code)
           events <save>                        list PKHeX's built-in events for this game
           redeem-event <save> <index>          send a built-in event Pokémon to the PC
           gen3-status <save>                   Gen 3 Mystery Gift / Event status
+          box-scene <save> <out.json> [assets] [slot]   scene file for the PC box viewer (testing)
           selftest | version
         """);
     return code;

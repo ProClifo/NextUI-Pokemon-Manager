@@ -11,6 +11,10 @@ public sealed class AppPaths
     public required string DataDir { get; init; }
     public required string TempDir { get; init; }
 
+    /// <summary>PC box art (res/box in the pak; the binary lives in bin/arm64).</summary>
+    public string BoxAssetsDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_ASSETS")
+        ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "box"));
+
     public string GiftsDir => Path.Combine(DataDir, "Gifts");
     public string ImportDir => Path.Combine(DataDir, "Import");
     public string ExportDir => Path.Combine(DataDir, "Export");
@@ -45,6 +49,8 @@ public sealed class AppSettings
     public bool AllowUnofficialTransfers { get; set; }
     /// <summary>Only list saves whose ROM is an unmodified retail Pokémon game (on by default).</summary>
     public bool OnlyOfficialRoms { get; set; } = true;
+    /// <summary>Browse Pokémon on a Gen 3 style PC box screen instead of lists (on by default).</summary>
+    public bool PcBoxView { get; set; } = true;
     public bool SeenWelcome { get; set; }
 
     public static AppSettings Load(string path)
@@ -63,6 +69,7 @@ public sealed class AppSettings
                 case "allow_unofficial_transfers": s.AllowUnofficialTransfers = on; break;
                 case "seen_welcome": s.SeenWelcome = on; break;
                 case "only_official_roms": s.OnlyOfficialRoms = on; break;
+                case "pc_box_view": s.PcBoxView = on; break;
             }
         }
         return s;
@@ -77,6 +84,7 @@ public sealed class AppSettings
                 $"allow_unofficial_transfers={AllowUnofficialTransfers.ToString().ToLowerInvariant()}",
                 $"seen_welcome={SeenWelcome.ToString().ToLowerInvariant()}",
                 $"only_official_roms={OnlyOfficialRoms.ToString().ToLowerInvariant()}",
+                $"pc_box_view={PcBoxView.ToString().ToLowerInvariant()}",
             ]);
         }
         catch (IOException)

@@ -19,6 +19,9 @@ public sealed class App
     private readonly AppPaths _paths;
     private readonly SaveLibrary _library;
     private readonly AppSettings _settings;
+    private readonly BoxViewer _boxViewer;
+    private bool _boxViewFailed;
+    private readonly Dictionary<string, SlotRef> _boxPositions = new();
     private List<SaveEntry>? _saves;
     private List<OfficialRomFilter.Hidden> _hidden = [];
 
@@ -28,6 +31,7 @@ public sealed class App
         _paths = paths;
         _paths.EnsureCreated();
         _library = new SaveLibrary(paths.BackupDir);
+        _boxViewer = new BoxViewer(new BoxScene(paths.BoxAssetsDir), paths.TempDir);
         _settings = AppSettings.Load(paths.SettingsFile);
     }
 
@@ -188,6 +192,24 @@ public sealed class App
 
     private void BrowseMenu(SaveEntry entry)
     {
+        if (_settings.PcBoxView && !_boxViewFailed && _boxViewer.IsAvailable)
+        {
+            var position = _boxPositions.GetValueOrDefault(entry.Path, new SlotRef(0, 0));
+            while (true)
+            {
+                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position);
+                _boxPositions[entry.Path] = position;
+                if (outcome == BoxViewer.Outcome.Back)
+                    return;
+                if (outcome == BoxViewer.Outcome.Unavailable)
+                {
+                    _boxViewFailed = true; // fall back to the lists for the rest of this session
+                    break;
+                }
+                PokemonMenu(entry, position);
+            }
+        }
+
         while (true)
         {
             var slot = PickSlot(entry, "Pokémon");
@@ -621,6 +643,7 @@ public sealed class App
             {
                 $"Unofficial transfers: {(_settings.AllowUnofficialTransfers ? "ON" : "OFF")}",
                 $"Official ROMs only: {(_settings.OnlyOfficialRoms ? "ON" : "OFF")}",
+                $"PC box view: {(_settings.PcBoxView ? "ON" : "OFF (lists)")}",
                 "Show welcome screen again",
             };
             var choice = _ui.Choose("Settings", items);
@@ -642,6 +665,11 @@ public sealed class App
                     continue;
                 _settings.OnlyOfficialRoms = !_settings.OnlyOfficialRoms;
                 _saves = null; // rescan with the new rule
+            }
+            else if (choice == 2)
+            {
+                _settings.PcBoxView = !_settings.PcBoxView;
+                _boxViewFailed = false;
             }
             else
             {

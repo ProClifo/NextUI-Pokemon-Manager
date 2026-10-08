@@ -33,11 +33,13 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
 
 ### Building it yourself
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl` and `zip`.
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow, and Docker for the PC box viewer. Without Docker the pak still builds and shows Pokémon as lists.
 
 ```sh
 scripts/build-pak.sh          # -> dist/PokemonManager.pak.zip and dist/PokemonManager-<platform>-sdcard.zip
 dotnet test                   # run the test suite
+scripts/build-native.sh h700  # just the PC box viewer for one platform (Docker)
+make -C native desktop        # desktop build of the viewer; --screenshot renders a frame to PNG
 ```
 
 ## Using it
@@ -55,6 +57,17 @@ By default the app only lists saves made with **unmodified, official Pokémon RO
 - To manage other saves anyway, turn off **Settings → Official ROMs only**, or copy the save into `PokemonManager/Saves`. Saves there have no ROM on the card and are always shown.
 
 To refresh the ROM list from a newer No-Intro database, run `scripts/update-vanilla-roms.py <libretro-database>/metadat/no-intro`.
+
+### PC box view
+
+**Pokémon (view / transfer / evolve)** opens a PC box screen styled after Pokémon Emerald:
+
+- Each box shows its own wallpaper from the save (Gen 3 saves). Other games cycle through the 16 Emerald wallpapers.
+- Pokémon appear as their Gen 3 box icons, including Unown letters and eggs. Pokémon newer than Gen 3 show a "?" icon.
+- The panel on the left shows the Pokémon under the cursor: front sprite (shiny palette for shinies), name, level, gender, held item and OT.
+- **D-pad** moves the hand cursor, **L/R** switch boxes (the first "box" is your party), **A** opens the Pokémon's actions, **B** goes back.
+
+The art isn't stored in this repository. `scripts/build-box-assets.py` generates it at build time from the [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC box view** switches between the two.
 
 | Menu | What it does |
 | --- | --- |
@@ -147,6 +160,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 - [minui-list / minui-presenter](https://github.com/josegonzalez) by Jose Diaz-Gonzalez (MIT)
 - The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event file formats and import procedure
 - [NextUI](https://github.com/LoveRetro/NextUI)
+- PC box art from the [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation, generated at build time
 - ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
 
 Pokémon is © Nintendo / Creatures Inc. / GAME FREAK inc. This project is not affiliated with or endorsed by them.
