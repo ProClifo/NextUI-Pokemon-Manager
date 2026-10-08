@@ -22,8 +22,16 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         Directory.CreateDirectory(tempDir);
         var scenePath = Path.Combine(tempDir, "box-scene.json");
         var outPath = Path.Combine(tempDir, "box-result.json");
-        File.WriteAllText(scenePath, scene.Build(sav, title, position).ToJsonString());
-        File.Delete(outPath);
+        try
+        {
+            File.WriteAllText(scenePath, scene.Build(sav, title, position).ToJsonString());
+            File.Delete(outPath);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Couldn't prepare the box view: {ex}");
+            return Outcome.Unavailable;
+        }
 
         int code;
         try

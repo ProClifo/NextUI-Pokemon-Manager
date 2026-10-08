@@ -27,13 +27,13 @@ public sealed class BoxScene(string assetDir)
         var party = Box("PARTY", Wallpaper(PlainWallpaper), 3, 2, Enumerable.Range(0, 6).Select(i => i < sav.PartyCount ? sav.GetPartySlotAtIndex(i) : null));
         party["offset_x"] = 40;
         party["offset_y"] = 48;
-        var boxes = new JsonArray { party };
+        var boxes = new JsonArray { (JsonNode)party };
         for (int b = 0; b < sav.BoxCount; b++)
         {
             var mons = Enumerable.Range(0, sav.BoxSlotCount).Select(s => (PKM?)sav.GetBoxSlotAtIndex(b, s));
             int columns = 6;
             int rows = (sav.BoxSlotCount + columns - 1) / columns;
-            boxes.Add(Box(SlotRef.BoxName(sav, b), Wallpaper(WallpaperFor(sav, b)), columns, rows, mons));
+            boxes.Add((JsonNode)Box(SlotRef.BoxName(sav, b), Wallpaper(WallpaperFor(sav, b)), columns, rows, mons));
         }
 
         var (box, slot) = ToViewer(start);
@@ -86,18 +86,18 @@ public sealed class BoxScene(string assetDir)
         var lines = new JsonArray();
         if (pk.IsEgg)
         {
-            lines.Add("Egg");
+            lines.Add((JsonNode)"Egg");
         }
         else
         {
-            lines.Add($"Lv.{pk.CurrentLevel}");
+            lines.Add((JsonNode)$"Lv.{pk.CurrentLevel}");
             if (pk.Gender is 0 or 1)
-                lines.Add(pk.Gender == 0 ? "Male" : "Female");
+                lines.Add((JsonNode)(pk.Gender == 0 ? "Male" : "Female"));
             if (pk.HeldItem > 0)
-                lines.Add(Names.Item(pk.HeldItem, pk.Context));
-            lines.Add($"OT {pk.OriginalTrainerName}");
+                lines.Add((JsonNode)Names.Item(pk.HeldItem, pk.Context));
+            lines.Add((JsonNode)$"OT {pk.OriginalTrainerName}");
             if (pk.IsShiny)
-                lines.Add("Shiny");
+                lines.Add((JsonNode)"Shiny");
         }
 
         var name = pk.IsEgg ? "EGG" : pk.IsNicknamed ? pk.Nickname : Names.Species(pk.Species).ToUpperInvariant();

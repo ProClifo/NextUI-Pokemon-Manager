@@ -11,7 +11,11 @@
     <Version>0.1.0</Version>
     <!-- The handhelds ship without ICU; PKHeX only needs invariant culture. -->
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- The trimmed device build has no reflection-based JSON; run every build that way so tests catch it. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Code that needs reflection breaks in the trimmed device build: fail the build instead. -->
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2067;IL2070;IL2072;IL2075;IL2080;IL2087;IL3050</WarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>

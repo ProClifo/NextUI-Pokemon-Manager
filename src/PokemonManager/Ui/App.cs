@@ -113,7 +113,25 @@ public sealed class App
             if (choice is null)
                 return;
             selected = choice.Value;
-            actions[choice.Value].Run();
+            RunSafely(actions[choice.Value].Run, entry);
+        }
+    }
+
+    /// <summary>
+    /// Runs a menu action; an unexpected error is shown and logged instead of closing the app.
+    /// The save is reloaded from disk so nothing half-done stays in memory.
+    /// </summary>
+    private void RunSafely(Action action, SaveEntry entry)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex);
+            entry.Reload();
+            _ui.Message($"Something went wrong: {ex.Message}\nNothing was saved. Details are in the log.");
         }
     }
 

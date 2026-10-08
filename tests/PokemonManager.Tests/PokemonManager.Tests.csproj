@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- The trimmed device build has no reflection-based JSON; run every build that way so tests catch it. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>

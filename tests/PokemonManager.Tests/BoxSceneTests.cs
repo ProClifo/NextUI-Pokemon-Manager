@@ -30,6 +30,8 @@ public sealed class BoxSceneTests : IDisposable
         ((IBoxDetailWallpaper)sav).SetBoxWallpaper(2, 11); // Sky
 
         var json = _scene.Build(sav, "Emerald - ASH", new SlotRef(2, 4));
+        // Serialising is what failed on the device: the trimmed build has no reflection-based JSON.
+        Assert.Contains("PIKACHU", json.ToJsonString());
         var boxes = json["boxes"]!.AsArray();
 
         Assert.Equal(1 + sav.BoxCount, boxes.Count);
