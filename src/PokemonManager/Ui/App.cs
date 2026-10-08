@@ -24,6 +24,11 @@ public sealed class App
     private readonly Dictionary<string, SlotRef> _boxPositions = new();
     private List<SaveEntry>? _saves;
     private List<OfficialRomFilter.Hidden> _hidden = [];
+    private VanillaRoms.Index? _romIndex;
+    private readonly GameBackgrounds _backgrounds;
+    private readonly (int Width, int Height)? _screen =
+        GameBackgrounds.ScreenSize(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE"));
+    private readonly Dictionary<string, string?> _backgroundCache = new();
 
     public App(IUi ui, AppPaths paths)
     {
@@ -32,6 +37,7 @@ public sealed class App
         _paths.EnsureCreated();
         _library = new SaveLibrary(paths.BackupDir);
         _boxViewer = new BoxViewer(new BoxScene(paths.BoxAssetsDir), paths.TempDir);
+        _backgrounds = new GameBackgrounds(paths.BackgroundsDir);
         _settings = AppSettings.Load(paths.SettingsFile);
     }
 
@@ -73,13 +79,36 @@ public sealed class App
         _ui.Busy("Looking for Pokémon saves...");
         var all = SaveLibrary.Scan(_paths.SaveRoots);
         _hidden = [];
+        _romIndex = null;
+        _backgroundCache.Clear();
         if (_settings.OnlyOfficialRoms && all.Count != 0)
         {
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
-            (all, _hidden) = OfficialRomFilter.Apply(all, _paths.RomRoots, _paths.RomCheckCache, _paths.ExtraSavesDir);
+            (all, _hidden) = OfficialRomFilter.Apply(all, RomIndex, _paths.ExtraSavesDir);
         }
         _saves = all;
         return _saves;
+    }
+
+    private VanillaRoms.Index RomIndex => _romIndex ??= new VanillaRoms.Index(_paths.RomRoots, _paths.RomCheckCache);
+
+    /// <summary>The save's game art, worked out from its ROM header the first time the save is opened.</summary>
+    private string? BackgroundFor(SaveEntry entry)
+    {
+        if (!_backgroundCache.TryGetValue(entry.Path, out var background))
+        {
+            try
+            {
+                background = _backgrounds.Find(entry.Sav, entry.Path, RomIndex.FindRoms(entry.Path), _screen);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Couldn't pick a background: {ex.Message}");
+                background = null;
+            }
+            _backgroundCache[entry.Path] = background;
+        }
+        return background;
     }
 
     private void ShowHidden()
@@ -109,7 +138,7 @@ public sealed class App
                 ("Restore a backup", () => RestoreMenu(entry)),
                 ("Save info", () => _ui.Message(SaveInfo(entry))),
             };
-            var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected);
+            var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected, BackgroundFor(entry));
             if (choice is null)
                 return;
             selected = choice.Value;

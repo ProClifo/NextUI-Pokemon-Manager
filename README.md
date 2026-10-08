@@ -69,6 +69,10 @@ To refresh the ROM list from a newer No-Intro database, run `scripts/update-vani
 
 The art isn't stored in this repository. `scripts/build-box-assets.py` generates it at build time from the [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC box view** switches between the two.
 
+### Game backgrounds
+
+A save's menu shows art for its game: Ruby, Sapphire, Emerald, FireRed or LeafGreen. The game is read from the ROM's header (the GBA game code, e.g. `BPRE` = FireRed USA, `BPGP` = LeafGreen Europe), so renamed or zipped ROMs still match; if no ROM is found it falls back to what the save says and then to the file name. The art lives in `assets/backgrounds/<game>.png` (240×160) and `scripts/build-backgrounds.py` pre-scales it with whole-number scaling for every NextUI screen size, so it fills the screen pixel-sharp.
+
 | Menu | What it does |
 | --- | --- |
 | Pokémon (view / transfer / evolve) | Browse the party and boxes. For each Pokémon: view summary, move or copy to another game, trade evolve, export to file. |

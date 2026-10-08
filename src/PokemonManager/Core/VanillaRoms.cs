@@ -86,10 +86,13 @@ internal static partial class VanillaRoms
                 list.Add(path);
         }
 
+        /// <summary>ROMs whose file name (or zipped file name) matches the save's.</summary>
+        public IReadOnlyList<string> FindRoms(string savePath)
+            => _byName.GetValueOrDefault(Path.GetFileNameWithoutExtension(savePath)) ?? [];
+
         public RomCheck Check(string savePath)
         {
-            var saveBase = Path.GetFileNameWithoutExtension(savePath);
-            var candidates = (_byName.GetValueOrDefault(saveBase) ?? []).ToList();
+            var candidates = FindRoms(savePath);
             if (candidates.Count == 0)
                 return new RomCheck(RomStatus.RomNotFound, null, null);
 
@@ -242,8 +245,10 @@ public static class OfficialRomFilter
 
     public static (List<SaveEntry> Shown, List<Hidden> Hidden) Apply(
         IEnumerable<SaveEntry> saves, IEnumerable<string> romRoots, string? cacheFile, string? exemptDir)
+        => Apply(saves, new VanillaRoms.Index(romRoots, cacheFile), exemptDir);
+
+    internal static (List<SaveEntry> Shown, List<Hidden> Hidden) Apply(IEnumerable<SaveEntry> saves, VanillaRoms.Index index, string? exemptDir)
     {
-        var index = new VanillaRoms.Index(romRoots, cacheFile);
         var exempt = exemptDir is null ? null : Path.GetFullPath(exemptDir) + Path.DirectorySeparatorChar;
         var shown = new List<SaveEntry>();
         var hidden = new List<Hidden>();

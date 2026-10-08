@@ -79,6 +79,9 @@ git -C "$EMERALD" checkout -q "$POKEEMERALD_COMMIT"
 git -C "$EMERALD" sparse-checkout set --no-cone     '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk'     '/src/pokemon_icon.c' '/include/constants/species.h' '/include/constants/pokedex.h'
 python3 "$ROOT/scripts/build-box-assets.py" "$EMERALD" "$PAK/res/box"
 
+echo "==> Per-game menu backgrounds"
+python3 "$ROOT/scripts/build-backgrounds.py" "$ROOT/assets/backgrounds" "$PAK/res/backgrounds"
+
 cp "$ROOT/launch.sh" "$ROOT/pak.json" "$ROOT/LICENSE" "$PAK/"
 cp "$ROOT/README.md" "$PAK/README.md"
 chmod +x "$PAK/launch.sh"

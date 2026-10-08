@@ -29,7 +29,7 @@ public sealed class MinUi : IUi
 
     public static bool IsAvailable() => FindOnPath("minui-list") is not null && FindOnPath("minui-presenter") is not null;
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -49,13 +49,18 @@ public sealed class MinUi : IUi
         File.WriteAllText(input, root.ToJsonString());
         File.Delete(output);
 
-        int code = Run("minui-list",
+        string[] args =
+        [
             "--file", input,
             "--title", title,
             "--write-location", output,
             "--write-value", "state",
             "--confirm-text", "SELECT",
-            "--cancel-text", "BACK");
+            "--cancel-text", "BACK",
+        ];
+        if (background is not null && File.Exists(background))
+            args = [.. args, "--background-image", background];
+        int code = Run("minui-list", args);
         if (code != ExitSelected || !File.Exists(output))
             return null;
 
@@ -188,7 +193,7 @@ public sealed class MinUi : IUi
 /// </summary>
 public sealed class ConsoleUi : IUi
 {
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null)
     {
         if (items.Count == 0)
             return null;

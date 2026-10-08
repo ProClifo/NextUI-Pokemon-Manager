@@ -6,8 +6,11 @@ namespace PokemonManager.Ui;
 /// </summary>
 public interface IUi
 {
-    /// <summary>Shows a list and returns the chosen index, or null when the user backs out.</summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0);
+    /// <summary>
+    /// Shows a list and returns the chosen index, or null when the user backs out. The optional
+    /// background image is drawn behind the list where the UI supports it.
+    /// </summary>
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null);
 
     /// <summary>Shows text until the user presses A or B. Long text is split into pages.</summary>
     void Message(string text);

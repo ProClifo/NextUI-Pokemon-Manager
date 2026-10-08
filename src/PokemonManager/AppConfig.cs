@@ -15,6 +15,10 @@ public sealed class AppPaths
     public string BoxAssetsDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_ASSETS")
         ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "box"));
 
+    /// <summary>Per-game menu backgrounds (res/backgrounds in the pak).</summary>
+    public string BackgroundsDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_BACKGROUNDS")
+        ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "backgrounds"));
+
     public string GiftsDir => Path.Combine(DataDir, "Gifts");
     public string ImportDir => Path.Combine(DataDir, "Import");
     public string ExportDir => Path.Combine(DataDir, "Export");
