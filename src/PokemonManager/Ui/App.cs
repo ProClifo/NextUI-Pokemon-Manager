@@ -164,6 +164,12 @@ public sealed class App
             var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
             // A game with one event gets that event on its menu; a game with several gets an Events menu.
             var tickets = TicketsFor(entry);
+            if (sav is SAV2 { Version: GameVersion.C } crystal)
+                actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
+            else if (tickets.Count == 1)
+                actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
+            else if (tickets.Count > 1)
+                actions.Add(("Events", null, () => EventsMenu(entry, tickets)));
             // Gen 1/2's event-only Pokémon get their own entries (Gen 1/2's other distributions are in the Gallery):
             // Mew in Gen 1 (and Korean Gen 2, which can't link with Gen 1), Celebi in Gen 2 outside Japan, where the
             // GS Ball never ran on cartridges.
@@ -171,12 +177,6 @@ public sealed class App
                 actions.Add(("Mew", LegalTag(true), () => GiveGameBoyEvent(entry, "Mew", GiftService.Mew)));
             if (sav is SAV2 { Japanese: false })
                 actions.Add(("Celebi", LegalTag(true), () => GiveGameBoyEvent(entry, "Celebi", GiftService.Celebi)));
-            if (sav is SAV2 { Version: GameVersion.C } crystal)
-                actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
-            else if (tickets.Count == 1)
-                actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
-            else if (tickets.Count > 1)
-                actions.Add(("Events", null, () => EventsMenu(entry, tickets)));
             if (sav.Generation >= 3)
                 actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
             actions.Add(("Gallery", null, () => GalleryMenu(entry)));
