@@ -1,0 +1,119 @@
+diff --git a/minui-list.c b/minui-list.c
+index 4639bb1..652eaea 100644
+--- a/minui-list.c
++++ b/minui-list.c
+@@ -418,6 +418,8 @@ struct AppState
+     bool always_show_confirm;
+     // whether to disable sleep
+     bool disable_auto_sleep;
++    // only the highlighted row shows its option value and image (--options-selected-only)
++    bool options_selected_only;
+     // whether alphabetic scroll (L1/R1 letter jumping) is enabled
+     bool alphabetic_scroll;
+     // whether the inline filter keyboard feature is allowed at all
+@@ -2888,6 +2890,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+         // resolve the row text color from its state (selected/disabled/muted).
+         // ListTheme_RowTextRole captures the precedence; theme_row_text_color maps
+         // the role to the greyscale palette or, on -nextui builds, the theme colors.
++        // with --options-selected-only, other rows show just their name
++        bool hide_extras = state->options_selected_only && j != selected_row;
++        if (hide_extras)
++            display_selected_text[0] = '\0';
++
+         SDL_Color text_color = theme_row_text_color(ListTheme_RowTextRole(
+             j == selected_row,
+             state->list_state->items[i].features.disabled,
+@@ -2911,7 +2918,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+             char image_effective[1024];
+             image_effective_path(image_item, state->fallback_image, image_effective, sizeof(image_effective));
+             ensure_item_image(image_item, image_effective, screen->w / IMAGE_MAX_WIDTH_DIVISOR, SCALE1(PILL_SIZE - 4));
+-            if (image_item->image_surface != NULL)
++            if (image_item->image_surface != NULL && !hide_extras)
+             {
+                 image_col_space = image_item->image_surface->w + SCALE1(PADDING);
+                 available_width -= image_col_space;
+@@ -3146,6 +3153,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+         int initial_cube_x_pos = text_x_pos + text_surface_width;
+ 
+         // draw the selected option text
++        int value_left = -1;
+         if (strcmp(display_selected_text, "") != 0)
+         {
+             initial_cube_x_pos = screen->w - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
+@@ -3157,7 +3165,10 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+                         : LIST_TEXT_NORMAL);
+                 SDL_Surface *selected_text;
+                 selected_text = TTF_RenderUTF8_Blended(state->fonts.large, display_selected_text, selected_text_color);
+-                pos = (SDL_Rect){screen->w - selected_text->w - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space, pos.y, selected_text->w, selected_text->h};
++                // with --options-selected-only the row's image goes just left of the value instead
++                int value_image_space = state->options_selected_only ? 0 : image_col_space;
++                pos = (SDL_Rect){screen->w - selected_text->w - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - value_image_space, pos.y, selected_text->w, selected_text->h};
++                value_left = pos.x;
+                 SDL_BlitSurface(selected_text, NULL, screen, &pos);
+                 SDL_FreeSurface(selected_text);
+             }
+@@ -3188,10 +3199,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+ 
+         // draw the per-item right-hand image, vertically centered in the row and
+         // anchored to the right edge (left of the hardware group on the top row)
+-        if (state->list_state->items[i].image_surface != NULL)
++        if (state->list_state->items[i].image_surface != NULL && !hide_extras)
+         {
+             SDL_Surface *image_surface = state->list_state->items[i].image_surface;
+             int image_right_edge = screen->w - SCALE1(PADDING);
++            if (state->options_selected_only && value_left >= 0)
++                image_right_edge = value_left - SCALE1(BUTTON_PADDING) / 2;
+             if (in_top_row_no_title)
+             {
+                 image_right_edge -= (ow + SCALE1(PADDING));
+@@ -3485,6 +3498,7 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+     {
+         OPT_SCREEN_RESOLUTION = 1000,
+         OPT_FALLBACK_IMAGE,
++        OPT_OPTIONS_SELECTED_ONLY,
+         OPT_ALLOW_FILTER,
+         OPT_FILTER_BUTTON,
+         OPT_DISPLAY_FILTER_KEYBOARD,
+@@ -3519,6 +3533,7 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+         {"alphabetic-scroll", no_argument, 0, 'S'},
+         {"screen-resolution", required_argument, 0, OPT_SCREEN_RESOLUTION},
+         {"fallback-image", required_argument, 0, OPT_FALLBACK_IMAGE},
++        {"options-selected-only", no_argument, 0, OPT_OPTIONS_SELECTED_ONLY},
+         {"allow-filter", required_argument, 0, OPT_ALLOW_FILTER},
+         {"filter-button", required_argument, 0, OPT_FILTER_BUTTON},
+         {"display-filter-keyboard", required_argument, 0, OPT_DISPLAY_FILTER_KEYBOARD},
+@@ -3571,13 +3586,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+             state->show_hardware_group = 0;
+             break;
+         case 'l':
+-            strncpy(state->fonts.default_font, optarg, sizeof(state->fonts.default_font) - 1);
++            state->fonts.default_font = optarg; // a pointer (NULL by default): strncpy into it crashed
+             break;
+         case 'L':
+-            strncpy(state->fonts.large_font, optarg, sizeof(state->fonts.large_font) - 1);
++            state->fonts.large_font = optarg;
+             break;
+         case 'M':
+-            strncpy(state->fonts.medium_font, optarg, sizeof(state->fonts.medium_font) - 1);
++            state->fonts.medium_font = optarg;
+             break;
+         case 'K':
+             strncpy(state->item_key, optarg, sizeof(state->item_key) - 1);
+@@ -3615,6 +3630,9 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+         case OPT_FALLBACK_IMAGE:
+             strncpy(state->fallback_image, optarg, sizeof(state->fallback_image) - 1);
+             break;
++        case OPT_OPTIONS_SELECTED_ONLY:
++            state->options_selected_only = true;
++            break;
+         case OPT_ALLOW_FILTER:
+             if (strcmp(optarg, "true") == 0)
+             {
+@@ -4090,6 +4108,7 @@ int main(int argc, char *argv[])
+         .show_brightness_setting = 0,
+         .always_show_confirm = false,
+         .disable_auto_sleep = false,
++        .options_selected_only = false,
+         .initial_selected = -1,
+         .scroll_anim_selected = -1,
+         .scroll_anim_option = -1,

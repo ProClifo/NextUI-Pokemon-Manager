@@ -12,7 +12,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
   - **Events**: every ticket the game has (Aurora Ticket, Mystic Ticket, Eon Ticket, Old Sea Map, Member Card, Oak's Letter, Secret Key, Azure Flute, Enigma Stone, Liberty Pass), marked Legal or Illegal. A game with one event shows it directly: Ruby/Sapphire get *Eon Ticket*, Crystal *GS Ball*.
   - **Distributions**: released distributions of Pokémon that can't be obtained legally any other way in that game's language, e.g. WISHMKR Jirachi, 10 ANIV Celebi and Aura Mew in English Emerald.
   - **Gallery**: every file for the game, in the gallery's own folders. Copies of the same distribution (same trainer, or same name once IDs, berries and the like in parentheses are dropped) are listed once and one is picked at random. A copy that happened to be shiny isn't listed separately, since every Pokémon is regenerated for the save; only distributions that were always shiny say "Shiny"; a folder with a single distribution shows it in the folder above instead.
-  - Every list shows **Legal** or **Illegal** next to each item.
+  - The highlighted item shows **✅ Legal** or **☠️ Illegal**.
 - **Automatic backups** before every change, in `PokemonManager/Backups`.
 
 > **Status:** early release. The code is covered by automated tests on generated saves, and the ARM64 build has been run under emulation. It has **not yet been tested on real hardware**. Keep your own backup of any save you care about until it has been.
@@ -36,12 +36,12 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
 
 ### Building it yourself
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow and fontTools, and Docker for the PC box viewer. Without Docker the pak still builds and shows Pokémon as lists.
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow and fontTools, and Docker, which builds the patched minui-list and the PC box viewer.
 
 ```sh
 scripts/build-pak.sh          # -> dist/PokemonManager.pak.zip and dist/PokemonManager-<platform>-sdcard.zip
 dotnet test                   # run the test suite
-scripts/build-native.sh h700  # just the PC box viewer for one platform (Docker)
+scripts/build-native.sh h700  # just minui-list and the PC box viewer for one platform (Docker)
 make -C native desktop        # desktop build of the viewer; --screenshot renders a frame to PNG
 ```
 
@@ -88,7 +88,7 @@ With Events, Distributions, Mew/Celebi and transfers between games, every game i
 | Gallery | Every gallery file for this game and language, in the gallery's folders. |
 | Info | The save's details: game, trainer and ID, play time, party and boxes, file; Gen 3 saves also show their Mystery Gift/Event status. |
 
-Every item in these lists is marked **Legal** or **Illegal**:
+Every item in these lists is marked **✅ Legal** or **☠️ Illegal**, shown for the highlighted item (the icons are [Noto Emoji](https://github.com/googlefonts/noto-emoji) images, since the menu fonts have no emoji):
 
 - **Tickets** are legal when they were officially distributed for the game and language. Otherwise the gallery's debug card or another game's card is used, if PKHeX says it works in the save, and the ticket is marked illegal (you're asked before it's added). For example, English Emerald shows Eon Ticket, Aurora Ticket and Mystic Ticket as legal and Old Sea Map as illegal; Japanese Emerald is the other way round for the Aurora Ticket and Old Sea Map. Diamond/Pearl only get illegal tickets: the Member Card and Oak's Letter were Platinum cards, and the Azure Flute was never released.
 - **Emerald's Eon Ticket** has no card of its own: outside Japan, Emerald players got it by Record Mixing with a Ruby/Sapphire that had it. Pokémon Manager does what Emerald's Record Mixing code does (`ReceiveGiftItem` in pokeemerald): it puts the Eon Ticket in Key Items, unless the bag or PC already has one, and enables the Lilycove ferry to Southern Island (`FLAG_ENABLE_SHIP_SOUTHERN_ISLAND`). It's legal wherever Ruby/Sapphire's Eon Ticket was officially distributed, which covers every Emerald language. The ferry runs once you've entered the Hall of Fame.
@@ -200,7 +200,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 ## How it works
 
 - `src/PokemonManager` is a .NET 10 app using the [PKHeX.Core](https://www.nuget.org/packages/PKHeX.Core) library for save parsing, Pokémon conversion, legality checks, evolution data, Mystery Gift albums and the event database. It's published as one self-contained, partially trimmed, ReadyToRun `linux-arm64` executable (~65 MB). No .NET install is needed on the device, and it works with glibc 2.27 or newer.
-- The UI uses josegonzalez's [`minui-list`](https://github.com/josegonzalez/minui-list) and [`minui-presenter`](https://github.com/josegonzalez/minui-presenter) (NextUI builds, so they follow your theme). They're driven from C#, so the runtime starts once per session. minui-list is built from source with a small patch (`native/minui-list-fonts.patch`): the released binaries crash when given a font, which the game fonts need.
+- The UI uses josegonzalez's [`minui-list`](https://github.com/josegonzalez/minui-list) and [`minui-presenter`](https://github.com/josegonzalez/minui-presenter) (NextUI builds, so they follow your theme). They're driven from C#, so the runtime starts once per session. minui-list is built from source with a small patch (`native/minui-list.patch`): the released binaries crash when given a font, which the game fonts need, and the patch adds an option to show the Legal/Illegal tag on the highlighted row only.
 - Gen 3 event injection isn't part of PKHeX itself. It follows the WC3 plugin's import procedure and goes through PKHeX's Gen 3 block accessors. Game-side details (flag IDs, CRC16, berry checksums, the Wonder Card save routine) were checked against the [pret](https://github.com/pret) decompilations.
 
 ## Credits
@@ -211,6 +211,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 - [NextUI](https://github.com/LoveRetro/NextUI)
 - PC box art from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeruby](https://github.com/pret/pokeruby), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), generated at build time
 - Game fonts from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), converted at build time
+- ✅ and ☠️ icons from Google's [Noto Emoji](https://github.com/googlefonts/noto-emoji) (Apache License 2.0), fetched at build time
 - ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
 - Event files from [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery), bundled at build time
 

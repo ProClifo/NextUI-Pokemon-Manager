@@ -53,7 +53,8 @@ int RunUi()
         Console.Error.WriteLine("minui-list/minui-presenter not found on PATH. Set PKMGR_UI=console to use the text UI.");
         return 3;
     }
-    IUi ui = console ? new ConsoleUi() : new MinUi(paths.TempDir);
+    IUi ui = console ? new ConsoleUi() : new MinUi(paths.TempDir, paths.IconsDir,
+        GameFonts.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE")));
     return new App(ui, paths).Run();
 }
 

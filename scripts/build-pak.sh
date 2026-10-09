@@ -7,8 +7,7 @@
 #
 # Needs the .NET 10 SDK, curl, zip, git and Python 3 with Pillow and fontTools (box art, game fonts).
 # The event gallery is bundled from projectpokemon/EventsGallery at a pinned commit.
-# The PC box viewer is built with Docker (scripts/build-native.sh); without Docker the pak still
-# works and shows Pokémon as lists.
+# minui-list (patched) and the PC box viewer are built with Docker (scripts/build-native.sh), so Docker is required.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,6 +19,7 @@ MINUI_LIST_VERSION="${MINUI_LIST_VERSION:-0.15.4}"  # also pinned in native/Make
 MINUI_PRESENTER_VERSION="${MINUI_PRESENTER_VERSION:-0.13.4}"
 POKEEMERALD_COMMIT="${POKEEMERALD_COMMIT:-731ad5bfd6e6f265508d0efcca0ba42f9dcf5881}"
 EVENTSGALLERY_COMMIT="${EVENTSGALLERY_COMMIT:-154d81be88453f6f78ec1d6d86e85fe0f2f5c240}"
+NOTO_EMOJI_COMMIT="${NOTO_EMOJI_COMMIT:-e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e}"
 # pret decompilations the game fonts and each game's box icons/sprites are built from (pokeemerald is the commit above)
 POKERED_COMMIT="${POKERED_COMMIT:-af519899719f0754965776faac0e836a3b906e6d}"
 POKEYELLOW_COMMIT="${POKEYELLOW_COMMIT:-e89ead154b9968aa50eed9328ff2b38b6c194382}"
@@ -59,35 +59,21 @@ for platform in "${PLATFORMS[@]}"; do
     fetch "https://github.com/josegonzalez/minui-presenter/releases/download/$MINUI_PRESENTER_VERSION/minui-presenter-$platform-nextui" "$PAK/bin/$platform/minui-presenter"
 done
 
-# Built from source: the PC box viewer, and minui-list $MINUI_LIST_VERSION patched so its font options
-# don't crash (the release binaries segfault on --font-large, which the per-game menu fonts use).
+# Built from source: the PC box viewer, and minui-list $MINUI_LIST_VERSION patched (native/minui-list.patch) so its
+# font options don't crash (the release binaries segfault on --font-large, which the per-game menu fonts use) and
+# so it can show the Legal/Illegal tag on the highlighted row only.
 echo "==> PC box viewer and minui-list"
 missing=()
 for platform in "${PLATFORMS[@]}"; do
     [ -x "$ROOT/native/pkmgr-box-$platform-nextui" ] && [ -x "$ROOT/native/minui-list-$platform-nextui" ] || missing+=("$platform")
 done
 if [ ${#missing[@]} -ne 0 ]; then
-    if command -v docker >/dev/null 2>&1; then
-        if ! "$ROOT/scripts/build-native.sh" "${missing[@]}"; then
-            [ -n "${REQUIRE_BOX_VIEWER:-}" ] && exit 1
-            echo "!! some viewer builds failed; those platforms will use the list view" >&2
-        fi
-    else
-        [ -n "${REQUIRE_BOX_VIEWER:-}" ] && { echo "docker is required to build the PC box viewer" >&2; exit 1; }
-        echo "!! docker not found: no PC box viewer for ${missing[*]} (the app falls back to lists)" >&2
-    fi
+    command -v docker >/dev/null 2>&1 || { echo "docker is required to build minui-list and the PC box viewer for ${missing[*]}" >&2; exit 1; }
+    "$ROOT/scripts/build-native.sh" "${missing[@]}"
 fi
-no_fonts=()
 for platform in "${PLATFORMS[@]}"; do
-    if [ -x "$ROOT/native/minui-list-$platform-nextui" ]; then
-        cp "$ROOT/native/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
-    else
-        fetch "https://github.com/josegonzalez/minui-list/releases/download/$MINUI_LIST_VERSION/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
-        no_fonts+=("$platform")
-    fi
-    if [ -x "$ROOT/native/pkmgr-box-$platform-nextui" ]; then
-        cp "$ROOT/native/pkmgr-box-$platform-nextui" "$PAK/bin/$platform/pkmgr-box"
-    fi
+    cp "$ROOT/native/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
+    cp "$ROOT/native/pkmgr-box-$platform-nextui" "$PAK/bin/$platform/pkmgr-box"
 done
 
 echo "==> Event gallery (projectpokemon/EventsGallery ${EVENTSGALLERY_COMMIT:0:7}, Gen 1-5)"
@@ -127,12 +113,14 @@ python3 "$ROOT/scripts/build-box-assets.py" "$DECOMP/pokeemerald" "$PAK/res/box"
 python3 "$ROOT/scripts/build-box-art.py" "$DECOMP" "$PAK/res/box/art"
 
 echo "==> Game fonts"
-if [ ${#no_fonts[@]} -eq 0 ]; then
-    python3 "$ROOT/scripts/build-fonts.py" "$DECOMP" "$PAK/res/fonts"
-else
-    # The released minui-list crashes when given a font, so without the patched build there are none.
-    echo "!! no patched minui-list for ${no_fonts[*]}: the pak uses the NextUI font everywhere" >&2
-fi
+python3 "$ROOT/scripts/build-fonts.py" "$DECOMP" "$PAK/res/fonts"
+
+echo "==> Legal/Illegal icons (googlefonts/noto-emoji ${NOTO_EMOJI_COMMIT:0:7})"
+NOTO="$BUILD/noto-emoji"
+git clone -q --filter=blob:none --sparse https://github.com/googlefonts/noto-emoji.git "$NOTO"
+git -C "$NOTO" checkout -q "$NOTO_EMOJI_COMMIT"
+git -C "$NOTO" sparse-checkout set --no-cone '/2D/png/128/emoji_u2705.png' '/2D/png/128/emoji_u2620.png'
+python3 "$ROOT/scripts/build-icons.py" "$NOTO" "$PAK/res/icons"
 
 echo "==> Per-game menu backgrounds"
 python3 "$ROOT/scripts/build-backgrounds.py" "$ROOT/assets/backgrounds" "$PAK/res/backgrounds"

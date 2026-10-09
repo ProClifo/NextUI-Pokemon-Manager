@@ -15,11 +15,15 @@ public sealed class MinUi : IUi
     private const int MaxCrashRetries = 3;
 
     private readonly string _tmp;
+    private readonly string? _iconsDir;
+    private readonly int _scale;
     private Process? _busy;
 
-    public MinUi(string tempDir)
+    public MinUi(string tempDir, string? iconsDir = null, int scale = 2)
     {
         _tmp = tempDir;
+        _iconsDir = iconsDir;
+        _scale = scale;
         Directory.CreateDirectory(_tmp);
         // launch.sh shows a "Loading..." screen while the runtime starts; take it down.
         foreach (var p in Process.GetProcessesByName("minui-presenter"))
@@ -27,6 +31,16 @@ public sealed class MinUi : IUi
             try { p.Kill(); }
             catch (Exception) { /* already gone */ }
         }
+    }
+
+    /// <summary>The icon for a Legal/Illegal tag at this UI scale, if the pak has it.</summary>
+    private string? TagIcon(string tag)
+    {
+        var name = tag switch { "Legal" => "legal", "Illegal" => "illegal", _ => null };
+        if (name is null || _iconsDir is null)
+            return null;
+        var path = Path.Combine(_iconsDir, $"{name}-{_scale}x.png");
+        return File.Exists(path) ? path : null;
     }
 
     public static bool IsAvailable() => FindOnPath("minui-list") is not null && FindOnPath("minui-presenter") is not null;
@@ -71,9 +85,13 @@ public sealed class MinUi : IUi
             var row = new JsonObject { ["name"] = string.IsNullOrWhiteSpace(items[i]) ? "-" : items[i] };
             if (tags is not null && i < tags.Count && tags[i] is { Length: > 0 } tag)
             {
-                // A single option is drawn right-aligned; show_confirm keeps A selecting the item.
+                // A single option is drawn right-aligned (on the highlighted row only, see below), with its icon
+                // (✅ or ☠️, which the fonts don't have) just left of it; show_confirm keeps A selecting the item.
                 row["options"] = new JsonArray { (JsonNode)tag };
-                row["features"] = new JsonObject { ["show_confirm"] = true };
+                var features = new JsonObject { ["show_confirm"] = true };
+                if (TagIcon(tag) is { } icon)
+                    features["images"] = new JsonObject { ["default"] = icon };
+                row["features"] = features;
             }
             array.Add((JsonNode)row);
         }
@@ -97,6 +115,8 @@ public sealed class MinUi : IUi
         ];
         if (background is not null && File.Exists(background))
             args = [.. args, "--background-image", background];
+        if (tags is not null && tags.Any(t => t is { Length: > 0 }))
+            args = [.. args, "--options-selected-only"];
         args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK"])];
         int code = Run("minui-list", args);
         // Killed by a signal: .NET reports 128 + the signal number (139 = SIGSEGV).

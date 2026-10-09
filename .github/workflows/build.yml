@@ -31,8 +31,6 @@ jobs:
 
       - name: Build pak
         run: scripts/build-pak.sh
-        env:
-          REQUIRE_BOX_VIEWER: "1"
 
       - uses: actions/upload-artifact@v4
         with:

@@ -72,11 +72,12 @@ device: $(NEXTUI_DIR) include/parson $(CURDIR)/platform/$(PLATFORM)/include/mset
 		-DPLATFORM=\"$(WORKSPACE)\" -DPLATFORM_NEXTUI -O2 -std=gnu99 \
 		-L$(LIB_DIR) -L/opt/nextui/lib $(LDFLAGS) -lmsettings $(NEXTUI_GL_LIBS)
 
-# minui-list, patched: its --font-large/--font-medium/--font-default options strncpy into NULL
-# pointers and crash (still so upstream), which the per-game menu fonts need.
+# minui-list, patched (minui-list.patch): its --font-large/--font-medium/--font-default options strncpy into
+# NULL pointers and crash (still so upstream), which the per-game menu fonts need; and --options-selected-only
+# shows a row's option value and image on the highlighted row only, with the image left of the value.
 minui-list-src:
 	git clone -q --branch $(MINUI_LIST_VERSION) https://github.com/josegonzalez/minui-list.git minui-list-src
-	git -C minui-list-src apply ../minui-list-fonts.patch
+	git -C minui-list-src apply ../minui-list.patch
 
 minui-list: $(NEXTUI_DIR) minui-list-src include/parson $(CURDIR)/platform/$(PLATFORM)/include/msettings.h
 	$(CROSS_COMPILE)gcc minui-list-src/minui-list.c $(wildcard minui-list-src/list_*.c) include/parson/parson.c \
