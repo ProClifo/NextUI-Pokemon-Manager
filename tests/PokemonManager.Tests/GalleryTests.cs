@@ -138,8 +138,20 @@ public sealed class GalleryTests : IDisposable
             Entry("Released/Gen 3/ENG/Aura Mew/RSEFL - Aura Mew (77D1) (ENG).pk3", 3, [], "ENG", GalleryKind.Pokemon),
         };
         var view = GalleryTree.Open(files, "ENG/WISHMKR");
-        Assert.Equal(["Shiny WSHMKR Jirachi", "WISHMKR Jirachi"], view.Items.Select(i => i.Title));
+        // "Shiny" goes too: the Pokémon is regenerated for the save, so it's only shiny by chance.
+        Assert.Equal(["WISHMKR Jirachi", "WSHMKR Jirachi"], view.Items.Select(i => i.Title));
         Assert.All(view.Items, i => Assert.Equal(2, i.Copies.Count));
+
+        // ...unless the distribution was always shiny.
+        var always = files.Take(4).Select(e => e.Title.StartsWith("Shiny") ? e with { Flags = GalleryFlags.AlwaysShiny } : e).ToList();
+        Assert.Equal(["Shiny WSHMKR Jirachi", "WISHMKR Jirachi"], GalleryTree.Open(always, "ENG/WISHMKR").Items.Select(i => i.Title));
+
+        // With the files' trainer known, every copy of the distribution is one item, whatever its file name
+        // says (the shiny copy isn't a different distribution: Pokémon are regenerated for the save).
+        var jirachi = files.Take(4).Select(e => e with { Species = (ushort)Species.Jirachi, Trainer = "WISHMKR/20043/0" }).ToList();
+        var merged = Assert.Single(GalleryTree.Open(jirachi, "ENG/WISHMKR").Items);
+        Assert.Equal("WISHMKR Jirachi", merged.Title);
+        Assert.Equal(4, merged.Copies.Count);
 
         // Aura Mew's folder holds one distribution (two copies), so it's listed in the parent instead.
         var root = GalleryTree.Open(files, "");

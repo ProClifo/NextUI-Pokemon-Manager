@@ -69,15 +69,18 @@ public enum GalleryFlags
     EventItem = 1,
     /// <summary>A Pokémon file that passes PKHeX's legality check (released ones always do).</summary>
     FileLegal = 2,
+    /// <summary>A shiny Pokémon from a distribution that was always shiny (others are regenerated, and rarely shiny).</summary>
+    AlwaysShiny = 4,
 }
 
 /// <summary>One file from the gallery, as listed in the bundled index.</summary>
 public sealed record GalleryEntry(
     string Path, int Generation, IReadOnlyList<string> Games, string? Language, bool Released,
-    GalleryKind Kind, ushort Species, byte Form, GalleryFlags Flags, string Title)
+    GalleryKind Kind, ushort Species, byte Form, GalleryFlags Flags, string Title, string Trainer = "")
 {
     public bool IsEventItem => Flags.HasFlag(GalleryFlags.EventItem);
     public bool IsFileLegal => Flags.HasFlag(GalleryFlags.FileLegal);
+    public bool IsAlwaysShiny => Flags.HasFlag(GalleryFlags.AlwaysShiny);
 
     /// <summary>Folder path shown in the gallery: the gallery's own folders without "Released/Gen N".</summary>
     public string Folder
@@ -92,16 +95,16 @@ public sealed record GalleryEntry(
 
     public string ToLine() => string.Join('\t',
         Path, Generation, string.Join(',', Games), Language ?? "-", Released ? "R" : "U",
-        Kind, Species, Form, (int)Flags, Title);
+        Kind, Species, Form, (int)Flags, Title, Trainer);
 
     public static GalleryEntry? FromLine(string line)
     {
         var f = line.Split('\t');
-        if (f.Length != 10 || !int.TryParse(f[1], out var gen) || !Enum.TryParse<GalleryKind>(f[5], out var kind)
+        if (f.Length is not (10 or 11) || !int.TryParse(f[1], out var gen) || !Enum.TryParse<GalleryKind>(f[5], out var kind)
             || !ushort.TryParse(f[6], out var species) || !byte.TryParse(f[7], out var form) || !int.TryParse(f[8], out var flags))
             return null;
         return new GalleryEntry(f[0], gen, f[2].Length == 0 ? [] : f[2].Split(','), f[3] == "-" ? null : f[3], f[4] == "R",
-            kind, species, form, (GalleryFlags)flags, f[9]);
+            kind, species, form, (GalleryFlags)flags, f[9], f.Length > 10 ? f[10] : "");
     }
 }
 
@@ -377,7 +380,15 @@ public static class GalleryBuilder
             flags |= GalleryFlags.EventItem;
         if (gift.Pokemon is { } legalCheck && (released || Legality.IsLegal(legalCheck)))
             flags |= GalleryFlags.FileLegal;
-        return new GalleryEntry(relativePath, generation, games, language, released, gift.Kind, gift.Species, gift.Form, flags, title);
+        if (gift.Pokemon is { IsShiny: true } shiny
+            && new LegalityAnalysis(shiny).EncounterMatch is IShinyPotential { Shiny: Shiny.Always or Shiny.AlwaysStar or Shiny.AlwaysSquare or Shiny.FixedValue })
+            flags |= GalleryFlags.AlwaysShiny;
+        // The distribution's trainer (OT name and IDs) tells copies of one distribution apart from others, whatever
+        // their file names say ("WISHMKR Jirachi", "WSHMKR Jirachi", "Shiny WSHMKR Jirachi" are one).
+        var trainer = gift.Pokemon is { } owner
+            ? $"{owner.OriginalTrainerName.Replace('\t', ' ')}/{owner.TID16}/{owner.SID16}"
+            : "";
+        return new GalleryEntry(relativePath, generation, games, language, released, gift.Kind, gift.Species, gift.Form, flags, title, trainer);
     }
 }
 
@@ -575,8 +586,8 @@ public static class GalleryLists
         => gallery.Entries
             .Where(e => e.Species > 0 && profile.Matches(e, allLanguages: false, unreleased: false)
                         && gallery.IsEventOnly(e.Generation, profile.Language, e.Species, e.Form))
-            .GroupBy(e => GalleryNames.DisplayTitle(e.Title), StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First() with { Title = g.Key })
+            .Let(GalleryGroups.Group)
+            .Select(g => g.Copies[0] with { Title = g.Title })
             .OrderBy(e => e.Species)
             .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -638,12 +649,76 @@ public static class GalleryTree
         }
     }
 
-    /// <summary>Groups copies of the same distribution (same folder, language and display title).</summary>
+    /// <summary>Groups copies of the same distribution within each folder and language.</summary>
     private static List<Item> Group(IEnumerable<GalleryEntry> files)
         => files
-            .GroupBy(e => (e.Folder, e.Language, Title: GalleryNames.DisplayTitle(e.Title).ToUpperInvariant()))
-            .Select(g => new Item(GalleryNames.DisplayTitle(g.First().Title), g.Key.Language, g.ToList()))
+            .GroupBy(e => (e.Folder, e.Language))
+            .SelectMany(g => GalleryGroups.Group(g).Select(c => new Item(c.Title, g.Key.Language, c.Copies)))
             .ToList();
 
     public static string Name(string folder) => folder[(folder.LastIndexOf('/') + 1)..];
+}
+
+/// <summary>
+/// Copies of one distribution: files with the same display title, or Pokémon of the same species and form
+/// from the same trainer (OT name and IDs). Every copy gives the same thing, since Pokémon are regenerated
+/// for the save (PID, IVs, shininess...), so the menus list each distribution once.
+/// </summary>
+public static class GalleryGroups
+{
+    public sealed record Distribution(string Title, List<GalleryEntry> Copies);
+
+    public static List<Distribution> Group(IEnumerable<GalleryEntry> files)
+    {
+        var list = files.ToList();
+        var parent = Enumerable.Range(0, list.Count).ToArray();
+        int Find(int i) => parent[i] == i ? i : parent[i] = Find(parent[i]);
+        void Join(Dictionary<string, int> seen, string key, int i)
+        {
+            if (seen.TryGetValue(key, out var j))
+                parent[Find(i)] = Find(j);
+            else
+                seen[key] = i;
+        }
+        var byTitle = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var byTrainer = new Dictionary<string, int>();
+        for (int i = 0; i < list.Count; i++)
+        {
+            var e = list[i];
+            Join(byTitle, $"{e.Kind}|{Shown(e, e.IsAlwaysShiny)}", i);
+            if (e.Kind == GalleryKind.Pokemon && e.Trainer.Length > 0)
+                Join(byTrainer, $"{e.Species}-{e.Form}|{e.Trainer}", i);
+        }
+        return Enumerable.Range(0, list.Count)
+            .GroupBy(Find)
+            .Select(g => g.Select(i => list[i]).ToList())
+            .Select(copies => new Distribution(Title(copies), copies))
+            .ToList();
+    }
+
+    /// <summary>The name most copies go by.</summary>
+    private static string Title(List<GalleryEntry> copies)
+    {
+        bool alwaysShiny = copies.Any(e => e.IsAlwaysShiny);
+        return copies.Select(c => Shown(c, alwaysShiny))
+            .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .First().Key;
+    }
+
+    /// <summary>
+    /// The display title, without a leading "Shiny" for Pokémon from distributions that weren't always shiny:
+    /// those are regenerated for the save like every other copy, so a gallery copy that happened to be shiny
+    /// isn't a different distribution and the Pokémon given won't be shiny either (except by chance).
+    /// </summary>
+    private static string Shown(GalleryEntry e, bool alwaysShiny)
+    {
+        var title = GalleryNames.DisplayTitle(e.Title);
+        if (e.Kind == GalleryKind.Pokemon && !alwaysShiny && title.StartsWith("Shiny ", StringComparison.OrdinalIgnoreCase))
+            title = title[6..];
+        return title;
+    }
+
+    internal static TResult Let<T, TResult>(this T value, Func<T, TResult> f) => f(value);
 }
