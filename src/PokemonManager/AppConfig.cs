@@ -54,7 +54,11 @@ public sealed class AppPaths
 
 public sealed class AppSettings
 {
-    public bool AllowUnofficialTransfers { get; set; }
+    /// <summary>
+    /// Allow moving Pokémon in ways the games never did (Gen 4 back to Gen 3, Gen 1 to Gen 3...) and skip the
+    /// games' trade requirements (National Pokédex, story progress). Off by default.
+    /// </summary>
+    public bool AllowIllegalTransfers { get; set; }
     /// <summary>Only list saves whose ROM is an unmodified retail Pokémon game (on by default).</summary>
     public bool OnlyOfficialRoms { get; set; } = true;
     /// <summary>Browse Pokémon on a Gen 3 style PC box screen instead of lists (on by default).</summary>
@@ -78,7 +82,7 @@ public sealed class AppSettings
             bool on = parts[1].Equals("true", StringComparison.OrdinalIgnoreCase);
             switch (parts[0])
             {
-                case "allow_unofficial_transfers": s.AllowUnofficialTransfers = on; break;
+                case "allow_illegal_transfers" or "allow_unofficial_transfers": s.AllowIllegalTransfers = on; break;
                 case "seen_welcome": s.SeenWelcome = on; break;
                 case "only_official_roms": s.OnlyOfficialRoms = on; break;
                 case "pc_box_view": s.PcBoxView = on; break;
@@ -95,7 +99,7 @@ public sealed class AppSettings
         {
             File.WriteAllLines(path,
             [
-                $"allow_unofficial_transfers={AllowUnofficialTransfers.ToString().ToLowerInvariant()}",
+                $"allow_illegal_transfers={AllowIllegalTransfers.ToString().ToLowerInvariant()}",
                 $"seen_welcome={SeenWelcome.ToString().ToLowerInvariant()}",
                 $"only_official_roms={OnlyOfficialRoms.ToString().ToLowerInvariant()}",
                 $"pc_box_view={PcBoxView.ToString().ToLowerInvariant()}",

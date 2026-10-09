@@ -96,7 +96,7 @@ int Show(List<string> a)
 int Transfer(List<string> a)
 {
     bool copy = TakeFlag(a, "--copy");
-    bool unofficial = TakeFlag(a, "--unofficial");
+    bool unofficial = TakeFlag(a, "--illegal") | TakeFlag(a, "--unofficial");
     var source = LoadSave(a, 0);
     var slot = ParseSlot(Arg(a, 1, "slot"));
     var dest = LoadSave(a, 2);
@@ -298,7 +298,7 @@ static int Usage(int code)
           scan                                 list Pokémon saves under <sd>/Saves and whether their ROM is official
           list <save>                          list Pokémon (slots: p:1 = party 1, 3:12 = box 3 slot 12)
           show <save> <slot>                   show one Pokémon
-          transfer <src> <slot> <dst> [--copy] [--unofficial]
+          transfer <src> <slot> <dst> [--copy] [--illegal]
           trade-evolve <save> <slot> [option] | trade-evolve <save> --all
           inject <save> <gift file> [--box]    .wc3/.wn3/.me3/.ect/.ecb or .pgt/.pcd/.pgf/.wc6/.wc7/.wc8/.wc9...
           events <save>                        list PKHeX's built-in events for this game

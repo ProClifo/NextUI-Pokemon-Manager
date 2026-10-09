@@ -84,6 +84,12 @@ public static class TransferService
         if (mode == TransferMode.Move && from.IsParty && CountUsableParty(src) <= 1 && !pk.IsEgg)
             return OpResult.Fail("You can't move your last party Pokémon. Put another one in your party first.");
 
+        if (!allowUnofficial)
+        {
+            var rules = TradeRules.CheckTransfer(pk, src, dest.Sav);
+            if (!rules.Ok)
+                return rules;
+        }
         var check = Prepare(pk, dest.Sav, allowUnofficial, out var prepared);
         if (!check.Ok || prepared is null)
             return check;
@@ -121,7 +127,7 @@ public static class TransferService
     {
         EntityConverterResult.NoTransferRoute =>
             $"There's no official way to send a Gen {pk.Format} Pokémon to Gen {dest.Generation}. " +
-            "Enable \"Unofficial transfers\" in Settings to force it.",
+            "Turn on \"Illegal transfers\" in Settings to force it.",
         EntityConverterResult.IncompatibleSpecies => $"{Names.Species(pk)} doesn't exist in {Names.Game(dest)}.",
         EntityConverterResult.IncompatibleForm => $"This form of {Names.Species(pk)} doesn't exist in {Names.Game(dest)}.",
         EntityConverterResult.IncompatibleLanguageGB => "Japanese and international Gen 1/2 games can't trade with each other.",

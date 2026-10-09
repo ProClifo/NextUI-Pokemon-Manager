@@ -16,6 +16,9 @@ public sealed class TransferTests : IDisposable
         var fr = _saves.Create(GameVersion.FR, "FireRed.sav");
         var em = _saves.Create(GameVersion.E, "Emerald.sav", "MAY");
         new SlotRef(0, 0).Set(fr.Sav, TestSaves.Make(fr.Sav, Species.Machoke));
+        // FireRed can link with Emerald once the Sapphire is with Celio, and Emerald once it's Champion.
+        ((SAV3)fr.Sav).SetEventFlag(0x844, true);
+        ((SAV3)em.Sav).SetEventFlag(0x87F, true);
         fr = _saves.Roundtrip(fr);
 
         var result = TransferService.Transfer(fr, new SlotRef(0, 0), em, TransferMode.Move, false, out var placed);
@@ -56,7 +59,7 @@ public sealed class TransferTests : IDisposable
 
         var refused = TransferService.Transfer(pt, new SlotRef(0, 0), em, TransferMode.Move, false, out _);
         Assert.False(refused.Ok);
-        Assert.Contains("no official way", refused.Message);
+        Assert.Contains("can't go back from Gen 4 to Gen 3", refused.Message);
 
         var forced = TransferService.Transfer(pt, new SlotRef(0, 0), em, TransferMode.Move, true, out var placed);
         Assert.True(forced.Ok, forced.Message);

@@ -350,7 +350,12 @@ public sealed class App
             return false;
 
         var pk = from.Get(source.Sav);
-        var check = TransferService.Prepare(pk, dest.Sav, _settings.AllowUnofficialTransfers, out _);
+        if (!_settings.AllowIllegalTransfers && TradeRules.CheckTransfer(pk, source.Sav, dest.Sav) is { Ok: false } refused)
+        {
+            _ui.Message($"{refused.Message}\n\n(Settings > Illegal transfers turns these rules off.)");
+            return false;
+        }
+        var check = TransferService.Prepare(pk, dest.Sav, _settings.AllowIllegalTransfers, out _);
         if (!check.Ok)
         {
             _ui.Message(check.Message);
@@ -364,7 +369,7 @@ public sealed class App
         if (!_ui.Confirm(question))
             return false;
 
-        var result = TransferService.Transfer(source, from, dest, mode, _settings.AllowUnofficialTransfers, out var placedAt);
+        var result = TransferService.Transfer(source, from, dest, mode, _settings.AllowIllegalTransfers, out var placedAt);
         if (!result.Ok)
         {
             source.Reload();
@@ -546,7 +551,7 @@ public sealed class App
         if (gift is DataMysteryGift data && GiftService.SupportsAlbum(sav))
             actions.Add(("Add to Mystery Gift album (pick up in-game)", () => GiftService.InjectCard(sav, data)));
         if (gift.IsEntity)
-            actions.Add(("Send the Pokémon straight to a PC box", () => GiftService.RedeemToBox(sav, gift)));
+            actions.Add(("Send the Pokémon straight to a PC box", () => GiftService.RedeemToBox(sav, gift, !_settings.AllowIllegalTransfers)));
         if (actions.Count == 0)
         {
             _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, and this gift isn't a Pokémon, so it can't be added.");
@@ -791,13 +796,23 @@ public sealed class App
             EventPokemon.Source.GalleryCopy => $"PKHeX can't regenerate this event, so this is one of the original copies at random: {Names.Rolled(pk)}.",
             _ => "",
         };
+        if (!_settings.AllowIllegalTransfers && TradeRules.CheckReceive(pk, entry.Sav) is { Ok: false } refused)
+        {
+            _ui.Message(refused.Message);
+            return;
+        }
         PlaceConverted(entry, pk, $"Put {file.Title}", origin);
     }
 
     /// <summary>Converts a Pokémon for this save if needed and puts it in the first free PC slot.</summary>
     private void PlacePokemon(SaveEntry entry, PKM pk, string verb)
     {
-        var check = TransferService.Prepare(pk, entry.Sav, _settings.AllowUnofficialTransfers, out var prepared);
+        if (!_settings.AllowIllegalTransfers && TradeRules.CheckFile(pk, entry.Sav) is { Ok: false } refused)
+        {
+            _ui.Message($"{refused.Message}\n\n(Settings > Illegal transfers turns these rules off.)");
+            return;
+        }
+        var check = TransferService.Prepare(pk, entry.Sav, _settings.AllowIllegalTransfers, out var prepared);
         if (!check.Ok || prepared is null)
         {
             _ui.Message(check.Message);
@@ -928,7 +943,7 @@ public sealed class App
         {
             var items = new List<string>
             {
-                $"Unofficial transfers: {(_settings.AllowUnofficialTransfers ? "ON" : "OFF")}",
+                $"Illegal transfers: {(_settings.AllowIllegalTransfers ? "ON" : "OFF")}",
                 $"Official ROMs only: {(_settings.OnlyOfficialRoms ? "ON" : "OFF")}",
                 $"PC box view: {(_settings.PcBoxView ? "ON" : "OFF (lists)")}",
                 $"Show all languages in gallery: {(_settings.GalleryAllLanguages ? "ON" : "OFF")}",
@@ -940,11 +955,12 @@ public sealed class App
                 return;
             if (choice == 0)
             {
-                if (!_settings.AllowUnofficialTransfers && !_ui.Confirm(
-                        "Unofficial transfers let you send Pokémon on routes the real games never allowed " +
-                        "(for example Gen 4 back to Gen 3). Those Pokémon are usually flagged as illegal. Turn on?", "TURN ON", "CANCEL"))
+                if (!_settings.AllowIllegalTransfers && !_ui.Confirm(
+                        "Illegal transfers let you move Pokémon in ways the real games never allowed: between any " +
+                        "generations (Gen 4 back to Gen 3, Gen 2 up to Gen 3...) and without the games' requirements, such as " +
+                        "having the National Pokédex. Those Pokémon are usually flagged as illegal. Turn on?", "TURN ON", "CANCEL"))
                     continue;
-                _settings.AllowUnofficialTransfers = !_settings.AllowUnofficialTransfers;
+                _settings.AllowIllegalTransfers = !_settings.AllowIllegalTransfers;
             }
             else if (choice == 1)
             {
