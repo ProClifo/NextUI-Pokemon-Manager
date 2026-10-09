@@ -3,8 +3,8 @@
 A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing Pokémon save files on your handheld:
 
 - **Transfer Pokémon between games.** Transfer (move) a Pokémon from one save to another. PKHeX converts the data between generations (Gen 1↔2, Gen 1/2→7, 3→4→5→6→7→8...). Moving between games of the same era counts as a trade, so trade evolutions trigger.
-- **Trade evolutions.** Evolve Kadabra, Machoke, Graveler, Haunter, Onix + Metal Coat, Scyther + Metal Coat, Seadra + Dragon Scale, Clamperl, Boldore and the rest without a second console. You can evolve one Pokémon or every Pokémon that's ready.
-- **Mystery Gifts, Mystery Events and e-Reader cards.**
+- **Trade evolutions.** Evolve Kadabra, Machoke, Graveler, Haunter, Onix + Metal Coat, Scyther + Metal Coat, Seadra + Dragon Scale, Clamperl, Boldore and the rest without a second console. Pick a Pokémon and choose *Evolve*.
+- **Mystery Gifts, Mystery Events and e-Reader cards**, from the built-in gallery:
   - Gen 3: Wonder Cards (`.wc3`), Wonder News (`.wn3`), Mystery Events (`.me3`, e.g. the Eon Ticket e-Card), e-Card Trainers (`.ect`) and e-Reader Berries (`.ecb`). These are the formats of the PKHeX *WC3 plugin* and suloku's *Gen III Mystery Gift Tool*, and injection produces the same save data as WC3 plugin 2.6.0 (see below).
   - Gen 4–7: Wonder Cards are placed in the in-game Mystery Gift album so you pick them up from the delivery person, as if you'd downloaded them (`.pgt .pcd .wc4 .pgf .wc6 .wc7 .wb7`...).
   - Any generation: a gift Pokémon can be sent straight to your party (`.wc8 .wb8 .wa8 .wc9 .wa9` included).
@@ -13,8 +13,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
   - **Distributions**: released distributions of Pokémon that can't be obtained legally any other way in that game's language, e.g. WISHMKR Jirachi, 10 ANIV Celebi and Aura Mew in English Emerald.
   - **Gallery**: every file for the game, in the gallery's own folders. Copies of the same distribution (same trainer, or same name once IDs, berries and the like in parentheses are dropped) are listed once and one is picked at random. A copy that happened to be shiny isn't listed separately, since every Pokémon is regenerated for the save; only distributions that were always shiny say "Shiny"; a folder with a single distribution shows it in the folder above instead.
   - Every list shows **Legal** or **Illegal** next to each item.
-- **Import/export** PKHeX Pokémon files (`.pk1`–`.pk9`...).
-- **Automatic backups** before every change, and a *Restore a backup* option.
+- **Automatic backups** before every change, in `PokemonManager/Backups`.
 
 > **Status:** early release. The code is covered by automated tests on generated saves, and the ARM64 build has been run under emulation. It has **not yet been tested on real hardware**. Keep your own backup of any save you care about until it has been.
 
@@ -87,7 +86,7 @@ A save's menu shows art for its game: Ruby, Sapphire, Emerald, FireRed or LeafGr
 
 With Events, Distributions, Mew/Celebi and transfers between games, every game in every language can complete its Pokédex. Where a language had no distribution of a Pokémon it needs, Distributions offers one from elsewhere: a distribution that really was given out in that language but isn't in the gallery (CHANNEL Jirachi in French, Italian and German), else the English one, which arrives as an English Pokémon, as if traded from an English game (legal: games of different languages trade). This also covers Pokémon behind tickets that weren't distributed in a language: European Gen 3 games never got the Mystic Ticket, so they get 10ANNIV Lugia and Ho-Oh.
 | Gallery | Every gallery file for this game and language, in the gallery's folders. |
-| More | Trade evolutions (incl. *Evolve all that are ready*), import a `.pk*` file from `PokemonManager/Import`, gift files from `PokemonManager/Gifts`, the Gen 3 Mystery Gift/Event status, restore a backup, save info. |
+| Info | The save's details: game, trainer and ID, play time, party and boxes, file; Gen 3 saves also show their Mystery Gift/Event status. |
 
 Every item in these lists is marked **Legal** or **Illegal**:
 
@@ -129,14 +128,10 @@ Close the game before editing. Afterwards, **start the game fresh from the menu,
 SDCARD/
 ├── Saves/                     ← NextUI's saves; scanned automatically
 └── PokemonManager/
-    ├── Gifts/                 ← put .wc3 .wn3 .me3 .ect .ecb .pgt .pcd .pgf .wc6 .wc7 .wc8 .wc9 ... here
-    ├── Import/                ← .pk1 – .pk9 files to import
     ├── Backups/               ← automatic backups (last 20 per save)
     ├── Saves/                 ← optional: extra saves to manage (always shown, even with "Official ROMs only")
     └── rom-check-cache.txt    ← cached ROM checks
 ```
-
-Gift and event files are widely shared by the community, for example in Project Pokémon's event gallery. Pokémon Manager doesn't ship any.
 
 ### Transfers
 

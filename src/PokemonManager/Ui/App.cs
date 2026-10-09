@@ -180,33 +180,10 @@ public sealed class App
             if (sav.Generation >= 3)
                 actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
             actions.Add(("Gallery", null, () => GalleryMenu(entry)));
-            actions.Add(("More", null, () => MoreMenu(entry)));
+            actions.Add(("Info", null, () => _ui.Message(SaveInfo(entry))));
 
             var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected, BackgroundFor(entry),
                 actions.Select(a => a.Tag).ToList());
-            if (choice is null)
-                return;
-            selected = choice.Value;
-            RunSafely(actions[choice.Value].Run, entry);
-        }
-    }
-
-    private void MoreMenu(SaveEntry entry)
-    {
-        int selected = 0;
-        while (true)
-        {
-            var actions = new List<(string Label, Action Run)>
-            {
-                ("Trade evolutions", () => TradeEvolutionMenu(entry)),
-                ("Import Pokémon from file", () => ImportMenu(entry)),
-                ("Gift files on SD card", () => GiftFilesMenu(entry, GiftService.ListFiles(_paths.GiftsDir, entry.Sav))),
-                ("Restore a backup", () => RestoreMenu(entry)),
-                ("Save info", () => _ui.Message(SaveInfo(entry))),
-            };
-            if (entry.Sav is SAV3 sav3)
-                actions.Insert(3, ("Mystery Gift / Event status", () => _ui.Message(Gen3Events.Status(sav3))));
-            var choice = _ui.Choose($"{entry.Label}: more", actions.Select(a => a.Label).ToList(), selected);
             if (choice is null)
                 return;
             selected = choice.Value;
@@ -485,75 +462,7 @@ public sealed class App
         return false;
     }
 
-    private void TradeEvolutionMenu(SaveEntry entry)
-    {
-        while (true)
-        {
-            var sav = entry.Sav;
-            var candidates = SlotRef.AllOccupied(sav)
-                .Select(s => (Slot: s, Pk: s.Get(sav)))
-                .Where(x => TradeEvolution.GetOptions(x.Pk).Count != 0)
-                .ToList();
-            if (candidates.Count == 0)
-            {
-                _ui.Message("None of your Pokémon in this save evolve by trading.");
-                return;
-            }
-
-            int ready = candidates.Count(c => !TradeEvolution.HoldsEverstone(c.Pk) && TradeEvolution.GetOptions(c.Pk).Any(o => o.ConditionsMet));
-            var labels = new List<string>();
-            if (ready > 0)
-                labels.Add($"Evolve all that are ready ({ready})");
-            foreach (var (slot, pk) in candidates)
-            {
-                var targets = string.Join(" / ", TradeEvolution.GetOptions(pk).Select(o => Names.Species(o.Species)).Distinct());
-                labels.Add($"{Names.Summary(pk)} -> {targets} ({slot})");
-            }
-
-            var choice = _ui.Choose("Trade evolutions", labels);
-            if (choice is null)
-                return;
-
-            if (ready > 0 && choice == 0)
-            {
-                if (!_ui.Confirm($"Evolve {ready} Pokémon that would evolve in a real trade right now (no item needed, or holding the right item)?", "EVOLVE", "CANCEL"))
-                    continue;
-                var (count, lines) = TradeEvolution.EvolveAllEligible(sav);
-                if (count > 0 && TryWrite(entry, out _))
-                    _ui.Message($"Evolved {count} Pokémon:\n{string.Join('\n', lines)}\n\n{SaveStateWarning}");
-                continue;
-            }
-
-            int index = choice.Value - (ready > 0 ? 1 : 0);
-            EvolveFlow(entry, candidates[index].Slot);
-        }
-    }
-
     // ---------------------------------------------------------------- gifts & events
-
-    private void GiftFilesMenu(SaveEntry entry, List<GiftFile> files)
-    {
-        if (files.Count == 0)
-        {
-            var kinds = entry.Sav.Generation == 3
-                ? ".wc3 (Wonder Card), .wn3 (Wonder News), .me3 (Mystery Event), .ect (e-Card Trainer) or .ecb (e-Reader Berry)"
-                : "PKHeX Mystery Gift files (.pgt .pcd .wc4 .pgf .wc6 .wc7 .wb7 .wc8 .wb8 .wa8 .wc9 .wa9)";
-            _ui.Message($"No gift files for this game were found.\n\nCopy {kinds} files into:\nPokemonManager/Gifts\non your SD card.");
-            return;
-        }
-
-        while (true)
-        {
-            var choice = _ui.Choose("Gift files", files.Select(f => f.DisplayName).ToList());
-            if (choice is null)
-                return;
-            var file = files[choice.Value];
-            if (file.Gen3 is { } g3)
-                InjectGen3(entry, g3);
-            else if (file.Gift is { } gift)
-                GiftActions(entry, gift);
-        }
-    }
 
     private void InjectGen3(SaveEntry entry, Gen3EventFile file)
     {
@@ -844,23 +753,6 @@ public sealed class App
         PlaceConverted(entry, pk, $"Put {file.Title}", origin, distribution: true);
     }
 
-    /// <summary>Converts a Pokémon for this save if needed and puts it in the first free PC slot.</summary>
-    private void PlacePokemon(SaveEntry entry, PKM pk, string verb)
-    {
-        if (!_settings.AllowIllegalTransfers && TradeRules.CheckFile(pk, entry.Sav) is { Ok: false } refused)
-        {
-            _ui.Message($"{refused.Message}\n\n(Settings > Illegal transfers turns these rules off.)");
-            return;
-        }
-        var check = TransferService.Prepare(pk, entry.Sav, _settings.AllowIllegalTransfers, out var prepared);
-        if (!check.Ok || prepared is null)
-        {
-            _ui.Message(check.Message);
-            return;
-        }
-        PlaceConverted(entry, prepared.Converted, verb);
-    }
-
     private static string LanguageArticle(string code)
     {
         var name = GalleryLanguage.Name(code);
@@ -941,65 +833,6 @@ public sealed class App
 
     // ---------------------------------------------------------------- files
 
-    private void ImportMenu(SaveEntry entry)
-    {
-        var sav = entry.Sav;
-        var files = Directory.Exists(_paths.ImportDir)
-            ? Directory.EnumerateFiles(_paths.ImportDir, "*", SearchOption.AllDirectories)
-                .Where(f => !Path.GetFileName(f).StartsWith('.') && PokemonExtensions.Contains(Path.GetExtension(f).TrimStart('.').ToLowerInvariant()))
-                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-                .ToList()
-            : [];
-        if (files.Count == 0)
-        {
-            _ui.Message("No Pokémon files found.\n\nCopy .pk1-.pk9 (or other PKHeX Pokémon files) into PokemonManager/Import on your SD card.");
-            return;
-        }
-
-        var choice = _ui.Choose("Import which Pokémon?", files.Select(f => Path.GetFileName(f)).ToList());
-        if (choice is null)
-            return;
-        var path = files[choice.Value];
-        var data = File.ReadAllBytes(path);
-        if (!FileUtil.TryGetPKM(data, out var pk, Path.GetExtension(path), sav))
-        {
-            _ui.Message("That file isn't a Pokémon PKHeX can read.");
-            return;
-        }
-
-        PlacePokemon(entry, pk, $"Import {Path.GetFileName(path)}");
-    }
-
-    private void RestoreMenu(SaveEntry entry)
-    {
-        var name = Path.GetFileNameWithoutExtension(entry.Path);
-        var ext = Path.GetExtension(entry.Path);
-        var backups = Directory.Exists(_paths.BackupDir)
-            ? Directory.GetFiles(_paths.BackupDir, $"{name}.*{ext}").OrderByDescending(File.GetLastWriteTimeUtc).ToList()
-            : [];
-        if (backups.Count == 0)
-        {
-            _ui.Message("There are no backups of this save yet. One is made automatically before every change.");
-            return;
-        }
-        var choice = _ui.Choose("Restore which backup?", backups.Select(b => $"{File.GetLastWriteTime(b):yyyy-MM-dd HH:mm:ss}  {Path.GetFileName(b)}").ToList());
-        if (choice is null)
-            return;
-        if (!_ui.Confirm("Replace the current save with this backup?\n(The current save is backed up first.)", "RESTORE", "CANCEL"))
-            return;
-        try
-        {
-            _library.Backup(entry.Path);
-            File.Copy(backups[choice.Value], entry.Path, overwrite: true);
-            entry.Reload();
-            _ui.Message($"Backup restored.\n\n{SaveStateWarning}");
-        }
-        catch (Exception ex)
-        {
-            _ui.Message($"Couldn't restore the backup: {ex.Message}");
-        }
-    }
-
     // ---------------------------------------------------------------- settings & help
 
     private void SettingsMenu()
@@ -1077,15 +910,6 @@ public sealed class App
         }
     }
 
-    private static readonly HashSet<string> PokemonExtensions = [.. EntityFileExtension.GetExtensionsAll()];
-
-    private static string Sanitize(string name)
-    {
-        foreach (var c in Path.GetInvalidFileNameChars())
-            name = name.Replace(c, '_');
-        return name;
-    }
-
     private const string HelpText =
         "Pokémon Manager (built on PKHeX)\n" +
         "\n" +
@@ -1094,12 +918,7 @@ public sealed class App
         "\n" +
         "Each game's menu has Events (every ticket the game has, like the Aurora Ticket), Distributions (Pokémon " +
         "you can only get from an event; Red/Blue/Yellow have Mew instead) and the Gallery (every event file for that game and language, from Project " +
-        "Pokémon's EventsGallery). Items are marked Legal or Illegal.\n" +
-        "\n" +
-        "Your own gift files go in PokemonManager/Gifts (More > Gift files):\n" +
-        "Gen 3: .wc3 .wn3 .me3 .ect .ecb\n" +
-        "Gen 4+: .pgt .pcd .wc4 .pgf .wc6 .wc7 .wc8 .wc9...\n" +
-        "Put Pokémon files (.pk3 etc.) in PokemonManager/Import.\n" +
+        "Pokémon's EventsGallery). Items are marked Legal or Illegal. Info shows the save's details.\n" +
         "\n" +
         SaveStateWarning;
 }
