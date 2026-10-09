@@ -56,7 +56,7 @@ public sealed class GiftTests : IDisposable
     }
 
     [Fact]
-    public void GiftFromFileRedeemsToBox()
+    public void GiftFromFileRedeemsToParty()
     {
         var entry = _saves.Create(GameVersion.SW, "Sword.sav");
         // HOME gifts are only legal with a HOME tracker, which only HOME itself can add.
@@ -68,10 +68,10 @@ public sealed class GiftTests : IDisposable
         var gift = Assert.Single(files).Gift!;
         Assert.False(GiftService.SupportsAlbum(entry.Sav));
 
-        var result = GiftService.RedeemToBox(entry.Sav, gift);
+        var result = GiftService.Redeem(entry.Sav, gift);
         Assert.True(result.Ok, result.Message);
         entry = _saves.Roundtrip(entry);
-        Assert.Equal(wc8.Species, new SlotRef(0, 0).Get(entry.Sav).Species);
+        Assert.Equal(wc8.Species, SlotRef.Party(0).Get(entry.Sav).Species);
     }
 
     [Theory]
@@ -89,14 +89,14 @@ public sealed class GiftTests : IDisposable
         Assert.NotEmpty(events);
 
         var ev = events.First(e => e.Encounter is not MysteryGift { IsEntity: false });
-        Assert.Contains("until you've received the Pokédex", GiftService.RedeemToBox(entry.Sav, ev.Encounter).Message);
+        Assert.Contains("until you've received the Pokédex", GiftService.Redeem(entry.Sav, ev.Encounter).Message);
         Assert.False(TradeRules.HasPokedex(entry.Sav));
         TestSaves.GivePokedex(entry.Sav);
         Assert.True(TradeRules.HasPokedex(entry.Sav));
-        var result = GiftService.RedeemToBox(entry.Sav, ev.Encounter);
+        var result = GiftService.Redeem(entry.Sav, ev.Encounter);
         Assert.True(result.Ok, $"{ev.Name}: {result.Message}");
         entry = _saves.Roundtrip(entry);
-        Assert.Equal(ev.Encounter.Species, new SlotRef(0, 0).Get(entry.Sav).Species);
+        Assert.Equal(ev.Encounter.Species, SlotRef.Party(0).Get(entry.Sav).Species);
     }
 
     [Theory]
@@ -108,9 +108,9 @@ public sealed class GiftTests : IDisposable
         TestSaves.GivePokedex(entry.Sav);
         var ev = GiftService.BuiltInEvents(entry.Sav).First(e => e.Encounter.Species == (ushort)species);
         Assert.False(TradeRules.CheckReceive(TestSaves.Make(entry.Sav, species, 5), entry.Sav).Ok); // a trade would need it
-        var result = GiftService.RedeemToBox(entry.Sav, ev.Encounter);
+        var result = GiftService.Redeem(entry.Sav, ev.Encounter);
         Assert.True(result.Ok, result.Message);
-        Assert.Equal((ushort)species, new SlotRef(0, 0).Get(entry.Sav).Species);
+        Assert.Equal((ushort)species, SlotRef.Party(0).Get(entry.Sav).Species);
     }
 
     [Theory]
@@ -126,6 +126,41 @@ public sealed class GiftTests : IDisposable
             Assert.NotNull(mew);
             Assert.Equal((ushort)Species.Mew, mew.Species);
             Assert.True(Legality.IsLegal(mew, sav), Legality.FirstProblem(mew));
+        }
+    }
+
+    [Theory]
+    [InlineData(GameVersion.RD, false)]
+    [InlineData(GameVersion.C, false)]
+    [InlineData(GameVersion.E, false)]
+    [InlineData(GameVersion.Pt, true)]
+    [InlineData(GameVersion.W2, true)]
+    public void DistributionsGoToThePartyLikeTheGames(GameVersion version, bool pcWhenPartyFull)
+    {
+        var entry = _saves.Create(version, $"{version}.sav");
+        var sav = TestSaves.GivePokedex(entry.Sav);
+        var ev = GiftService.BuiltInEvents(sav).First(e => e.Encounter is not MysteryGift { IsEntity: false });
+
+        sav.SetPartySlotAtIndex(TestSaves.Make(sav, Species.Pikachu, 5), 0);
+        Assert.True(GiftService.Redeem(sav, ev.Encounter).Ok);
+        Assert.Equal(ev.Encounter.Species, SlotRef.Party(1).Get(sav).Species);
+        Assert.Equal(2, sav.PartyCount);
+
+        for (int i = 2; i < 6; i++)
+            sav.SetPartySlotAtIndex(TestSaves.Make(sav, Species.Pikachu, 5), i);
+        var full = GiftService.Redeem(sav, ev.Encounter);
+        if (pcWhenPartyFull)
+        {
+            // Gen 4/5's delivery person sends it to the PC when the party is full.
+            Assert.True(full.Ok, full.Message);
+            Assert.Equal(ev.Encounter.Species, new SlotRef(0, 0).Get(sav).Species);
+        }
+        else
+        {
+            // Gen 1-3 distributions needed room in the party.
+            Assert.False(full.Ok);
+            Assert.Contains("party is full", full.Message);
+            Assert.Equal(0, new SlotRef(0, 0).Get(sav).Species);
         }
     }
 }

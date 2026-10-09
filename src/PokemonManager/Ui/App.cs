@@ -581,7 +581,7 @@ public sealed class App
         if (gift is DataMysteryGift data && GiftService.SupportsAlbum(sav))
             actions.Add(("Add to Mystery Gift album (pick up in-game)", () => GiftService.InjectCard(sav, data)));
         if (gift.IsEntity)
-            actions.Add(("Send the Pokémon straight to a PC box", () => GiftService.RedeemToBox(sav, gift)));
+            actions.Add(("Send the Pokémon to your party", () => GiftService.Redeem(sav, gift)));
         if (actions.Count == 0)
         {
             _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, and this gift isn't a Pokémon, so it can't be added.");
@@ -837,7 +837,7 @@ public sealed class App
             _ => "",
         };
         // No trade rules: the real distributions didn't need the National Pokédex (only the Pokédex, checked above).
-        PlaceConverted(entry, pk, $"Put {file.Title}", origin);
+        PlaceConverted(entry, pk, $"Put {file.Title}", origin, distribution: true);
     }
 
     /// <summary>Converts a Pokémon for this save if needed and puts it in the first free PC slot.</summary>
@@ -857,16 +857,31 @@ public sealed class App
         PlaceConverted(entry, prepared.Converted, verb);
     }
 
-    private void PlaceConverted(SaveEntry entry, PKM pk, string verb, string details = "")
+    /// <summary>Puts a Pokémon in the first free PC slot, or for a distribution where the games put it (the party).</summary>
+    private void PlaceConverted(SaveEntry entry, PKM pk, string verb, string details = "", bool distribution = false)
     {
         var sav = entry.Sav;
-        var target = SlotRef.FirstEmptyBoxSlot(sav);
-        if (target is not { } slot)
+        SlotRef slot;
+        if (distribution)
+        {
+            var target = SlotRef.ForDistribution(sav);
+            if (target.Value is not { } found)
+            {
+                _ui.Message(target.Message);
+                return;
+            }
+            slot = found;
+        }
+        else if (SlotRef.FirstEmptyBoxSlot(sav) is { } free)
+        {
+            slot = free;
+        }
+        else
         {
             _ui.Message("Every PC box is full.");
             return;
         }
-        if (!_ui.Confirm($"{verb} ({Names.Summary(pk)}) into {SlotRef.BoxName(sav, slot.Box)}, slot {slot.Slot + 1}?"))
+        if (!_ui.Confirm($"{verb} ({Names.Summary(pk)}) into {slot.Describe(sav)}?"))
             return;
         slot.Set(sav, pk);
         if (TryWrite(entry, out _))
@@ -892,7 +907,7 @@ public sealed class App
             _ui.Message($"PKHeX couldn't generate a legal Mew for {Names.Game(entry.Sav)}.");
             return;
         }
-        PlaceConverted(entry, mew, "Put Mew", $"Generated like the original distribution: {Names.Rolled(mew)}.");
+        PlaceConverted(entry, mew, "Put Mew", $"Generated like the original distribution: {Names.Rolled(mew)}.", distribution: true);
     }
 
     private void GsBallFlow(SaveEntry entry)

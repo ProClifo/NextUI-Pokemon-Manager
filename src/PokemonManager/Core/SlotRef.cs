@@ -47,6 +47,25 @@ public readonly record struct SlotRef(int Box, int Slot)
         return $"Box {box + 1}";
     }
 
+    /// <summary>Where the slot is, for messages: "your party" or "BOX 1, slot 3".</summary>
+    public string Describe(SaveFile sav) => IsParty ? "your party" : $"{BoxName(sav, Box)}, slot {Slot + 1}";
+
+    /// <summary>
+    /// Where a distribution Pokémon goes, as in the games: the party. Gen 1-3 distributions (trades at events,
+    /// distribution cartridges, the Colosseum bonus disc) needed room in the party; Gen 4/5's delivery person
+    /// sends the Pokémon to the PC when the party is full.
+    /// </summary>
+    public static OpResult<SlotRef> ForDistribution(SaveFile sav)
+    {
+        if (sav.PartyCount < 6)
+            return OpResult<SlotRef>.Success(Party(sav.PartyCount));
+        if (sav.Generation <= 3)
+            return OpResult<SlotRef>.Fail("Your party is full. Like the original distributions, this needs a free place in your party.");
+        return FirstEmptyBoxSlot(sav) is { } box
+            ? OpResult<SlotRef>.Success(box)
+            : OpResult<SlotRef>.Fail("Your party and every PC box are full.");
+    }
+
     /// <summary>Finds the first empty, writable PC slot.</summary>
     public static SlotRef? FirstEmptyBoxSlot(SaveFile sav)
     {
@@ -77,6 +96,14 @@ public readonly record struct SlotRef(int Box, int Slot)
             }
         }
     }
+}
+
+/// <summary>A value, or why there isn't one.</summary>
+public readonly record struct OpResult<T>(T? Value, string Message) where T : struct
+{
+    public bool Ok => Value.HasValue;
+    public static OpResult<T> Success(T value) => new(value, "");
+    public static OpResult<T> Fail(string message) => new(null, message);
 }
 
 public readonly record struct OpResult(bool Ok, string Message)

@@ -158,7 +158,7 @@ int Inject(List<string> a)
         var gift = MysteryGift.GetMysteryGift(File.ReadAllBytes(path), Path.GetExtension(path))
                    ?? throw new InvalidDataException("Not a recognized gift file.");
         result = toBox || !GiftService.SupportsAlbum(entry.Sav)
-            ? GiftService.RedeemToBox(entry.Sav, gift)
+            ? GiftService.Redeem(entry.Sav, gift)
             : GiftService.InjectCard(entry.Sav, gift);
     }
     if (!result.Ok)
@@ -181,7 +181,7 @@ int RedeemEvent(List<string> a)
     var entry = LoadSave(a, 0);
     int index = int.Parse(Arg(a, 1, "event index"));
     var events = GiftService.BuiltInEvents(entry.Sav);
-    var result = GiftService.RedeemToBox(entry.Sav, events[index].Encounter);
+    var result = GiftService.Redeem(entry.Sav, events[index].Encounter);
     if (!result.Ok)
         return Fail(result.Message);
     Library().Write(entry);

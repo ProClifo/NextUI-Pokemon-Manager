@@ -138,7 +138,7 @@ public static class GiftService
         else
         {
             if (!album.Any(g => g.Type == gift.Type))
-                return OpResult.Fail($"{Names.Game(sav)} stores a different kind of card than this file. Use \"Send the Pokémon straight to a PC box\" instead.");
+                return OpResult.Fail($"{Names.Game(sav)} stores a different kind of card than this file. Use \"Send the Pokémon to your party\" instead.");
             int slot = Array.FindIndex(album, g => g.IsEmpty && g.Type == gift.Type);
             if (slot < 0)
                 return OpResult.Fail("The Mystery Gift album is full. Delete a card in-game first.");
@@ -163,11 +163,11 @@ public static class GiftService
     }
 
     /// <summary>
-    /// Generates the gift Pokémon with the save's trainer details and places it in the first empty PC slot.
+    /// Generates the gift Pokémon with the save's trainer details and places it where the games did (the party).
     /// Works for every generation, including games without a Mystery Gift album. The trade rules don't apply
     /// (the real distributions didn't need the National Pokédex), but the player must have the Pokédex.
     /// </summary>
-    public static OpResult RedeemToBox(SaveFile sav, IEncounterable encounter)
+    public static OpResult Redeem(SaveFile sav, IEncounterable encounter)
     {
         if (encounter is MysteryGift { IsEntity: false })
             return OpResult.Fail("This gift is an item, not a Pokémon. Use \"Add to Mystery Gift album\" instead.");
@@ -182,13 +182,14 @@ public static class GiftService
         var pk = EventPokemon.Generate(encounter, sav);
         if (pk is null)
             return OpResult.Fail("PKHeX couldn't generate a legal Pokémon from this event, so nothing was added.");
-        var target = SlotRef.FirstEmptyBoxSlot(sav);
-        if (target is not { } slot)
-            return OpResult.Fail("Every PC box is full.");
+        // Where the games put it: the party (Gen 4/5: the PC when the party is full).
+        var target = SlotRef.ForDistribution(sav);
+        if (target.Value is not { } slot)
+            return OpResult.Fail(target.Message);
         slot.Set(sav, pk);
         var placed = slot.Get(sav);
         return OpResult.Success(
-            $"{Names.Summary(placed)} was sent to {SlotRef.BoxName(sav, slot.Box)}, slot {slot.Slot + 1}.\n" +
+            $"{Names.Summary(placed)} was sent to {slot.Describe(sav)}.\n" +
             $"Legality: {Names.Legality(placed)}");
     }
 
