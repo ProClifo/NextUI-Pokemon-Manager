@@ -1,5 +1,5 @@
 diff --git a/minui-list.c b/minui-list.c
-index 4639bb1..d753113 100644
+index 4639bb1..8da3be7 100644
 --- a/minui-list.c
 +++ b/minui-list.c
 @@ -418,6 +418,8 @@ struct AppState
@@ -11,7 +11,123 @@ index 4639bb1..d753113 100644
      // whether alphabetic scroll (L1/R1 letter jumping) is enabled
      bool alphabetic_scroll;
      // whether the inline filter keyboard feature is allowed at all
-@@ -2888,6 +2890,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -462,6 +464,9 @@ struct AppState
+     char title[1024];
+     // the title alignment ('left', 'center', 'right')
+     char title_alignment[1024];
++    // with --title-image, a title "A\tB\tC" draws as "A   B <image> C" (left-aligned)
++    char title_image[1024];
++    SDL_Surface *title_image_surface;
+     // the location to write the value to
+     char write_location[1024];
+     // the value to write (selected, state)
+@@ -2755,6 +2760,55 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+         char truncated_title_text[256];
+         int title_width = GFX_truncateText(state->fonts.medium, state->title, truncated_title_text, title_available_width, SCALE1(BUTTON_PADDING * 2));
+ 
++        // "A\tB\tC" with --title-image: render the parts now, measure them as one title
++        SDL_Surface *title_parts[3] = {NULL, NULL, NULL};
++        bool title_composed = false;
++        if (state->title_image[0] != '\0' && strchr(state->title, '\t') != NULL)
++        {
++            if (state->title_image_surface == NULL)
++            {
++                SDL_Surface *loaded = IMG_Load(state->title_image);
++                int max_h = SCALE1(PILL_SIZE - 4);
++                if (loaded != NULL && loaded->h > max_h)
++                {
++                    int dst_w = 0, dst_h = 0;
++                    if (ImageFit_Scale(loaded->w, loaded->h, screen->w, max_h, &dst_w, &dst_h))
++                    {
++                        SDL_Surface *scaled = SDL_CreateRGBSurfaceWithFormat(0, dst_w, dst_h, 32, SDL_PIXELFORMAT_RGBA32);
++                        if (scaled != NULL)
++                        {
++                            SDL_BlitScaled(loaded, NULL, scaled, NULL);
++                            SDL_FreeSurface(loaded);
++                            loaded = scaled;
++                        }
++                    }
++                }
++                state->title_image_surface = loaded;
++            }
++            char parts_text[1024];
++            strncpy(parts_text, state->title, sizeof(parts_text) - 1);
++            parts_text[sizeof(parts_text) - 1] = '\0';
++            char *b = strchr(parts_text, '\t');
++            *b++ = '\0';
++            char *c = strchr(b, '\t');
++            if (c != NULL)
++                *c++ = '\0';
++            SDL_Color part_color = theme_title_text_color(should_draw_background_image);
++            title_parts[0] = TTF_RenderUTF8_Blended(state->fonts.medium, parts_text, part_color);
++            if (b[0] != '\0')
++                title_parts[1] = TTF_RenderUTF8_Blended(state->fonts.medium, b, part_color);
++            if (c != NULL && c[0] != '\0')
++                title_parts[2] = TTF_RenderUTF8_Blended(state->fonts.medium, c, part_color);
++            title_width = SCALE1(BUTTON_PADDING * 2);
++            for (int k = 0; k < 3; k++)
++                if (title_parts[k] != NULL)
++                    title_width += title_parts[k]->w;
++            title_width += SCALE1(BUTTON_PADDING * 2); // between the game and the trainer
++            if (state->title_image_surface != NULL)
++                title_width += state->title_image_surface->w + SCALE1(BUTTON_PADDING);
++            title_composed = true;
++        }
++
+         // compute the x position of the title based on the alignment
+         int title_x_pos;
+         const char *title_alignment = state->title_alignment[0] != '\0' ? state->title_alignment : "left";
+@@ -2801,15 +2855,40 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+         }
+ 
+         // draw the title
+-        SDL_Color text_color = theme_title_text_color(should_draw_background_image);
+-        SDL_Surface *text = TTF_RenderUTF8_Blended(state->fonts.medium, truncated_title_text, text_color);
+-        SDL_Rect pos = {
+-            title_x_pos,
+-            SCALE1(PADDING + 4),
+-            text->w,
+-            text->h};
+-        SDL_BlitSurface(text, NULL, screen, &pos);
+-        SDL_FreeSurface(text);
++        if (title_composed)
++        {
++            int x = title_x_pos;
++            for (int k = 0; k < 3; k++)
++            {
++                if (k == 1)
++                    x += SCALE1(BUTTON_PADDING * 2);
++                if (k == 2 && state->title_image_surface != NULL)
++                {
++                    SDL_Surface *img = state->title_image_surface;
++                    x += SCALE1(BUTTON_PADDING) / 2;
++                    SDL_BlitSurface(img, NULL, screen, &(SDL_Rect){x, SCALE1(PADDING) + (SCALE1(PILL_SIZE) - img->h) / 2, img->w, img->h});
++                    x += img->w + SCALE1(BUTTON_PADDING) / 2;
++                }
++                if (title_parts[k] != NULL)
++                {
++                    SDL_BlitSurface(title_parts[k], NULL, screen, &(SDL_Rect){x, SCALE1(PADDING + 4), title_parts[k]->w, title_parts[k]->h});
++                    x += title_parts[k]->w;
++                    SDL_FreeSurface(title_parts[k]);
++                }
++            }
++        }
++        else
++        {
++            SDL_Color text_color = theme_title_text_color(should_draw_background_image);
++            SDL_Surface *text = TTF_RenderUTF8_Blended(state->fonts.medium, truncated_title_text, text_color);
++            SDL_Rect pos = {
++                title_x_pos,
++                SCALE1(PADDING + 4),
++                text->w,
++                text->h};
++            SDL_BlitSurface(text, NULL, screen, &pos);
++            SDL_FreeSurface(text);
++        }
+     }
+ 
+     // the rest of the function is just for drawing your app to the screen
+@@ -2888,6 +2967,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          // resolve the row text color from its state (selected/disabled/muted).
          // ListTheme_RowTextRole captures the precedence; theme_row_text_color maps
          // the role to the greyscale palette or, on -nextui builds, the theme colors.
@@ -23,7 +139,7 @@ index 4639bb1..d753113 100644
          SDL_Color text_color = theme_row_text_color(ListTheme_RowTextRole(
              j == selected_row,
              state->list_state->items[i].features.disabled,
-@@ -2911,7 +2918,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2911,7 +2995,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              char image_effective[1024];
              image_effective_path(image_item, state->fallback_image, image_effective, sizeof(image_effective));
              ensure_item_image(image_item, image_effective, screen->w / IMAGE_MAX_WIDTH_DIVISOR, SCALE1(PILL_SIZE - 4));
@@ -32,7 +148,7 @@ index 4639bb1..d753113 100644
              {
                  image_col_space = image_item->image_surface->w + SCALE1(PADDING);
                  available_width -= image_col_space;
-@@ -3146,6 +3153,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3146,6 +3230,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          int initial_cube_x_pos = text_x_pos + text_surface_width;
  
          // draw the selected option text
@@ -41,7 +157,7 @@ index 4639bb1..d753113 100644
          if (strcmp(display_selected_text, "") != 0)
          {
              initial_cube_x_pos = screen->w - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
-@@ -3155,11 +3164,44 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3155,11 +3241,44 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
                      (state->list_state->items[i].features.disabled || state->list_state->items[i].features.unselectable)
                          ? LIST_TEXT_MUTED
                          : LIST_TEXT_NORMAL);
@@ -91,7 +207,7 @@ index 4639bb1..d753113 100644
              }
          }
  
-@@ -3188,10 +3230,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3188,10 +3307,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
  
          // draw the per-item right-hand image, vertically centered in the row and
          // anchored to the right edge (left of the hardware group on the top row)
@@ -105,23 +221,25 @@ index 4639bb1..d753113 100644
              if (in_top_row_no_title)
              {
                  image_right_edge -= (ow + SCALE1(PADDING));
-@@ -3485,6 +3529,7 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3485,6 +3606,8 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
      {
          OPT_SCREEN_RESOLUTION = 1000,
          OPT_FALLBACK_IMAGE,
 +        OPT_OPTIONS_SELECTED_ONLY,
++        OPT_TITLE_IMAGE,
          OPT_ALLOW_FILTER,
          OPT_FILTER_BUTTON,
          OPT_DISPLAY_FILTER_KEYBOARD,
-@@ -3519,6 +3564,7 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3519,6 +3642,8 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          {"alphabetic-scroll", no_argument, 0, 'S'},
          {"screen-resolution", required_argument, 0, OPT_SCREEN_RESOLUTION},
          {"fallback-image", required_argument, 0, OPT_FALLBACK_IMAGE},
 +        {"options-selected-only", no_argument, 0, OPT_OPTIONS_SELECTED_ONLY},
++        {"title-image", required_argument, 0, OPT_TITLE_IMAGE},
          {"allow-filter", required_argument, 0, OPT_ALLOW_FILTER},
          {"filter-button", required_argument, 0, OPT_FILTER_BUTTON},
          {"display-filter-keyboard", required_argument, 0, OPT_DISPLAY_FILTER_KEYBOARD},
-@@ -3571,13 +3617,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3571,13 +3696,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
              state->show_hardware_group = 0;
              break;
          case 'l':
@@ -138,17 +256,20 @@ index 4639bb1..d753113 100644
              break;
          case 'K':
              strncpy(state->item_key, optarg, sizeof(state->item_key) - 1);
-@@ -3615,6 +3661,9 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3615,6 +3740,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          case OPT_FALLBACK_IMAGE:
              strncpy(state->fallback_image, optarg, sizeof(state->fallback_image) - 1);
              break;
 +        case OPT_OPTIONS_SELECTED_ONLY:
 +            state->options_selected_only = true;
 +            break;
++        case OPT_TITLE_IMAGE:
++            strncpy(state->title_image, optarg, sizeof(state->title_image) - 1);
++            break;
          case OPT_ALLOW_FILTER:
              if (strcmp(optarg, "true") == 0)
              {
-@@ -4090,6 +4139,7 @@ int main(int argc, char *argv[])
+@@ -4090,6 +4221,7 @@ int main(int argc, char *argv[])
          .show_brightness_setting = 0,
          .always_show_confirm = false,
          .disable_auto_sleep = false,

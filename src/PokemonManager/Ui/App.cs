@@ -63,9 +63,9 @@ public sealed class App
         {
             var saves = GetSaves();
             // "[ENG] Emerald", with "NAME <player sprite> ID" on the right of every save.
-            var items = saves.Select(s => $"[{ProfileFor(s).ShownLanguage ?? ProfileFor(s).Language}] {Names.Game(s.Sav)}").ToList();
+            var items = saves.Select(SaveName).ToList();
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
-            var tags = saves.Select((s, i) => (string?)$"{s.Sav.OT}{(sprites[i] is null ? "  " : "\t")}{s.Sav.DisplayTID:D5}").ToList();
+            var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
                 items.Add($"[{_hidden.Count} hidden saves]");
@@ -206,8 +206,9 @@ public sealed class App
             actions.Add(("Gallery", null, () => GalleryMenu(entry)));
             actions.Add(("Info", null, () => _ui.Message(SaveInfo(entry))));
 
-            var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected, BackgroundFor(entry),
-                actions.Select(a => a.Tag).ToList());
+            // Headed like the save on the main menu: "[ENG] Emerald   NAME <player sprite> ID".
+            var choice = _ui.Choose($"{SaveName(entry)}\t{sav.OT}\t{sav.DisplayTID:D5}", actions.Select(a => a.Label).ToList(), selected,
+                BackgroundFor(entry), actions.Select(a => a.Tag).ToList(), titleImage: TrainerSprite(sav));
             if (choice is null)
                 return;
             selected = choice.Value;
@@ -575,6 +576,12 @@ public sealed class App
     /// The player's overworld sprite in this save's game, boy or girl (scripts/build-trainers.py), or an empty
     /// path where there's none: Black/White have no decompilation to take it from.
     /// </summary>
+    /// <summary>A save as the main menu names it: "[ENG] Emerald".</summary>
+    private string SaveName(SaveEntry save) => $"[{ProfileFor(save).ShownLanguage ?? ProfileFor(save).Language}] {Names.Game(save.Sav)}";
+
+    /// <summary>"NAME\tID", the tab marking where the player sprite goes (just spaced without one).</summary>
+    private static string TrainerTag(SaveFile sav, bool withSprite) => $"{sav.OT}{(withSprite ? "\t" : "  ")}{sav.DisplayTID:D5}";
+
     private string? TrainerSprite(SaveFile sav)
     {
         var set = sav switch

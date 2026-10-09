@@ -62,7 +62,7 @@ public sealed class MinUi : IUi
             ? ["--font-default", f.Message, "--font-size-default", f.MessageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)]
             : [];
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -73,14 +73,14 @@ public sealed class MinUi : IUi
         // that wrap-around, so reopen the list at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
-            int? result = ChooseOnce(title, items, selected, background, tags, images, out bool crashed);
+            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, out bool crashed);
             if (!crashed || attempt == MaxCrashRetries)
                 return result;
             selected = 0;
         }
     }
 
-    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, out bool crashed)
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, out bool crashed)
     {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
@@ -109,6 +109,10 @@ public sealed class MinUi : IUi
         };
         File.WriteAllText(input, root.ToJsonString());
         File.Delete(output);
+        // A title "A\tB\tC" draws as "A   B <titleImage> C"; without the image, the parts are just spaced.
+        bool titleImaged = titleImage is not null && File.Exists(titleImage);
+        if (!titleImaged)
+            title = title.Replace("\t", "  ");
 
         string[] args =
         [
@@ -124,6 +128,8 @@ public sealed class MinUi : IUi
             args = [.. args, "--background-image", background];
         if (images is null && tags is not null && tags.Any(t => t is { Length: > 0 }))
             args = [.. args, "--options-selected-only"];
+        if (titleImaged)
+            args = [.. args, "--title-image", titleImage!];
         args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK"])];
         int code = Run("minui-list", args);
         // Killed by a signal: .NET reports 128 + the signal number (139 = SIGSEGV).
@@ -277,12 +283,12 @@ public sealed class ConsoleUi : IUi
     public GameFont? Font { get; set; }
     public string? Background { get; set; }
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null)
     {
         if (items.Count == 0)
             return null;
         Console.WriteLine();
-        Console.WriteLine($"== {title} ==");
+        Console.WriteLine($"== {title.Replace('\t', ' ')} ==");
         for (int i = 0; i < items.Count; i++)
             Console.WriteLine($"{i + 1,3}. {items[i]}{(tags is not null && i < tags.Count && tags[i] is { } tag ? $"  [{tag.Replace('\t', ' ')}]" : "")}");
         Console.Write("Choose (blank = back): ");

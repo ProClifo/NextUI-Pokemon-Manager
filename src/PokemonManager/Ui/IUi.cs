@@ -20,7 +20,7 @@ public interface IUi
     /// (e.g. "Legal") are shown at the right of the highlighted item. With <paramref name="images"/> every
     /// item shows its tag, and a tag written "LEFT\tRIGHT" has the item's image between the two parts.
     /// </summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null);
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null);
 
     /// <summary>Shows text until the user presses A or B. Long text is split into pages.</summary>
     void Message(string text);
