@@ -11,6 +11,10 @@ public sealed class AppPaths
     public required string DataDir { get; init; }
     public required string TempDir { get; init; }
 
+    /// <summary>NextUI's recently played games (one ROM path per line, relative to the SD card, newest first).</summary>
+    public string? RecentFile { get; init; }
+    public string? SdRoot { get; init; }
+
     /// <summary>PC box art (res/box in the pak; the binary lives in bin/arm64).</summary>
     public string BoxAssetsDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_ASSETS")
         ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "box"));
@@ -57,6 +61,8 @@ public sealed class AppPaths
             RomRoots = [Path.Combine(sd, "Roms")],
             DataDir = data,
             TempDir = tmp,
+            RecentFile = Path.Combine(sd, ".userdata", "shared", ".minui", "recent.txt"),
+            SdRoot = sd,
         };
     }
 }

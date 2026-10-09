@@ -67,7 +67,7 @@ public sealed class App
             var tags = saves.Select((s, i) => (string?)$"{s.Sav.OT}{(sprites[i] is null ? "  " : "\t")}{s.Sav.DisplayTID:D5}").ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
-                items.Add($"[{_hidden.Count} hidden: not official ROMs]");
+                items.Add($"[{_hidden.Count} hidden: no ROM or not official]");
             int rescan = items.Count; items.Add("[Rescan SD card]");
             int settings = items.Count; items.Add("[Settings]");
             int help = items.Count; items.Add("[Help]");
@@ -94,12 +94,20 @@ public sealed class App
         _backgroundCache.Clear();
         _profiles.Clear();
         _tickets.Clear();
+        // Only saves with their game's ROM (same file name) are listed.
+        foreach (var save in all.Where(s => RomIndex.FindRoms(s.Path).Count == 0).ToList())
+        {
+            _hidden.Add(new OfficialRomFilter.Hidden(save, new RomCheck(RomStatus.RomNotFound, null, null)));
+            all.Remove(save);
+        }
         if (_settings.OnlyOfficialRoms && all.Count != 0)
         {
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
-            (all, _hidden) = OfficialRomFilter.Apply(all, RomIndex, _paths.ExtraSavesDir);
+            List<OfficialRomFilter.Hidden> unofficial;
+            (all, unofficial) = OfficialRomFilter.Apply(all, RomIndex, _paths.ExtraSavesDir);
+            _hidden.AddRange(unofficial);
         }
-        _saves = all;
+        _saves = SaveOrder.ByLastPlayed(all, RomIndex.FindRoms, SaveOrder.ReadRecents(_paths.RecentFile, _paths.SdRoot));
         return _saves;
     }
 
@@ -128,10 +136,10 @@ public sealed class App
     {
         var lines = _hidden.Select(h => $"- {h.Save.FileName}: {h.Check.Describe()}");
         _ui.Message(
-            "Only saves made with unmodified, official Pokémon ROMs are shown. Hidden:\n" +
+            "Only saves whose game's ROM is on the card (same file name), unmodified and official, are shown. Hidden:\n" +
             string.Join('\n', lines) +
-            "\n\nTo manage these anyway, turn off Settings > Official ROMs only, " +
-            "or copy the save into PokemonManager/Saves.");
+            "\n\nTo manage saves from unofficial ROMs anyway, turn off Settings > Official ROMs only. " +
+            "A save without its ROM is never shown.");
     }
 
     // ---------------------------------------------------------------- save menu

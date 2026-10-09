@@ -47,7 +47,7 @@ make -C native desktop        # desktop build of the viewer; --screenshot render
 
 ## Using it
 
-Open **Tools → Pokemon Manager**. The app scans `Saves/` for anything PKHeX recognizes whose ROM is official (see below) and lists it as *Game - Trainer (file)*. Pick a save, then:
+Open **Tools → Pokemon Manager**. The app scans `Saves/` for anything PKHeX recognizes that has its game's ROM on the card (official, see below) and lists the saves most recently played first: in the order of NextUI's Recently Played list, then by when the save was last written. Pick a save, then:
 
 ### Official ROMs only (default)
 
@@ -57,8 +57,8 @@ By default the app only lists saves made with **unmodified, official Pokémon RO
 - The ROM's CRC32 is compared with the 175 retail dumps of the main-series games (Red/Green/Blue/Yellow through Black 2/White 2, all regions and revisions) from the No-Intro database. Zipped ROMs are checked without unzipping, and trimmed DS ROMs are recognised.
 - Each ROM is hashed once and the result is cached in `PokemonManager/rom-check-cache.txt`, so only the first scan is slow.
 - The main menu lists each save as its language and game, e.g. **[ENG] Emerald** or **[JPN] Ruby**, with the trainer's name, the player's overworld sprite from that game (boy or girl) and the trainer ID on the right. The sprites come from the pret decompilations at build time (`scripts/build-trainers.py`; HeartGold/SoulSilver's are decoded from the game's DS textures). Black/White have no decompilation, so their saves show just the name and ID.
-- Hidden saves appear as **[N hidden: not official ROMs]** in the main menu. Select it to see each file and the reason.
-- To manage other saves anyway, turn off **Settings → Official ROMs only**, or copy the save into `PokemonManager/Saves`. Saves there have no ROM on the card and are always shown.
+- Only saves with their ROM on the card are listed (matched by name, as above). Hidden saves appear as **[N hidden: no ROM or not official]** in the main menu. Select it to see each file and the reason.
+- To manage saves from unofficial ROMs anyway, turn off **Settings → Official ROMs only**. A save without its ROM is never listed.
 
 To refresh the ROM list from a newer No-Intro database, run `scripts/update-vanilla-roms.py <libretro-database>/metadat/no-intro`.
 
@@ -130,7 +130,7 @@ SDCARD/
 ├── Saves/                     ← NextUI's saves; scanned automatically
 └── PokemonManager/
     ├── Backups/               ← automatic backups (last 20 per save)
-    ├── Saves/                 ← optional: extra saves to manage (always shown, even with "Official ROMs only")
+    ├── Saves/                 ← optional: extra saves to manage (listed when their ROM is on the card)
     └── rom-check-cache.txt    ← cached ROM checks
 ```
 
