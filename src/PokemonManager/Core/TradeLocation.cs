@@ -15,8 +15,24 @@ public static class TradeLocation
     {
         if (InPokemonCenter(sav) is not false)
             return null; // in a Pokémon Center, or a game whose map we can't read
-        return $"{Names.Game(sav)} was saved outside a Pokémon Center. Party Pokémon can only be traded from a Pokémon Center: save there in-game first, or put it in a PC box.";
+        // Gen 5 trades over the C-Gear anywhere, except Pokémon that know an HM move.
+        if (sav is SAV5 s5 && HasCGear(s5))
+        {
+            if (!KnowsHm(pk))
+                return null;
+            return $"{Names.Summary(pk)} knows an HM move, so it can only be traded from a Pokémon Center. Save there in-game first, or put it in a PC box.";
+        }
+        var how = sav is SAV5 ? " (or anywhere once you have the C-Gear)" : "";
+        return $"{Names.Game(sav)} was saved outside a Pokémon Center. Party Pokémon can only be traded from a Pokémon Center{how}: save there in-game first, or put it in a PC box.";
     }
+
+    /// <summary>The C-Gear: FE_CGEAR_GET (Black/White 0x73, Black 2/White 2 0x6A).</summary>
+    public static bool HasCGear(SAV5 sav) => sav.EventWork.GetEventFlag(sav is SAV5B2W2 ? 0x6A : 0x73);
+
+    // Cut, Fly, Surf, Strength, Waterfall, Dive: Gen 5's HMs.
+    private static readonly ushort[] Gen5Hms = [15, 19, 57, 70, 127, 291];
+
+    private static bool KnowsHm(PKM pk) => Gen5Hms.Any(pk.HasMove);
 
     /// <summary>Whether the save was made in a Pokémon Center, or null when its map can't be read.</summary>
     public static bool? InPokemonCenter(SaveFile sav) => sav switch
@@ -25,6 +41,8 @@ public static class TradeLocation
         SAV2 s2 => Gen2Map(s2) is var (group, number)
                    && (Gen2Centers.Contains((group, number)) || (group, number) == (s2.Version == GameVersion.C ? (11, 20) : (11, 9))),
         SAV3 s3 => Gen3Centers(s3).Contains(((sbyte)s3.Large[4], (sbyte)s3.Large[5])),
+        SAV4 s4 => (s4 is SAV4HGSS ? HeartGoldSoulSilverCenters : DiamondPearlPlatinumCenters).Contains(s4.M),
+        SAV5 s5 => (s5 is SAV5B2W2 ? Black2White2Centers : BlackWhiteCenters).Contains(s5.PlayerPosition.M & 0xFFFF),
         _ => null,
     };
 
@@ -131,4 +149,33 @@ public static class TradeLocation
         (37, 0), (37, 1),   // Six Island
         (31, 3), (31, 4),   // Seven Island
     ];
+
+    // ---------------------------------------------------------------- Gen 4
+    // SAV4.M: the map header ID the player stands on (maps.h / map_headers.txt).
+
+    /// <summary>1F, 2F and the B1F Wi-Fi floor of every center; Diamond/Pearl and Platinum share the numbers.</summary>
+    private static readonly HashSet<int> DiamondPearlPlatinumCenters =
+    [
+        6, 7, 474, 36, 37, 475, 48, 49, 476, 69, 70, 477, 101, 102, 478, 123, 124, 479, 134, 135, 480,
+        151, 152, 481, 168, 169, 482, 173, 174, 483, 175, 495, 496, 189, 190, 484, 420, 421, 485,
+        428, 429, 486, 435, 436, 487, 443, 444, 488, 452, 453, 489, 459, 460, 490,
+    ];
+
+    /// <summary>1F and B1F of every center, and the Indigo Plateau lobby (300) and its Wi-Fi room (539).</summary>
+    private static readonly HashSet<int> HeartGoldSoulSilverCenters =
+    [
+        69, 144, 158, 167, 166, 168, 169, 170, 185, 219, 226, 367, 236, 241, 246, 368, 293, 369,
+        81, 131, 358, 359, 393, 394, 407, 408, 428, 495, 434, 494, 466, 484, 475, 476, 482, 485,
+        501, 502, 508, 509, 511, 512, 514, 515, 528, 529, 534, 535,
+        300, 539,
+    ];
+
+    // ---------------------------------------------------------------- Gen 5
+    // PlayerPosition.M: the zone ID (pokebw2's zone table; Black/White's zones are its first 427).
+
+    private static readonly HashSet<int> BlackWhiteCenters = [1, 8, 20, 41, 65, 99, 109, 115, 122, 146, 398, 407, 413, 425];
+
+    /// <summary>Black/White's centers, Aspertia to Humilau, and Victory Road's (602).</summary>
+    private static readonly HashSet<int> Black2White2Centers =
+        [.. BlackWhiteCenters, 435, 443, 454, 460, 472, 602];
 }

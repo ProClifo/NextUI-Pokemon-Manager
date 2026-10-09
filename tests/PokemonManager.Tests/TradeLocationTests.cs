@@ -60,4 +60,49 @@ public sealed class TradeLocationTests : IDisposable
         var sav = (SAV3)_saves.Create(GameVersion.E, "E.sav").Sav;
         Assert.Equal(sav.PartyCount, sav.Large[0x234]);
     }
+
+    [Theory]
+    [InlineData(GameVersion.D, 6, true)]       // Jubilife PC 1F
+    [InlineData(GameVersion.Pt, 496, true)]    // Pokémon League lobby B1F
+    [InlineData(GameVersion.Pt, 3, false)]
+    [InlineData(GameVersion.HG, 300, true)]    // Indigo Plateau
+    [InlineData(GameVersion.SS, 2, false)]     // Union Room
+    public void Gen4CentersAreRecognised(GameVersion version, int map, bool center)
+    {
+        var sav = (SAV4)_saves.Create(version, $"{version}.sav").Sav;
+        sav.M = map;
+        Assert.Equal(center, TradeLocation.InPokemonCenter(sav));
+    }
+
+    [Theory]
+    [InlineData(GameVersion.W, 8, true)]       // Striaton
+    [InlineData(GameVersion.W, 435, false)]    // Aspertia's center is B2W2's
+    [InlineData(GameVersion.B2, 435, true)]
+    [InlineData(GameVersion.B2, 422, false)]   // Union Room
+    public void Gen5CentersAreRecognised(GameVersion version, int zone, bool center)
+    {
+        var sav = (SAV5)_saves.Create(version, $"{version}.sav").Sav;
+        sav.PlayerPosition.M = zone;
+        Assert.Equal(center, TradeLocation.InPokemonCenter(sav));
+    }
+
+    [Theory]
+    [InlineData(GameVersion.B, 0x73)]
+    [InlineData(GameVersion.W2, 0x6A)]
+    public void Gen5TradesAnywhereWithTheCGearUnlessItKnowsAnHm(GameVersion version, int cgearFlag)
+    {
+        var sav = (SAV5)_saves.Create(version, $"{version}.sav").Sav;
+        sav.PlayerPosition.M = 0; // outside
+        var pk = TestSaves.Make(sav, Species.Pidove, 20);
+        pk.SetMove(0, (ushort)Move.Tackle);
+        Assert.NotNull(TradeLocation.PartyTradeBlocked(sav, pk)); // no C-Gear yet
+
+        sav.EventWork.SetEventFlag(cgearFlag, true);
+        Assert.Null(TradeLocation.PartyTradeBlocked(sav, pk));
+
+        pk.SetMove(1, (ushort)Move.Fly);
+        Assert.Contains("HM", TradeLocation.PartyTradeBlocked(sav, pk));
+        sav.PlayerPosition.M = 8; // Striaton's Pokémon Center
+        Assert.Null(TradeLocation.PartyTradeBlocked(sav, pk));
+    }
 }
