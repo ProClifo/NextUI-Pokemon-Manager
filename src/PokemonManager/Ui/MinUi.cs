@@ -30,7 +30,7 @@ public sealed class MinUi : IUi
 
     public static bool IsAvailable() => FindOnPath("minui-list") is not null && FindOnPath("minui-presenter") is not null;
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -41,20 +41,29 @@ public sealed class MinUi : IUi
         // that wrap-around, so reopen the list at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
-            int? result = ChooseOnce(title, items, selected, background, out bool crashed);
+            int? result = ChooseOnce(title, items, selected, background, tags, out bool crashed);
             if (!crashed || attempt == MaxCrashRetries)
                 return result;
             selected = 0;
         }
     }
 
-    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, out bool crashed)
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, out bool crashed)
     {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
         var array = new JsonArray();
-        foreach (var item in items)
-            array.Add((JsonNode)new JsonObject { ["name"] = string.IsNullOrWhiteSpace(item) ? "-" : item });
+        for (int i = 0; i < items.Count; i++)
+        {
+            var row = new JsonObject { ["name"] = string.IsNullOrWhiteSpace(items[i]) ? "-" : items[i] };
+            if (tags is not null && i < tags.Count && tags[i] is { Length: > 0 } tag)
+            {
+                // A single option is drawn right-aligned; show_confirm keeps A selecting the item.
+                row["options"] = new JsonArray { (JsonNode)tag };
+                row["features"] = new JsonObject { ["show_confirm"] = true };
+            }
+            array.Add((JsonNode)row);
+        }
         var root = new JsonObject
         {
             ["items"] = array,
@@ -212,14 +221,14 @@ public sealed class MinUi : IUi
 /// </summary>
 public sealed class ConsoleUi : IUi
 {
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null)
     {
         if (items.Count == 0)
             return null;
         Console.WriteLine();
         Console.WriteLine($"== {title} ==");
         for (int i = 0; i < items.Count; i++)
-            Console.WriteLine($"{i + 1,3}. {items[i]}");
+            Console.WriteLine($"{i + 1,3}. {items[i]}{(tags is not null && i < tags.Count && tags[i] is { } tag ? $"  [{tag}]" : "")}");
         Console.Write("Choose (blank = back): ");
         var line = Console.ReadLine();
         if (line is null || !int.TryParse(line.Trim(), out var n) || n < 1 || n > items.Count)

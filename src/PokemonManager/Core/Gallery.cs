@@ -67,17 +67,17 @@ public enum GalleryFlags
     None = 0,
     /// <summary>Gives a key item that unlocks an in-game event (Aurora Ticket, Member Card...).</summary>
     EventItem = 1,
-    /// <summary>A notable Pokémon giveaway: mythical or legendary Pokémon, or one that unlocks an event.</summary>
-    Distribution = 2,
+    /// <summary>A Pokémon file that passes PKHeX's legality check (released ones always do).</summary>
+    FileLegal = 2,
 }
 
 /// <summary>One file from the gallery, as listed in the bundled index.</summary>
 public sealed record GalleryEntry(
     string Path, int Generation, IReadOnlyList<string> Games, string? Language, bool Released,
-    GalleryKind Kind, ushort Species, GalleryFlags Flags, string Title)
+    GalleryKind Kind, ushort Species, byte Form, GalleryFlags Flags, string Title)
 {
     public bool IsEventItem => Flags.HasFlag(GalleryFlags.EventItem);
-    public bool IsDistribution => Flags.HasFlag(GalleryFlags.Distribution);
+    public bool IsFileLegal => Flags.HasFlag(GalleryFlags.FileLegal);
 
     /// <summary>Folder path shown in the gallery: the gallery's own folders without "Released/Gen N".</summary>
     public string Folder
@@ -92,16 +92,16 @@ public sealed record GalleryEntry(
 
     public string ToLine() => string.Join('\t',
         Path, Generation, string.Join(',', Games), Language ?? "-", Released ? "R" : "U",
-        Kind, Species, (int)Flags, Title);
+        Kind, Species, Form, (int)Flags, Title);
 
     public static GalleryEntry? FromLine(string line)
     {
         var f = line.Split('\t');
-        if (f.Length != 9 || !int.TryParse(f[1], out var gen) || !Enum.TryParse<GalleryKind>(f[5], out var kind)
-            || !ushort.TryParse(f[6], out var species) || !int.TryParse(f[7], out var flags))
+        if (f.Length != 10 || !int.TryParse(f[1], out var gen) || !Enum.TryParse<GalleryKind>(f[5], out var kind)
+            || !ushort.TryParse(f[6], out var species) || !byte.TryParse(f[7], out var form) || !int.TryParse(f[8], out var flags))
             return null;
         return new GalleryEntry(f[0], gen, f[2].Length == 0 ? [] : f[2].Split(','), f[3] == "-" ? null : f[3], f[4] == "R",
-            kind, species, (GalleryFlags)flags, f[8]);
+            kind, species, form, (GalleryFlags)flags, f[9]);
     }
 }
 
@@ -138,6 +138,8 @@ public sealed record GalleryGift(PKM? Pokemon, DataMysteryGift? Card, Gen3EventF
     public GalleryKind Kind => Pokemon is not null ? GalleryKind.Pokemon : Card is not null ? GalleryKind.Card : GalleryKind.Gen3;
 
     public ushort Species => Pokemon?.Species ?? (Card is { IsEntity: true } c ? c.Species : (ushort)0);
+
+    public byte Form => Pokemon?.Form ?? (Card is { IsEntity: true } c ? c.Form : (byte)0);
 }
 
 /// <summary>
@@ -161,9 +163,6 @@ public static partial class GalleryNames
         "eonticket", "auroraticket", "mysticticket", "oldseamap",
         "membercard", "oaksletter", "secretkey", "azureflute", "enigmastone", "libertypass",
     ];
-
-    /// <summary>Gen 4 HG/SS gift that unlocks the Spiky-eared Pichu event.</summary>
-    private const string PichuEvent = "pikachucoloredpichu";
 
     [GeneratedRegex(@"^(?:[-\d]+|\d+-[A-Z]\d+)\s+")]
     private static partial Regex LeadingId();
@@ -245,10 +244,6 @@ public static partial class GalleryNames
 
     public static bool IsEventItem(string title) => EventItems.Any(Letters(title).Contains);
 
-    public static bool IsDistribution(ushort species, string title)
-        => species > 0 && (SpeciesCategory.IsMythical(species) || SpeciesCategory.IsLegendary(species)
-                           || SpeciesCategory.IsSubLegendary(species) || Letters(title).Contains(PichuEvent));
-
     /// <summary>Title without per-copy IDs and regions, so the copies of one distribution group together.</summary>
     public static string GroupKey(string title)
         => Spaces().Replace(StandaloneNumber().Replace(VariantTag().Replace(title, ""), ""), " ").Trim();
@@ -260,6 +255,7 @@ public static partial class GalleryNames
 public static class GalleryBuilder
 {
     public const string IndexName = "index.tsv";
+    public const string EventOnlyName = "eventonly.tsv";
     public const string FilesPrefix = "files/";
 
     private static readonly string[] SkippedFolders = ["hex extracted cards", "Wondercard Fulls"];
@@ -308,10 +304,39 @@ public static class GalleryBuilder
                 foreach (var (entry, _) in entries)
                     writer.Write(entry.ToLine() + "\n");
             }
+            var table = zip.CreateEntry(EventOnlyName, CompressionLevel.SmallestSize);
+            using (var writer = new StreamWriter(table.Open(), new UTF8Encoding(false)))
+            {
+                foreach (var line in EventOnlyTable(entries.Select(e => e.Entry), log))
+                    writer.Write(line + "\n");
+            }
             foreach (var (entry, source) in entries)
                 zip.CreateEntryFromFile(source, FilesPrefix + entry.Path, CompressionLevel.SmallestSize);
         }
         return (entries.Count, skipped);
+    }
+
+    /// <summary>
+    /// Which of the gallery's Pokémon are event-only, per generation and language ("gen \t lang \t species-form,...").
+    /// Candidates are the mythical, legendary and alternate-form Pokémon in released files; every other species
+    /// can be caught or bred in the handheld games.
+    /// </summary>
+    private static IEnumerable<string> EventOnlyTable(IEnumerable<GalleryEntry> entries, TextWriter? log)
+    {
+        var candidates = entries
+            .Where(e => e.Released && e.Species > 0 && (e.Form > 0 || SpeciesCategory.IsMythical(e.Species)
+                        || SpeciesCategory.IsLegendary(e.Species) || SpeciesCategory.IsSubLegendary(e.Species)))
+            .GroupBy(e => e.Generation)
+            .ToDictionary(g => g.Key, g => g.Select(e => (e.Species, EventOnly.KeyForm(e.Species, e.Form, e.Generation))).Distinct().ToList());
+        foreach (var (gen, list) in candidates.OrderBy(c => c.Key))
+        {
+            foreach (var language in EventOnly.Languages(gen))
+            {
+                var only = EventOnly.Compute(gen, language, list);
+                log?.WriteLine($"event-only, Gen {gen} {language}: {string.Join(", ", only.Select(o => o.Form == 0 ? $"{(Species)o.Species}" : $"{(Species)o.Species}-{o.Form}"))}");
+                yield return $"{gen}\t{language}\t{string.Join(',', only.Select(o => $"{o.Species}-{o.Form}"))}";
+            }
+        }
     }
 
     public static GalleryEntry? Describe(string relativePath, int generation, bool released, byte[] data, out string problem)
@@ -337,18 +362,51 @@ public static class GalleryBuilder
         var flags = GalleryFlags.None;
         if (gift.Kind != GalleryKind.Pokemon && GalleryNames.IsEventItem(title))
             flags |= GalleryFlags.EventItem;
-        if (GalleryNames.IsDistribution(gift.Species, title))
-            flags |= GalleryFlags.Distribution;
-        return new GalleryEntry(relativePath, generation, games, language, released, gift.Kind, gift.Species, flags, title);
+        if (gift.Pokemon is { } legalCheck && (released || Legality.IsLegal(legalCheck)))
+            flags |= GalleryFlags.FileLegal;
+        return new GalleryEntry(relativePath, generation, games, language, released, gift.Kind, gift.Species, gift.Form, flags, title);
     }
 }
 
 /// <summary>The bundled gallery: an index plus every file, in one zip so the SD card holds a single file.</summary>
-public sealed class GalleryArchive(string zipPath)
+public sealed class GalleryArchive(string zipPath) : IDisposable
 {
     private List<GalleryEntry>? _entries;
+    private Dictionary<(int, string), HashSet<(ushort, byte)>>? _eventOnly;
 
     public string ZipPath { get; } = zipPath;
+
+    /// <summary>Whether this Pokémon can only be obtained from an event in games of the given generation and language.</summary>
+    public bool IsEventOnly(int generation, string language, ushort species, byte form)
+        => (_eventOnly ??= LoadEventOnly()).TryGetValue((generation, language), out var set)
+           && set.Contains((species, EventOnly.KeyForm(species, form, generation)));
+
+    private Dictionary<(int, string), HashSet<(ushort, byte)>> LoadEventOnly()
+    {
+        var result = new Dictionary<(int, string), HashSet<(ushort, byte)>>();
+        if (!Exists)
+            return result;
+        using var zip = ZipFile.OpenRead(ZipPath);
+        var table = zip.GetEntry(GalleryBuilder.EventOnlyName);
+        if (table is null)
+            return result;
+        using var reader = new StreamReader(table.Open(), Encoding.UTF8);
+        while (reader.ReadLine() is { } line)
+        {
+            var f = line.Split('\t');
+            if (f.Length != 3 || !int.TryParse(f[0], out var gen))
+                continue;
+            var set = new HashSet<(ushort, byte)>();
+            foreach (var item in f[2].Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = item.Split('-');
+                if (parts.Length == 2 && ushort.TryParse(parts[0], out var species) && byte.TryParse(parts[1], out var form))
+                    set.Add((species, form));
+            }
+            result[(gen, f[1])] = set;
+        }
+        return result;
+    }
 
     public bool Exists => File.Exists(ZipPath);
 
@@ -372,9 +430,14 @@ public sealed class GalleryArchive(string zipPath)
         return list;
     }
 
+    public void Dispose() => _zip?.Dispose();
+
+    // Kept open: reading the zip's directory of ~7,000 entries each time would be slow on the handheld.
+    private ZipArchive? _zip;
+
     public GalleryGift? Load(GalleryEntry entry)
     {
-        using var zip = ZipFile.OpenRead(ZipPath);
+        var zip = _zip ??= ZipFile.OpenRead(ZipPath);
         var file = zip.GetEntry(GalleryBuilder.FilesPrefix + entry.Path);
         if (file is null)
             return null;
@@ -490,20 +553,15 @@ public sealed record GameProfile(int Generation, IReadOnlyList<string> Games, st
 /// <summary>The curated lists on a game's menu, picked from the gallery.</summary>
 public static class GalleryLists
 {
-    /// <summary>Key items that unlock in-game events, for this game and language.</summary>
-    public static List<GalleryEntry> Events(GalleryArchive gallery, GameProfile profile)
-        => gallery.Entries
-            .Where(e => e.IsEventItem && profile.Matches(e, allLanguages: false, unreleased: false))
-            .OrderBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
     /// <summary>
-    /// Notable Pokémon giveaways. The gallery keeps every known copy of a distribution (e.g. hundreds of
-    /// MYSTRY Mew), which differ only in PID/IVs; the list shows each distribution once.
+    /// Released distributions of Pokémon that can't be obtained legally any other way in this game's
+    /// language. The gallery keeps every known copy of a distribution (e.g. hundreds of MYSTRY Mew), which
+    /// differ only in PID/IVs; the list shows each distribution once.
     /// </summary>
     public static List<GalleryEntry> Distributions(GalleryArchive gallery, GameProfile profile)
         => gallery.Entries
-            .Where(e => e.IsDistribution && profile.Matches(e, allLanguages: false, unreleased: false))
+            .Where(e => e.Species > 0 && profile.Matches(e, allLanguages: false, unreleased: false)
+                        && gallery.IsEventOnly(e.Generation, profile.Language, e.Species, e.Form))
             .GroupBy(e => GalleryNames.GroupKey(e.Title), StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First() with { Title = g.Key })
             .OrderBy(e => e.Species)

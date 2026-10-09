@@ -8,9 +8,10 @@ public interface IUi
 {
     /// <summary>
     /// Shows a list and returns the chosen index, or null when the user backs out. The optional
-    /// background image is drawn behind the list where the UI supports it.
+    /// background image is drawn behind the list where the UI supports it, and <paramref name="tags"/>
+    /// (e.g. "Legal") are shown at the right of their items.
     /// </summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null);
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null);
 
     /// <summary>Shows text until the user presses A or B. Long text is split into pages.</summary>
     void Message(string text);

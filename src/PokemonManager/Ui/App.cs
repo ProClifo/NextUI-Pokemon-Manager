@@ -30,6 +30,7 @@ public sealed class App
         GameBackgrounds.ScreenSize(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE"));
     private readonly Dictionary<string, string?> _backgroundCache = new();
     private readonly Dictionary<string, GameProfile> _profiles = new();
+    private readonly Dictionary<string, List<TicketChoice>> _tickets = new();
     private readonly GalleryArchive _gallery;
 
     public App(IUi ui, AppPaths paths)
@@ -85,6 +86,7 @@ public sealed class App
         _romIndex = null;
         _backgroundCache.Clear();
         _profiles.Clear();
+        _tickets.Clear();
         if (_settings.OnlyOfficialRoms && all.Count != 0)
         {
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
@@ -134,16 +136,21 @@ public sealed class App
         {
             var sav = entry.Sav;
             Legality.For(sav); // legality reports in this save's menus are for this game and trainer
-            var actions = new List<(string Label, Action Run)> { ("Pokémon", () => BrowseMenu(entry)) };
+            var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
+            // A game with one event gets that event on its menu; a game with several gets an Events menu.
+            var tickets = TicketsFor(entry);
             if (sav is SAV2 { Version: GameVersion.C } crystal)
-                actions.Add((crystal.IsEnabledGSBallMobileEvent ? "GS Ball Event (enabled)" : "Enable GS Ball Event", () => GsBallFlow(entry)));
-            if (sav.Generation >= 3)
-                actions.Add(("Events", () => EventsMenu(entry)));
-            actions.Add(("Distributions", () => DistributionsMenu(entry)));
-            actions.Add(("Gallery", () => GalleryMenu(entry)));
-            actions.Add(("More", () => MoreMenu(entry)));
+                actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
+            else if (tickets.Count == 1)
+                actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
+            else if (tickets.Count > 1)
+                actions.Add(("Events", null, () => EventsMenu(entry, tickets)));
+            actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
+            actions.Add(("Gallery", null, () => GalleryMenu(entry)));
+            actions.Add(("More", null, () => MoreMenu(entry)));
 
-            var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected, BackgroundFor(entry));
+            var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected, BackgroundFor(entry),
+                actions.Select(a => a.Tag).ToList());
             if (choice is null)
                 return;
             selected = choice.Value;
@@ -164,6 +171,8 @@ public sealed class App
                 ("Restore a backup", () => RestoreMenu(entry)),
                 ("Save info", () => _ui.Message(SaveInfo(entry))),
             };
+            if (entry.Sav is SAV3 sav3)
+                actions.Insert(3, ("Mystery Gift / Event status", () => _ui.Message(Gen3Events.Status(sav3))));
             var choice = _ui.Choose($"{entry.Label}: more", actions.Select(a => a.Label).ToList(), selected);
             if (choice is null)
                 return;
@@ -575,37 +584,51 @@ public sealed class App
         return false;
     }
 
-    private void EventsMenu(SaveEntry entry)
+    private static string LegalTag(bool legal) => legal ? "Legal" : "Illegal";
+
+    private List<TicketChoice> TicketsFor(SaveEntry entry)
     {
-        if (!GalleryAvailable())
-            return;
-        var profile = ProfileFor(entry);
-        var events = GalleryLists.Events(_gallery, profile);
+        if (!_tickets.TryGetValue(entry.Path, out var tickets))
+        {
+            try
+            {
+                tickets = _gallery.Entries.Count == 0 ? [] : Tickets.For(_gallery, ProfileFor(entry), entry.Sav);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Couldn't list event tickets: {ex}");
+                tickets = [];
+            }
+            _tickets[entry.Path] = tickets;
+        }
+        return tickets;
+    }
+
+    /// <summary>Every ticket the game has, legitimate or not.</summary>
+    private void EventsMenu(SaveEntry entry, List<TicketChoice> tickets)
+    {
         int selected = 0;
         while (true)
         {
-            var labels = events.Select(e => StripItemPrefix(e.Title)).ToList();
-            int status = -1;
-            if (entry.Sav is SAV3)
-            {
-                status = labels.Count;
-                labels.Add("[Current event status]");
-            }
-            if (labels.Count == 0)
-            {
-                _ui.Message($"No event items were distributed for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}.");
-                return;
-            }
-
-            var choice = _ui.Choose("Events", labels, selected);
+            var choice = _ui.Choose("Events", tickets.Select(t => t.Ticket.Name).ToList(), selected, tags: tickets.Select(t => (string?)LegalTag(t.Legal)).ToList());
             if (choice is null)
                 return;
             selected = choice.Value;
-            if (choice == status)
-                _ui.Message(Gen3Events.Status((SAV3)entry.Sav));
-            else
-                GiveGalleryFile(entry, events[choice.Value]);
+            GiveTicket(entry, tickets[choice.Value]);
         }
+    }
+
+    private void GiveTicket(SaveEntry entry, TicketChoice ticket)
+    {
+        if (!ticket.Legal)
+        {
+            var profile = ProfileFor(entry);
+            if (!_ui.Confirm(
+                    $"{ticket.Ticket.Name} was never officially distributed for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}. " +
+                    $"PKHeX will flag Pokémon met through it as illegal.\n\nUse \"{StripItemPrefix(ticket.File.Title)}\" anyway?", "USE IT", "CANCEL"))
+                return;
+        }
+        GiveGalleryFile(entry, ticket.File);
     }
 
     private void DistributionsMenu(SaveEntry entry)
@@ -616,13 +639,15 @@ public sealed class App
         var list = GalleryLists.Distributions(_gallery, profile);
         if (list.Count == 0)
         {
-            _ui.Message($"The gallery has no notable distributions for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}. Try the Gallery.");
+            _ui.Message($"Every Pokémon the gallery has for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)} can be obtained without an event. See the Gallery for all distributions.");
             return;
         }
         int selected = 0;
         while (true)
         {
-            var choice = _ui.Choose($"Distributions ({list.Count})", list.Select(e => e.Title).ToList(), selected);
+            // Only released distributions are listed, and every Pokémon handed out passes the legality check.
+            var choice = _ui.Choose($"Distributions ({list.Count})", list.Select(e => e.Title).ToList(), selected,
+                tags: list.Select(_ => (string?)"Legal").ToList());
             if (choice is null)
                 return;
             selected = choice.Value;
@@ -643,11 +668,11 @@ public sealed class App
             _ui.Message($"The gallery has nothing for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}.");
             return;
         }
-        GalleryFolder(entry, files, "");
+        GalleryFolder(entry, files, "", profile);
     }
 
     /// <summary>Browses one gallery folder. Folders that only lead to one other folder are skipped through.</summary>
-    private void GalleryFolder(SaveEntry entry, List<GalleryEntry> files, string folder)
+    private void GalleryFolder(SaveEntry entry, List<GalleryEntry> files, string folder, GameProfile profile)
     {
         var view = GalleryTree.Open(files, folder);
         int selected = 0;
@@ -659,16 +684,26 @@ public sealed class App
             var path = string.Join('/', view.Path.Split('/', StringSplitOptions.RemoveEmptyEntries)
                 .Where(p => _settings.GalleryAllLanguages || !GalleryLanguage.Tags.Contains(p)));
             var title = path.Length == 0 ? $"Gallery ({files.Count})" : $"Gallery: {path}";
-            var choice = _ui.Choose(title, labels, selected);
+            var tags = view.Folders.Select(_ => (string?)null).Concat(view.Files.Select(f => (string?)LegalTag(IsLegalFor(f, profile)))).ToList();
+            var choice = _ui.Choose(title, labels, selected, tags: tags);
             if (choice is null)
                 return;
             selected = choice.Value;
             if (choice < view.Folders.Count)
-                GalleryFolder(entry, files, view.Folders[choice.Value]);
+                GalleryFolder(entry, files, view.Folders[choice.Value], profile);
             else
                 GiveGalleryFile(entry, view.Files[choice.Value - view.Folders.Count]);
         }
     }
+
+    /// <summary>
+    /// Released Pokémon are legal (they're regenerated for the save and checked before being added); cards are
+    /// legal when officially distributed for this game and language; unreleased files go by PKHeX's verdict
+    /// on the file, and unreleased cards were never distributed at all.
+    /// </summary>
+    private static bool IsLegalFor(GalleryEntry e, GameProfile profile) => e.Kind == GalleryKind.Pokemon
+        ? e.IsFileLegal
+        : e.Released && (e.Language is null || e.Language == profile.Language);
 
     private string GalleryLabel(GalleryEntry e)
     {
@@ -784,7 +819,10 @@ public sealed class App
             _ui.Message($"The GS Ball event is already enabled.\n\n{HowTo}");
             return;
         }
-        if (!_ui.Confirm("Enable the GS Ball event? This turns on the event the 3DS Virtual Console release unlocked.", "ENABLE", "CANCEL"))
+        var question = sav.Japanese
+            ? "Enable the GS Ball event? Japanese Crystal handed it out through the Mobile System."
+            : "Enable the GS Ball event? Outside Japan it only ran in the 3DS Virtual Console release, so PKHeX flags a Celebi from it in a cartridge copy as illegal.";
+        if (!_ui.Confirm(question, "ENABLE", "CANCEL"))
             return;
         sav.EnableGSBallMobileEvent();
         if (TryWrite(entry, out _))
@@ -955,8 +993,9 @@ public sealed class App
         "Saves are read from the Saves folder, plus PokemonManager/Saves.\n" +
         "A backup is written to PokemonManager/Backups before every change.\n" +
         "\n" +
-        "Each game's menu has Events (event items like the Aurora Ticket), Distributions (notable Pokémon " +
-        "giveaways) and the Gallery (every event file for that game and language, from Project Pokémon's EventsGallery).\n" +
+        "Each game's menu has Events (every ticket the game has, like the Aurora Ticket), Distributions (Pokémon " +
+        "you can only get from an event) and the Gallery (every event file for that game and language, from Project " +
+        "Pokémon's EventsGallery). Items are marked Legal or Illegal.\n" +
         "\n" +
         "Your own gift files go in PokemonManager/Gifts (More > Gift files):\n" +
         "Gen 3: .wc3 .wn3 .me3 .ect .ecb\n" +

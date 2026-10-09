@@ -9,10 +9,10 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
   - Gen 4–7: Wonder Cards are placed in the in-game Mystery Gift album so you pick them up from the delivery person, as if you'd downloaded them (`.pgt .pcd .wc4 .pgf .wc6 .wc7 .wb7`...).
   - Any generation: a gift Pokémon can be sent straight to a PC box (`.wc8 .wb8 .wa8 .wc9 .wa9` included).
 - **Event gallery built in.** The Gen 1–5 files of Project Pokémon's [EventsGallery](https://github.com/projectpokemon/EventsGallery) ship with the pak, filtered to the game and language of each save:
-  - **Events**: key items that unlock in-game events, e.g. Aurora Ticket, Mystic Ticket, Eon Ticket, Old Sea Map, Member Card, Oak's Letter, Secret Key, Enigma Stone, Liberty Pass.
-  - **Distributions**: notable Pokémon giveaways (mythical and legendary Pokémon, e.g. WISHMKR Jirachi, Aura Mew, Movie Darkrai), each listed once.
+  - **Events**: every ticket the game has (Aurora Ticket, Mystic Ticket, Eon Ticket, Old Sea Map, Member Card, Oak's Letter, Secret Key, Azure Flute, Enigma Stone, Liberty Pass), marked Legal or Illegal. A game with one event shows it directly: Ruby/Sapphire get *Eon Ticket*, Crystal *GS Ball*.
+  - **Distributions**: released distributions of Pokémon that can't be obtained legally any other way in that game's language, e.g. WISHMKR Jirachi, 10 ANIV Celebi and Aura Mew in English Emerald.
   - **Gallery**: every file for the game, in the gallery's own folders.
-  - Crystal gets **Enable GS Ball Event** instead of Events.
+  - Every list shows **Legal** or **Illegal** next to each item.
 - **Import/export** PKHeX Pokémon files (`.pk1`–`.pk9`...).
 - **Automatic backups** before every change, and a *Restore a backup* option.
 
@@ -80,11 +80,19 @@ A save's menu shows art for its game: Ruby, Sapphire, Emerald, FireRed or LeafGr
 | Menu | What it does |
 | --- | --- |
 | Pokémon | Browse the party and boxes. For each Pokémon: view summary, move or copy to another game, trade evolve, export to file. |
-| Events (Gen 3–5) | Key items for in-game events, for this game and language. Gen 3 also shows the current Mystery Gift/Event status. |
-| Enable GS Ball Event (Crystal) | Turns on the GS Ball event, as the 3DS Virtual Console release did. |
-| Distributions | Notable Pokémon giveaways for this game and language. Copies of one distribution that differ only in PID/IVs (hundreds of MYSTRY Mew, for example) are listed once. |
+| Events | Every event ticket the game has, legitimate or not (see below). Games with a single event show it on the game menu instead: *Eon Ticket* (Ruby/Sapphire), *Enigma Stone* (HeartGold/SoulSilver), *Liberty Pass* (Black/White), *GS Ball* (Crystal). |
+| Distributions | Released distributions of Pokémon you can't legally get any other way in this game's language (see below). Copies of one distribution that differ only in PID/IVs (hundreds of MYSTRY Mew, for example) are listed once. |
 | Gallery | Every gallery file for this game and language, in the gallery's folders. |
-| More | Trade evolutions (incl. *Evolve all that are ready*), import a `.pk*` file from `PokemonManager/Import`, gift files from `PokemonManager/Gifts`, restore a backup, save info. |
+| More | Trade evolutions (incl. *Evolve all that are ready*), import a `.pk*` file from `PokemonManager/Import`, gift files from `PokemonManager/Gifts`, the Gen 3 Mystery Gift/Event status, restore a backup, save info. |
+
+Every item in these lists is marked **Legal** or **Illegal**:
+
+- **Tickets** are legal when they were officially distributed for the game and language. Otherwise the gallery's debug card or another game's card is used, if PKHeX says it works in the save, and the ticket is marked illegal (you're asked before it's added). For example, English Emerald shows Aurora Ticket and Mystic Ticket as legal and Old Sea Map as illegal; Japanese Emerald is the other way round for the Aurora Ticket and Old Sea Map. Diamond/Pearl only get illegal tickets: the Member Card and Oak's Letter were Platinum cards, and the Azure Flute was never released.
+- **GS Ball** is legal in Japanese Crystal (Mobile System). Elsewhere it only ran on the 3DS Virtual Console, so it's illegal on a cartridge game.
+- **Distributions** and released **Gallery** files are always legal. Released Pokémon files PKHeX rejects aren't bundled, and each Pokémon is regenerated and checked before it's added.
+- **Unreleased** gallery files (with *Show unreleased files* on) show PKHeX's verdict; unreleased cards were never distributed, so they're illegal.
+
+**Which Pokémon count as distributions.** At build time PKHeX checks every mythical, legendary and alternate-form Pokémon in the gallery: is there a legal non-event way to get it in a handheld game of that language? That covers catching, gifts, in-game trades, breeding and transfers from earlier handheld generations; GameCube games don't count. The ones with no other way make up the Distributions list. Language matters: a Faraway Island Mew is only legitimate in Japanese Emerald (the Old Sea Map was only distributed there), so Mew is event-only in every other language, while Deoxys, Lugia and Ho-Oh aren't, because their ticket encounters are legitimate in English Emerald.
 
 Picking a gift: event Pokémon are **generated fresh for your save**, as the real distributions did. PKHeX works out which distribution a gallery file came from and rolls a new PID, nature, IVs and so on with that event's own method, keeping the event's OT and ID. Each Pokémon must pass PKHeX's legality check for your game before it's added; generation is retried until one does. For the few events PKHeX can't recreate (the Berry Glitch Shiny Zigzagoon), you get a random legal copy from the gallery's originals. Pokémon that weren't generated per player (e.g. one specific traded Pokémon) are given as they are. Released files that PKHeX flags as illegal aren't bundled at all, and unreleased ones ask before adding an illegal Pokémon. Gen 1/2 Pokémon are judged as cartridge-era games, so the GB event Mews count as legal. The new Pokémon goes to the first free PC slot. Gen 4/5 Wonder Cards can go to the in-game Mystery Gift album (pick them up from the delivery person) or, for Pokémon, straight to the PC. Gen 3 cards are injected as described under *Gen 3 events* below.
 

@@ -49,7 +49,7 @@ public sealed class GalleryTests : IDisposable
     }
 
     private static GalleryEntry Entry(string path, int gen, string[] games, string? lang, GalleryKind kind = GalleryKind.Card, bool released = true)
-        => new(path, gen, games, lang, released, kind, 0, GalleryFlags.None, Path.GetFileNameWithoutExtension(path));
+        => new(path, gen, games, lang, released, kind, 0, 0, GalleryFlags.None, Path.GetFileNameWithoutExtension(path));
 
     [Fact]
     public void ProfileFiltersByGameLanguageAndRelease()
@@ -156,6 +156,8 @@ public sealed class GalleryTests : IDisposable
         {
             write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (C579) (ENG).pk3", Bytes(EventCopy(sav, Species.Jirachi, "WISHMKR")));
             write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (6E7E) (ENG).pk3", Bytes(EventCopy(sav, Species.Jirachi, "WISHMKR")));
+            // Lugia can be caught (Navel Rock), so its distribution isn't listed under Distributions.
+            write("Released/Gen 3/ENG/10th/RSEFL - 10 ANIV Lugia (ENG).pk3", Bytes(EventCopy(sav, Species.Lugia, "")));
             write("Released/Gen 3/ENG/Wondercards/E - Item AuroraTicket (ENG) (UK).wc3", Gen3EventTests.MakeWonderCard("AURORA TICKET"));
             write("Released/Gen 3/ENG/Wondercards/notes.txt", [1, 2, 3]);
             write("Released/Gen 3/ENG/broken.pk3", [1, 2, 3]);
@@ -163,27 +165,57 @@ public sealed class GalleryTests : IDisposable
             write("Released/Gen 3/ENG/Fake/RSEFL - Fake Mew (ENG).pk3", Bytes(TestSaves.Make(sav, Species.Mew, 10)));
             // ...but unreleased debug files are kept for the "show unreleased" setting.
             write("Unreleased/Gen 3/ENG/RSEFL - Debug Mew (ENG).pk3", Bytes(TestSaves.Make(sav, Species.Mew, 10)));
+            write("Unreleased/Gen 3/ENG/Wondercards/E - Item Old Sea Map (debug)(ENG).wc3", Gen3EventTests.MakeWonderCard("OLD SEA MAP"));
             write("Released/Gen 4/hex extracted cards/ENG/x.pcd", new byte[856]);
         });
 
         var zip = Path.Combine(_saves.Dir, "gallery.zip");
         var (added, skipped) = GalleryBuilder.Build(root, zip);
-        Assert.Equal(4, added);
+        Assert.Equal(6, added);
         Assert.Equal(2, skipped);
 
-        var gallery = new GalleryArchive(zip);
+        using var gallery = new GalleryArchive(zip);
         var profile = new GameProfile(3, ["E"], "ENG");
-        var events = GalleryLists.Events(gallery, profile);
-        Assert.Equal("Item AuroraTicket (UK)", Assert.Single(events).Title);
-        Assert.NotNull(gallery.Load(events[0])?.Gen3);
+
+        // Every ticket Emerald has a file for, the unofficial Old Sea Map included but marked illegal.
+        var tickets = Tickets.For(gallery, profile, sav);
+        Assert.Equal(["Aurora Ticket", "Old Sea Map"], tickets.Select(t => t.Ticket.Name));
+        Assert.True(tickets[0].Legal);
+        Assert.False(tickets[1].Legal);
+        Assert.Empty(Tickets.For(gallery, profile with { Games = ["R"] }, sav)); // Ruby has the Eon Ticket only
 
         var distributions = GalleryLists.Distributions(gallery, profile);
         Assert.Equal("WISHMKR Jirachi", Assert.Single(distributions).Title);
         Assert.Equal((ushort)Species.Jirachi, gallery.Load(distributions[0])?.Pokemon?.Species);
-        Assert.Contains(gallery.Entries, e => e is { Released: false, Species: (ushort)Species.Mew });
 
-        Assert.Empty(GalleryLists.Events(gallery, profile with { Language = "GER" }));
-        Assert.Empty(GalleryLists.Events(gallery, profile with { Games = ["FR"] }));
+        var debugMew = Assert.Single(gallery.Entries, e => e is { Released: false, Species: (ushort)Species.Mew });
+        Assert.False(debugMew.IsFileLegal);
+        Assert.True(gallery.Entries.Single(e => e.Title.Contains("Lugia")).IsFileLegal);
+    }
+
+    [Theory]
+    [InlineData(3, "ENG", Species.Mew, true)]       // Faraway Island Mew is only legitimate in Japanese Emerald
+    [InlineData(3, "JPN", Species.Mew, false)]
+    [InlineData(3, "ENG", Species.Celebi, true)]
+    [InlineData(3, "ENG", Species.Jirachi, true)]
+    [InlineData(3, "ENG", Species.Lugia, false)]
+    [InlineData(3, "ENG", Species.Latias, false)]
+    [InlineData(1, "INT", Species.Mew, true)]
+    [InlineData(1, "INT", Species.Mewtwo, false)]
+    [InlineData(2, "JPN", Species.Raikou, false)]
+    [InlineData(4, "ENG", Species.Arceus, true)]
+    [InlineData(4, "ENG", Species.Darkrai, false)]   // Newmoon Island with the Member Card
+    public void EventOnlyMeansNoOtherLegalWay(int gen, string language, Species species, bool eventOnly)
+    {
+        var sav = EventOnly.TrainerSave(gen, language);
+        Assert.Equal(eventOnly, !EventOnly.IsObtainable(sav, (ushort)species, 0));
+    }
+
+    [Fact]
+    public void FormsChangedInGameCountAsTheBaseForm()
+    {
+        Assert.Equal(0, EventOnly.KeyForm((ushort)Species.Deoxys, 1, 4));
+        Assert.Equal(1, EventOnly.KeyForm((ushort)Species.Pichu, 1, 4)); // Spiky-eared Pichu can't change back
     }
 
     [Fact]
@@ -194,7 +226,7 @@ public sealed class GalleryTests : IDisposable
         var root = WriteGallery(write => write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (C579) (ENG).pk3", Bytes(copy)));
         var zip = Path.Combine(_saves.Dir, "gallery.zip");
         GalleryBuilder.Build(root, zip);
-        var gallery = new GalleryArchive(zip);
+        using var gallery = new GalleryArchive(zip);
         var entry = Assert.Single(gallery.Entries);
 
         var pids = new HashSet<uint>();
