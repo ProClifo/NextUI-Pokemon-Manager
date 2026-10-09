@@ -5,8 +5,10 @@ namespace PokemonManager.Core;
 /// <summary>
 /// The games' own rules for moving Pokémon around, applied unless "Illegal transfers" is on: which
 /// generations can reach which, and how far each game must have progressed before it can send or receive.
-/// Gen 3 rules follow the trade code of the pret decompilations (pokeemerald/pokefirered src/trade.c);
-/// Ruby/Sapphire's trade code has no such checks of its own.
+/// Rules follow the pret decompilations: pokered/pokeyellow (Cable Club), pokegold/pokecrystal (Trade
+/// Center, Time Capsule), pokeemerald/pokefirered src/trade.c (Ruby/Sapphire have no checks of their own) and
+/// pokediamond/pokeplatinum/pokeheartgold (Pal Park). Gen 5's Poké Transfer Lab needing the National Pokédex
+/// isn't decompiled; it's how the games are documented.
 /// </summary>
 public static class TradeRules
 {
@@ -16,6 +18,16 @@ public static class TradeRules
     private const int FlagIsChampionE = 0x87F;     // FLAG_IS_CHAMPION
 
     private const ushort KantoDexEnd = 151;        // KANTO_SPECIES_END
+
+    // Gen 1/2 event flags (pokered/pokeyellow and pokegold/pokecrystal constants/event_flags.asm)
+    private const int EventGotPokedex1 = 37;        // EVENT_GOT_POKEDEX: the Cable Club needs it
+    private const int EventGaveMysteryEggToElm = 31; // the Trade Center needs it
+    private const int EventMetBill = 1810;          // set at new game, cleared when Bill turns the Time Capsule on
+
+    // Gen 3 IsNationalPokedexEnabled: flag + var + the Pokédex magic byte (src/event_data.c)
+    private const int FlagNationalDexE = 0x896, FlagNationalDexRS = 2102, FlagNationalDexFRLG = 0x840;
+    private const int VarNationalDexRSE = 70, VarNationalDexFRLG = 78;
+    private const ushort VarNationalDexValueRSE = 0x302, VarNationalDexValueFRLG = 0x6258;
 
     /// <summary>Gen 3's HMs, which Pal Park refuses to carry.</summary>
     private static readonly HashSet<ushort> HmMoves3 =
@@ -36,14 +48,21 @@ public static class TradeRules
     /// real games: by trade within a generation, the Time Capsule between Gen 1 and 2, Pal Park from Gen 3 to
     /// Gen 4 and Poké Transfer from Gen 4 to Gen 5.
     /// </summary>
-    public static OpResult CheckTransfer(PKM pk, SaveFile source, SaveFile dest)
+    /// <param name="sourceLanguage">The games' languages as gallery codes (ENG, JPN...), when known: Pal Park
+    /// only migrates from a Gen 3 game of the same language.</param>
+    public static OpResult CheckTransfer(PKM pk, SaveFile source, SaveFile dest, string? sourceLanguage = null, string? destLanguage = null)
     {
         var route = CheckRoute(pk, source.Generation, dest.Generation);
         if (!route.Ok)
             return route;
-        if (source.Generation == 3 && dest.Generation == 3)
-            return Gen3Trade(pk, source, dest);
-        return CheckReceive(pk, dest);
+        return (source.Generation, dest.Generation) switch
+        {
+            ( <= 2, <= 2) => GameBoyLink(source, dest),
+            (3, 3) => Gen3Trade(pk, source, dest),
+            (3, 4) => PalPark(dest, sourceLanguage, destLanguage),
+            (_, 5) when source.Generation < 5 => PokeTransfer(dest),
+            _ => CheckReceive(pk, dest),
+        };
     }
 
     /// <summary>
@@ -79,12 +98,83 @@ public static class TradeRules
         return OpResult.Success("");
     }
 
-    /// <summary>Whether this save can take in <paramref name="pk"/> at all (for gifts, imports and transfers).</summary>
+    /// <summary>
+    /// Whether this save can take in <paramref name="pk"/> from outside (gifts and imports): Game Boy games
+    /// received event Pokémon by trade, so their link rooms must be open; Emerald and FireRed/LeafGreen need
+    /// the National Pokédex for Pokémon outside their regional Pokédex.
+    /// </summary>
     public static OpResult CheckReceive(PKM pk, SaveFile dest)
     {
-        if (dest is SAV3E or SAV3FRLG && !((SAV3)dest).NationalDex && !InRegionalDex(dest, pk.Species))
+        if (dest.Generation <= 2 && LinkRoomClosed(dest) is { } closed)
+            return OpResult.Fail(closed);
+        if (dest is SAV3E or SAV3FRLG && !NationalDex3((SAV3)dest) && !InRegionalDex(dest, pk.Species))
             return OpResult.Fail($"{Names.Game(dest)} can't receive {Names.Species(pk)} until it has the National Pokédex.");
         return OpResult.Success("");
+    }
+
+    /// <summary>Gen 1/2 trades (Cable Club / Trade Center) and Gen 1 &lt;-&gt; Gen 2 (Time Capsule).</summary>
+    private static OpResult GameBoyLink(SaveFile source, SaveFile dest)
+    {
+        bool timeCapsule = source.Generation != dest.Generation;
+        foreach (var sav in new[] { source, dest })
+        {
+            if (sav is SAV2 gen2 && timeCapsule)
+            {
+                if (gen2.GetEventFlag(EventMetBill))
+                    return OpResult.Fail($"{Names.Game(sav)}'s Time Capsule opens once Bill has switched it on, in the Ecruteak City Pokémon Center.");
+            }
+            else if (LinkRoomClosed(sav) is { } closed)
+            {
+                return OpResult.Fail(closed);
+            }
+        }
+        return OpResult.Success("");
+    }
+
+    private static string? LinkRoomClosed(SaveFile sav) => sav switch
+    {
+        SAV1 gen1 when !gen1.GetEventFlag(EventGotPokedex1)
+            => $"{Names.Game(sav)} can't trade until you've received the Pokédex from Professor Oak.",
+        SAV2 gen2 when !gen2.GetEventFlag(EventGaveMysteryEggToElm)
+            => $"{Names.Game(sav)} can't trade until you've given the Mystery Egg to Professor Elm.",
+        _ => null,
+    };
+
+    /// <summary>Pal Park opens from the main menu once the Gen 4 game has the National Pokédex.</summary>
+    private static OpResult PalPark(SaveFile dest, string? sourceLanguage, string? destLanguage)
+    {
+        if (!NationalDex4((SAV4)dest))
+            return OpResult.Fail($"{Names.Game(dest)} can't use Pal Park until it has the National Pokédex.");
+        if (sourceLanguage is not null && destLanguage is not null && sourceLanguage != destLanguage)
+            return OpResult.Fail($"Pal Park only migrates from a Gen 3 game of the same language ({GalleryLanguage.Name(sourceLanguage)} to {GalleryLanguage.Name(destLanguage)} isn't allowed).");
+        return OpResult.Success("");
+    }
+
+    /// <summary>The Poké Transfer Lab on Route 15 opens once the Gen 5 game has the National Pokédex.</summary>
+    private static OpResult PokeTransfer(SaveFile dest)
+    {
+        if (dest is SAV5 gen5 && !gen5.Zukan.IsNationalDexUnlocked)
+            return OpResult.Fail($"{Names.Game(dest)} can't use the Poké Transfer Lab until it has the National Pokédex.");
+        return OpResult.Success("");
+    }
+
+    /// <summary>The game's own IsNationalPokedexEnabled: PKHeX's NationalDex only checks the magic byte.</summary>
+    public static bool NationalDex3(SAV3 sav) => sav.NationalDex && sav switch
+    {
+        SAV3FRLG => sav.GetEventFlag(FlagNationalDexFRLG) && sav.GetWork(VarNationalDexFRLG) == VarNationalDexValueFRLG,
+        SAV3E => sav.GetEventFlag(FlagNationalDexE) && sav.GetWork(VarNationalDexRSE) == VarNationalDexValueRSE,
+        _ => sav.GetEventFlag(FlagNationalDexRS) && sav.GetWork(VarNationalDexRSE) == VarNationalDexValueRSE,
+    };
+
+    /// <summary>
+    /// The Pokédex block's own National Pokédex flag, which the main menu checks for Pal Park (PKHeX's
+    /// NationalDex is the copy in the trainer card; both are set together).
+    /// </summary>
+    public static bool NationalDex4(SAV4 sav)
+    {
+        int offset = sav switch { SAV4DP => 0x139, SAV4Pt => 0x319, _ => 0x337 };
+        var dex = sav.Dex.Data;
+        return sav.NationalDex || (offset < dex.Length && dex[offset] != 0);
     }
 
     /// <summary>Trades between two Gen 3 games, as pokeemerald/pokefirered's CanTradeSelectedMon and GetGameProgressForLinkTrade decide.</summary>
@@ -107,7 +197,7 @@ public static class TradeRules
         {
             if (sav is not (SAV3E or SAV3FRLG))
                 continue; // Ruby/Sapphire don't check
-            if (!((SAV3)sav).NationalDex)
+            if (!NationalDex3((SAV3)sav))
             {
                 if (pk.IsEgg)
                     return OpResult.Fail($"{Names.Game(sav)} can't trade Eggs until it has the National Pokédex.");

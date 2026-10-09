@@ -38,6 +38,7 @@ public sealed class TransferTests : IDisposable
     {
         var em = _saves.Create(GameVersion.E, "Emerald.sav");
         var hg = _saves.Create(GameVersion.HG, "HeartGold.sav");
+        TestSaves.Progress(hg.Sav); // Pal Park needs the National Pokédex
         new SlotRef(1, 4).Set(em.Sav, TestSaves.Make(em.Sav, Species.Mudkip, 12));
 
         var result = TransferService.Transfer(em, new SlotRef(1, 4), hg, TransferMode.Copy, false, out var placed);
@@ -83,6 +84,7 @@ public sealed class TransferTests : IDisposable
     {
         var red = _saves.Create(GameVersion.RD, "Red.sav");
         var crystal = _saves.Create(GameVersion.C, "Crystal.sav", "GOLD");
+        TestSaves.Progress(red.Sav); // the Cable Club needs the Pokédex
         new SlotRef(0, 0).Set(red.Sav, TestSaves.Make(red.Sav, Species.Kadabra, 25));
 
         var result = TransferService.Transfer(red, new SlotRef(0, 0), crystal, TransferMode.Move, false, out var placed);

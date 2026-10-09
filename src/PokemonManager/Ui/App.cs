@@ -350,7 +350,8 @@ public sealed class App
             return false;
 
         var pk = from.Get(source.Sav);
-        if (!_settings.AllowIllegalTransfers && TradeRules.CheckTransfer(pk, source.Sav, dest.Sav) is { Ok: false } refused)
+        if (!_settings.AllowIllegalTransfers
+            && TradeRules.CheckTransfer(pk, source.Sav, dest.Sav, ProfileFor(source).Language, ProfileFor(dest).Language) is { Ok: false } refused)
         {
             _ui.Message($"{refused.Message}\n\n(Settings > Illegal transfers turns these rules off.)");
             return false;

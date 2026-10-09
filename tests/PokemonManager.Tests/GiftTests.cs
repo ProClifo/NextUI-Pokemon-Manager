@@ -84,13 +84,9 @@ public sealed class GiftTests : IDisposable
     public void BuiltInEventLibraryRedeems(GameVersion version)
     {
         var entry = _saves.Create(version, $"{version}.sav");
-        // Games can only receive Pokémon outside their regional Pokédex once they have the National Pokédex.
-        switch (entry.Sav)
-        {
-            case SAV3 s3: s3.NationalDex = true; break;
-            case SAV4 s4: s4.NationalDex = true; break;
-            case SAV5 s5: s5.Zukan.IsNationalDexUnlocked = true; break;
-        }
+        // Event Pokémon reach Game Boy games by trade, and Gen 3 games outside their regional Pokédex
+        // need the National Pokédex.
+        TestSaves.Progress(entry.Sav);
         var events = GiftService.BuiltInEvents(entry.Sav);
         Assert.NotEmpty(events);
 

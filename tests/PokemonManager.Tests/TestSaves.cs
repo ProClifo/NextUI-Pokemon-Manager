@@ -101,6 +101,27 @@ public sealed class TestSaves : IDisposable
         _ => sav.Small[..SAV3.SIZE_SECTOR_USED],
     };
 
+    /// <summary>
+    /// Marks the save as far enough in the story to trade, receive and transfer anything: the link rooms
+    /// open, the National Pokédex, FireRed/LeafGreen's Sapphire delivered and Emerald's Champion title.
+    /// </summary>
+    public static SaveFile Progress(SaveFile sav)
+    {
+        switch (sav)
+        {
+            case SAV1 s1: s1.SetEventFlag(37, true); break;           // EVENT_GOT_POKEDEX
+            case SAV2 s2: s2.SetEventFlag(31, true); break;           // EVENT_GAVE_MYSTERY_EGG_TO_ELM
+            case SAV3 s3:
+                s3.NationalDex = true;
+                if (s3 is SAV3FRLG) s3.SetEventFlag(0x844, true);     // FLAG_SYS_CAN_LINK_WITH_RS
+                if (s3 is SAV3E) s3.SetEventFlag(0x87F, true);        // FLAG_IS_CHAMPION
+                break;
+            case SAV4 s4: s4.NationalDex = true; break;
+            case SAV5 s5: s5.Zukan.IsNationalDexUnlocked = true; break;
+        }
+        return sav;
+    }
+
     public static PKM Make(SaveFile sav, Species species, int level = 30, int heldItem = 0)
     {
         var pk = sav.BlankPKM;

@@ -26,15 +26,8 @@ public sealed class TradeRulesTests : IDisposable
     {
         var source = Save(from);
         var dest = Save(to);
-        foreach (var sav in new[] { source, dest })
-        {
-            switch (sav)
-            {
-                case SAV3 s3: s3.NationalDex = true; break;
-                case SAV4 s4: s4.NationalDex = true; break;
-                case SAV5 s5: s5.Zukan.IsNationalDexUnlocked = true; break;
-            }
-        }
+        TestSaves.Progress(source);
+        TestSaves.Progress(dest);
         var pk = TestSaves.Make(source, Species.Pikachu, 20);
         var result = TradeRules.CheckTransfer(pk, source, dest);
         Assert.True(allowed == result.Ok, result.Message);
@@ -108,5 +101,71 @@ public sealed class TradeRulesTests : IDisposable
         Assert.Contains("official event", TradeRules.CheckTransfer(mew, ruby, em).Message);
         mew.FatefulEncounter = true;
         Assert.True(TradeRules.CheckTransfer(mew, ruby, em).Ok);
+    }
+
+    [Fact]
+    public void GameBoyLinkRoomsOpenWithTheStory()
+    {
+        var red = (SAV1)Save(GameVersion.RD);
+        var crystal = (SAV2)Save(GameVersion.C);
+        var gold = (SAV2)Save(GameVersion.GD);
+        var pk = TestSaves.Make(red, Species.Pikachu, 10);
+
+        // Gen 1: the Cable Club needs the Pokédex.
+        Assert.Contains("Pokédex", TradeRules.CheckTransfer(pk, red, crystal).Message);
+        red.SetEventFlag(37, true);
+        // Time Capsule: open once Bill has switched it on (EVENT_MET_BILL cleared; it's set at new game).
+        crystal.SetEventFlag(1810, true);
+        Assert.Contains("Time Capsule", TradeRules.CheckTransfer(pk, red, crystal).Message);
+        crystal.SetEventFlag(1810, false);
+        Assert.True(TradeRules.CheckTransfer(pk, red, crystal).Ok);
+
+        // Gen 2 trades: the Trade Center opens once the Mystery Egg is with Elm.
+        var pk2 = TestSaves.Make(crystal, Species.Chikorita, 10);
+        Assert.Contains("Mystery Egg", TradeRules.CheckTransfer(pk2, crystal, gold).Message);
+        crystal.SetEventFlag(31, true);
+        gold.SetEventFlag(31, true);
+        Assert.True(TradeRules.CheckTransfer(pk2, crystal, gold).Ok);
+
+        // Event gifts reached Game Boy games by trade too.
+        Assert.False(TradeRules.CheckReceive(pk, (SAV1)Save(GameVersion.BU)).Ok);
+    }
+
+    [Fact]
+    public void PalParkNeedsTheNationalDexAndTheSameLanguage()
+    {
+        var em = Save(GameVersion.E);
+        var pt = (SAV4)Save(GameVersion.Pt);
+        var pk = TestSaves.Make(em, Species.Pikachu, 10);
+
+        Assert.Contains("Pal Park", TradeRules.CheckTransfer(pk, em, pt).Message);
+        pt.NationalDex = true;
+        Assert.True(TradeRules.CheckTransfer(pk, em, pt, "ENG", "ENG").Ok);
+        Assert.Contains("same language", TradeRules.CheckTransfer(pk, em, pt, "GER", "ENG").Message);
+    }
+
+    [Fact]
+    public void PokeTransferNeedsTheNationalDex()
+    {
+        var pt = Save(GameVersion.Pt);
+        var b2 = (SAV5)Save(GameVersion.B2);
+        var pk = TestSaves.Make(pt, Species.Pikachu, 10);
+        Assert.Contains("Poké Transfer", TradeRules.CheckTransfer(pk, pt, b2).Message);
+        b2.Zukan.IsNationalDexUnlocked = true;
+        Assert.True(TradeRules.CheckTransfer(pk, pt, b2).Ok);
+
+        // Gen 4 and Gen 5 trades have no story requirement.
+        Assert.True(TradeRules.CheckTransfer(pk, pt, Save(GameVersion.HG)).Ok);
+    }
+
+    [Fact]
+    public void Gen3NationalDexMeansWhatTheGameChecks()
+    {
+        var em = (SAV3)Save(GameVersion.E);
+        em.NationalDex = true;
+        Assert.True(TradeRules.NationalDex3(em));
+        em.SetEventFlag(0x896, false); // FLAG_SYS_NATIONAL_DEX: PKHeX's NationalDex still says yes, the game doesn't
+        Assert.True(em.NationalDex);
+        Assert.False(TradeRules.NationalDex3(em));
     }
 }

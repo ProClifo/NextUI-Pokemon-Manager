@@ -128,9 +128,22 @@ Gift and event files are widely shared by the community, for example in Project 
 
 ### Transfers
 
-By default only routes the real games supported are allowed. If PKHeX reports "no transfer route", the menu says so. **Settings → Unofficial transfers** lets PKHeX force a conversion (e.g. Gen 4 → Gen 3), but those Pokémon will usually be flagged as illegal.
+By default Pokémon only move the way the real games allowed, and only once each game has progressed far enough. **Settings → Illegal transfers** (off by default) turns all of this off: Pokémon can then go between any generations PKHeX can convert (e.g. Gen 4 → Gen 3), but they'll usually be flagged as illegal.
 
-Rules the app enforces:
+| Route | Allowed | Requirements (from the pret decompilations) |
+| --- | --- | --- |
+| Gen 1 ↔ Gen 1 | Cable Club | Each Gen 1 game has the Pokédex from Oak. |
+| Gen 2 ↔ Gen 2 | Trade Center | Each game has given the Mystery Egg to Elm. |
+| Gen 1 ↔ Gen 2 | Time Capsule | Gen 1: the Pokédex. Gen 2: Bill has switched the Time Capsule on (first visit to the Ecruteak City Pokémon Center). Gen 2-only species and moves can't go to Gen 1. |
+| Gen 3 ↔ Gen 3 | Trade | FireRed/LeafGreen ↔ Ruby/Sapphire/Emerald: the Sapphire has been delivered to Celio, and Emerald is Champion. Emerald and FR/LG without the National Pokédex can't send or receive Eggs or Pokémon outside their Hoenn/Kanto Pokédex (Ruby/Sapphire don't check). Mew and Deoxys need the event flag. |
+| Gen 3 → Gen 4 | Pal Park | The Gen 4 game has the National Pokédex; both games are the same language; no Eggs; no Gen 3 HM moves. |
+| Gen 4 ↔ Gen 4, Gen 5 ↔ Gen 5 | Trade | None. |
+| Gen 4 → Gen 5 | Poké Transfer | The Gen 5 game has the National Pokédex (documented, not decompiled); no Eggs; no Gen 4 HM moves. |
+| Gen 1/2 → Gen 3+, anything backwards | — | Not possible in the games. |
+
+Gifts, Wonder Card Pokémon sent to the PC and imported files follow the receiving side of these rules: Game Boy games need their link room open (their event Pokémon arrived by trade), and Emerald and FireRed/LeafGreen need the National Pokédex for Pokémon outside their regional Pokédex. Pal Park's once-a-day and six-Pokémon limits aren't applied.
+
+Rules the app always enforces:
 
 - A Pokémon only moves into an empty PC slot. Nothing is overwritten.
 - The destination save is written first, then the source save. If the second write fails, the Pokémon ends up in both saves instead of being lost.
