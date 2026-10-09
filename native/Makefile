@@ -12,6 +12,7 @@ NEXTUI_VERSION ?= v6.14.0
 H700_VERSION ?= h700-rc11
 MY355_NEXTUI_VERSION ?= my355-latest
 PARSON_VERSION ?= ec53fb6528b45811df9db0db22cab96a94a96a11
+MINUI_LIST_VERSION ?= 0.15.4
 
 WORKSPACE = $(patsubst %-nextui,%,$(PLATFORM))
 ifeq ($(PLATFORM),h700-nextui)
@@ -71,7 +72,21 @@ device: $(NEXTUI_DIR) include/parson $(CURDIR)/platform/$(PLATFORM)/include/mset
 		-DPLATFORM=\"$(WORKSPACE)\" -DPLATFORM_NEXTUI -O2 -std=gnu99 \
 		-L$(LIB_DIR) -L/opt/nextui/lib $(LDFLAGS) -lmsettings $(NEXTUI_GL_LIBS)
 
-clean:
-	rm -rf pkmgr-box-* platform nextui-*
+# minui-list, patched: its --font-large/--font-medium/--font-default options strncpy into NULL
+# pointers and crash (still so upstream), which the per-game menu fonts need.
+minui-list-src:
+	git clone -q --branch $(MINUI_LIST_VERSION) https://github.com/josegonzalez/minui-list.git minui-list-src
+	git -C minui-list-src apply ../minui-list-fonts.patch
 
-.PHONY: all desktop device nextui clean
+minui-list: $(NEXTUI_DIR) minui-list-src include/parson $(CURDIR)/platform/$(PLATFORM)/include/msettings.h
+	$(CROSS_COMPILE)gcc minui-list-src/minui-list.c $(wildcard minui-list-src/list_*.c) include/parson/parson.c \
+		$(COMMON)/scaler.c $(COMMON)/utils.c $(COMMON)/api.c $(COMMON)/config.c $(PLAT)/platform.c \
+		-o minui-list-$(PLATFORM) \
+		$(CFLAGS) -Iminui-list-src -Iinclude -Iplatform/$(PLATFORM)/include -I$(COMMON) -I$(PLAT) -I/opt/nextui/include \
+		-DPLATFORM=\"$(WORKSPACE)\" -DPLATFORM_NEXTUI -O2 -std=gnu99 \
+		-L$(LIB_DIR) -L/opt/nextui/lib $(LDFLAGS) -lmsettings $(NEXTUI_GL_LIBS)
+
+clean:
+	rm -rf pkmgr-box-* minui-list-*-nextui minui-list-src platform nextui-*
+
+.PHONY: all desktop device nextui clean minui-list

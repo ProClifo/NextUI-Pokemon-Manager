@@ -16,7 +16,7 @@ BUILD="$ROOT/build"
 DIST="$ROOT/dist"
 PAK="$BUILD/Pokemon Manager.pak"
 
-MINUI_LIST_VERSION="${MINUI_LIST_VERSION:-0.15.4}"
+MINUI_LIST_VERSION="${MINUI_LIST_VERSION:-0.15.4}"  # also pinned in native/Makefile
 MINUI_PRESENTER_VERSION="${MINUI_PRESENTER_VERSION:-0.13.4}"
 POKEEMERALD_COMMIT="${POKEEMERALD_COMMIT:-731ad5bfd6e6f265508d0efcca0ba42f9dcf5881}"
 EVENTSGALLERY_COMMIT="${EVENTSGALLERY_COMMIT:-154d81be88453f6f78ec1d6d86e85fe0f2f5c240}"
@@ -53,17 +53,18 @@ fetch() {
     chmod +x "$dest"
 }
 
-echo "==> Fetching minui-list $MINUI_LIST_VERSION and minui-presenter $MINUI_PRESENTER_VERSION"
+echo "==> Fetching minui-presenter $MINUI_PRESENTER_VERSION"
 for platform in "${PLATFORMS[@]}"; do
     mkdir -p "$PAK/bin/$platform"
-    fetch "https://github.com/josegonzalez/minui-list/releases/download/$MINUI_LIST_VERSION/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
     fetch "https://github.com/josegonzalez/minui-presenter/releases/download/$MINUI_PRESENTER_VERSION/minui-presenter-$platform-nextui" "$PAK/bin/$platform/minui-presenter"
 done
 
-echo "==> PC box viewer"
+# Built from source: the PC box viewer, and minui-list $MINUI_LIST_VERSION patched so its font options
+# don't crash (the release binaries segfault on --font-large, which the per-game menu fonts use).
+echo "==> PC box viewer and minui-list"
 missing=()
 for platform in "${PLATFORMS[@]}"; do
-    [ -x "$ROOT/native/pkmgr-box-$platform-nextui" ] || missing+=("$platform")
+    [ -x "$ROOT/native/pkmgr-box-$platform-nextui" ] && [ -x "$ROOT/native/minui-list-$platform-nextui" ] || missing+=("$platform")
 done
 if [ ${#missing[@]} -ne 0 ]; then
     if command -v docker >/dev/null 2>&1; then
@@ -76,7 +77,14 @@ if [ ${#missing[@]} -ne 0 ]; then
         echo "!! docker not found: no PC box viewer for ${missing[*]} (the app falls back to lists)" >&2
     fi
 fi
+no_fonts=()
 for platform in "${PLATFORMS[@]}"; do
+    if [ -x "$ROOT/native/minui-list-$platform-nextui" ]; then
+        cp "$ROOT/native/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
+    else
+        fetch "https://github.com/josegonzalez/minui-list/releases/download/$MINUI_LIST_VERSION/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
+        no_fonts+=("$platform")
+    fi
     if [ -x "$ROOT/native/pkmgr-box-$platform-nextui" ]; then
         cp "$ROOT/native/pkmgr-box-$platform-nextui" "$PAK/bin/$platform/pkmgr-box"
     fi
@@ -119,7 +127,12 @@ python3 "$ROOT/scripts/build-box-assets.py" "$DECOMP/pokeemerald" "$PAK/res/box"
 python3 "$ROOT/scripts/build-box-art.py" "$DECOMP" "$PAK/res/box/art"
 
 echo "==> Game fonts"
-python3 "$ROOT/scripts/build-fonts.py" "$DECOMP" "$PAK/res/fonts"
+if [ ${#no_fonts[@]} -eq 0 ]; then
+    python3 "$ROOT/scripts/build-fonts.py" "$DECOMP" "$PAK/res/fonts"
+else
+    # The released minui-list crashes when given a font, so without the patched build there are none.
+    echo "!! no patched minui-list for ${no_fonts[*]}: the pak uses the NextUI font everywhere" >&2
+fi
 
 echo "==> Per-game menu backgrounds"
 python3 "$ROOT/scripts/build-backgrounds.py" "$ROOT/assets/backgrounds" "$PAK/res/backgrounds"
