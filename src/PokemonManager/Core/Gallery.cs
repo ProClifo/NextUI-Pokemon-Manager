@@ -588,6 +588,20 @@ public static class GalleryLists
     /// differ only in PID/IVs; the list shows each distribution once.
     /// </summary>
     public static List<GalleryEntry> Distributions(GalleryArchive gallery, GameProfile profile)
+        => Curated.TryGetValue((profile.Generation, profile.Language), out var picks)
+            ? All(gallery, profile).Where(e => picks.Contains(e.Title)).ToList()
+            : All(gallery, profile);
+
+    /// <summary>
+    /// Games whose Distributions menu offers a chosen few rather than everything event-only (the rest stay in
+    /// the Gallery): English Gen 3 has one distribution each of Mew, Celebi and Jirachi.
+    /// </summary>
+    private static readonly Dictionary<(int Generation, string Language), HashSet<string>> Curated = new()
+    {
+        [(3, GalleryLanguage.English)] = new(StringComparer.OrdinalIgnoreCase) { "Aura Mew", "10 ANIV Celebi", "WISHMKR Jirachi" },
+    };
+
+    private static List<GalleryEntry> All(GalleryArchive gallery, GameProfile profile)
         => gallery.Entries
             .Where(e => e.Species > 0 && profile.Matches(e, allLanguages: false, unreleased: false)
                         && gallery.IsEventOnly(e.Generation, profile.Language, e.Species, e.Form))
