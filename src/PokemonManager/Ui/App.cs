@@ -304,7 +304,7 @@ public sealed class App
             var position = _boxPositions.GetValueOrDefault(entry.Path, new SlotRef(0, 0));
             while (true)
             {
-                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position);
+                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ui.Font);
                 _boxPositions[entry.Path] = position;
                 if (outcome == BoxViewer.Outcome.Back)
                     return;

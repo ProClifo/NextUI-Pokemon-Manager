@@ -8,6 +8,10 @@
 //   A       pick the Pokémon under the cursor
 //   B       back
 //
+// Icons and sprites can be pictures within a sheet ("icon_rect" / "sprite_rect": [x, y, w, h]), and
+// "font" / "font_em" name the game's font, drawn at one font pixel per GBA pixel (text it can't show
+// falls back to the NextUI font).
+//
 // The result is written to --write-location as {"box": n, "slot": n}.
 // Exit codes: 0 picked, 2 back (B), 3 back (MENU), 1 error.
 //
@@ -59,7 +63,9 @@ typedef struct
 {
     bool filled;
     char *icon;
+    SDL_Rect icon_rect; // w == 0: the whole image (frames stacked 32x32)
     char *sprite;
+    SDL_Rect sprite_rect;
     char *name;
     char *lines[MAX_LINES];
     int line_count;
@@ -81,6 +87,8 @@ typedef struct
     char *title;
     char *background;
     char *cursor;
+    char *font;
+    int font_em;
     Box *boxes;
     int box_count;
     int box;
@@ -124,6 +132,20 @@ static SDL_Surface *load_image(const char *path)
     return converted;
 }
 
+static SDL_Rect get_rect(JSON_Object *obj, const char *key)
+{
+    SDL_Rect r = {0, 0, 0, 0};
+    JSON_Array *a = json_object_get_array(obj, key);
+    if (a && json_array_get_count(a) == 4)
+    {
+        r.x = (int)json_array_get_number(a, 0);
+        r.y = (int)json_array_get_number(a, 1);
+        r.w = (int)json_array_get_number(a, 2);
+        r.h = (int)json_array_get_number(a, 3);
+    }
+    return r;
+}
+
 static char *dup_string(JSON_Object *obj, const char *key)
 {
     const char *value = json_object_get_string(obj, key);
@@ -143,6 +165,8 @@ static bool load_scene(const char *path, Scene *scene)
     scene->title = dup_string(obj, "title");
     scene->background = dup_string(obj, "background");
     scene->cursor = dup_string(obj, "cursor");
+    scene->font = dup_string(obj, "font");
+    scene->font_em = (int)json_object_get_number(obj, "font_em");
     scene->box = (int)json_object_get_number(obj, "box");
     scene->slot = (int)json_object_get_number(obj, "slot");
 
@@ -179,7 +203,9 @@ static bool load_scene(const char *path, Scene *scene)
             Slot *slot = &box->slots[s];
             slot->filled = true;
             slot->icon = dup_string(so, "icon");
+            slot->icon_rect = get_rect(so, "icon_rect");
             slot->sprite = dup_string(so, "sprite");
+            slot->sprite_rect = get_rect(so, "sprite_rect");
             slot->name = dup_string(so, "name");
             JSON_Array *lines = json_object_get_array(so, "lines");
             int n = lines ? (int)json_array_get_count(lines) : 0;
@@ -246,6 +272,37 @@ static void fill_logical(SDL_Surface *dst, const Layout *l, int x, int y, int w,
     SDL_FillRect(dst, &r, color);
 }
 
+// The game's font, if the scene names one, and its shadow offset (one font pixel).
+static TTF_Font *game_font = NULL;
+static int game_font_pixel = 1;
+
+// The game font if it has every character of the text, else the NextUI font.
+static TTF_Font *font_for(const char *text, TTF_Font *fallback)
+{
+    if (game_font == NULL || text == NULL)
+        return fallback;
+    const unsigned char *p = (const unsigned char *)text;
+    while (*p)
+    {
+        Uint32 c;
+        int n;
+        if (*p < 0x80) { c = *p; n = 1; }
+        else if ((*p & 0xE0) == 0xC0) { c = *p & 0x1F; n = 2; }
+        else if ((*p & 0xF0) == 0xE0) { c = *p & 0x0F; n = 3; }
+        else return fallback; // outside the Basic Multilingual Plane: no game font has it
+        for (int i = 1; i < n; i++)
+        {
+            if ((p[i] & 0xC0) != 0x80)
+                return fallback;
+            c = (c << 6) | (p[i] & 0x3F);
+        }
+        if (c >= 0x20 && !TTF_GlyphIsProvided(game_font, (Uint16)c))
+            return fallback;
+        p += n;
+    }
+    return game_font;
+}
+
 // Draws text with a dark shadow, like the game's box title. Returns the rendered width.
 static int draw_text(SDL_Surface *dst, TTF_Font *f, const char *text, int x, int y, int max_w, SDL_Color color, bool centered)
 {
@@ -281,7 +338,7 @@ static int draw_text(SDL_Surface *dst, TTF_Font *f, const char *text, int x, int
     SDL_Surface *t = TTF_RenderUTF8_Blended(f, truncated, color);
     if (s)
     {
-        int off = th / 12 > 0 ? th / 12 : 1;
+        int off = f == game_font ? game_font_pixel : (th / 12 > 0 ? th / 12 : 1);
         SDL_Rect r = {x + off, y + off, 0, 0};
         SDL_BlitSurface(s, NULL, dst, &r);
         SDL_FreeSurface(s);
@@ -338,7 +395,7 @@ static void draw_frame(SDL_Surface *screen, Scene *scene, const Layout *l, Uint3
     draw_arrow(screen, l, WALLPAPER_X + 10 - bob, WALLPAPER_Y + 6, false, arrow);
     draw_arrow(screen, l, WALLPAPER_X + WALLPAPER_W - 15 + bob, WALLPAPER_Y + 6, true, arrow);
     SDL_Color white = {255, 255, 255, 255};
-    TTF_Font *title_font = font.medium ? font.medium : font.large;
+    TTF_Font *title_font = font_for(box->name, font.medium ? font.medium : font.large);
     int title_h = TTF_FontHeight(title_font);
     draw_text(screen, title_font, box->name,
               l->origin_x + (WALLPAPER_X + WALLPAPER_W / 2) * l->scale,
@@ -355,8 +412,9 @@ static void draw_frame(SDL_Surface *screen, Scene *scene, const Layout *l, Uint3
         SDL_Surface *icon = load_image(slot->icon);
         if (icon == NULL)
             continue;
-        int frame = (i == scene->slot && icon->h >= 64) ? (int)((ticks / 200) % 2) : 0;
-        SDL_Rect src = {0, frame * 32, 32, 32};
+        SDL_Rect cell = slot->icon_rect.w ? slot->icon_rect : (SDL_Rect){0, 0, 32, icon->h};
+        int frame = (i == scene->slot && cell.h >= 64) ? (int)((ticks / 200) % 2) : 0;
+        SDL_Rect src = {cell.x, cell.y + frame * 32, 32, 32};
         int col = i % box->columns, row = i / box->columns;
         blit_scaled(icon, &src, screen, l, WALLPAPER_X + box->offset_x + ICON_X + col * SLOT_SIZE,
                     WALLPAPER_Y + box->offset_y + ICON_Y + row * SLOT_SIZE);
@@ -380,18 +438,29 @@ static void draw_frame(SDL_Surface *screen, Scene *scene, const Layout *l, Uint3
     Slot *current = &box->slots[scene->slot];
     if (current->filled)
     {
+        // The sprite, centred in the 72x72 picture area (sheets hold sprites trimmed to their pixels).
         SDL_Surface *sprite = load_image(current->sprite);
         if (sprite)
         {
-            SDL_Rect src = {0, 0, sprite->w < 64 ? sprite->w : 64, sprite->h < 64 ? sprite->h : 64};
-            blit_scaled(sprite, &src, screen, l, 8, 8);
+            SDL_Rect src = current->sprite_rect.w ? current->sprite_rect : (SDL_Rect){0, 0, sprite->w, sprite->h};
+            if (src.w > 72)
+            {
+                src.x += (src.w - 72) / 2;
+                src.w = 72;
+            }
+            if (src.h > 72)
+            {
+                src.y += src.h - 72;
+                src.h = 72;
+            }
+            blit_scaled(sprite, &src, screen, l, 4 + (72 - src.w) / 2, 4 + (72 - src.h) / 2);
         }
         else
         {
             SDL_Surface *icon = load_image(current->icon);
             if (icon)
             {
-                SDL_Rect src = {0, 0, 32, 32};
+                SDL_Rect src = {current->icon_rect.x, current->icon_rect.y, 32, 32};
                 SDL_Rect d = {l->origin_x + 8 * l->scale, l->origin_y + 8 * l->scale, 64 * l->scale, 64 * l->scale};
                 SDL_BlitScaled(icon, &src, screen, &d);
             }
@@ -401,28 +470,33 @@ static void draw_frame(SDL_Surface *screen, Scene *scene, const Layout *l, Uint3
         int x = l->origin_x + 7 * l->scale;
         int y = l->origin_y + 79 * l->scale;
         int max_w = 66 * l->scale;
-        TTF_Font *name_font = font.small ? font.small : font.medium;
-        TTF_Font *line_font = font.tiny ? font.tiny : name_font;
+        TTF_Font *nextui_name = font.small ? font.small : font.medium;
+        TTF_Font *nextui_line = font.tiny ? font.tiny : nextui_name;
+        TTF_Font *name_font = font_for(current->name, nextui_name);
         int name_w = 0;
         if (current->name)
             TTF_SizeUTF8(name_font, current->name, &name_w, NULL);
-        if (name_w > max_w)
-            name_font = line_font; // long names (UMBREON, nicknames) use the smaller font before truncating
-        draw_text(screen, name_font, current->name, x, y, max_w, dark, false);
+        int name_x = x;
+        if (name_font == game_font && name_w > max_w && name_w <= 72 * l->scale)
+            name_x = l->origin_x + 4 * l->scale + (72 * l->scale - name_w) / 2; // Game Boy names fill the panel
+        else if (name_w > max_w)
+            name_font = nextui_line; // long names (UMBREON, nicknames) use the smaller font before truncating
+        draw_text(screen, name_font, current->name, name_x, y, 72 * l->scale, dark, false);
         y += TTF_FontLineSkip(name_font) + l->scale;
         for (int i = 0; i < current->line_count; i++)
         {
+            TTF_Font *line_font = font_for(current->lines[i], nextui_line);
             if (y + TTF_FontHeight(line_font) > l->origin_y + 156 * l->scale)
                 break;
             draw_text(screen, line_font, current->lines[i], x, y, max_w, dark, false);
-            y += TTF_FontLineSkip(line_font);
+            y += TTF_FontLineSkip(line_font) + (line_font == game_font ? game_font_pixel : 0); // room for the shadow
         }
     }
 
     // Top line: which save this is.
     if (scene->title && l->origin_y + 0 >= 0)
     {
-        TTF_Font *tf = font.tiny ? font.tiny : font.small;
+        TTF_Font *tf = font_for(scene->title, font.tiny ? font.tiny : font.small);
         int h = TTF_FontHeight(tf);
         if (h <= WALLPAPER_Y * l->scale)
             draw_text(screen, tf, scene->title, l->origin_x + (WALLPAPER_X + WALLPAPER_W / 2) * l->scale,
@@ -510,6 +584,13 @@ int main(int argc, char *argv[])
     InitSettings();
 
     Layout layout = make_layout(screen, hint_band_height());
+    if (scene.font && scene.font_em > 0)
+    {
+        game_font = TTF_OpenFont(scene.font, scene.font_em * layout.scale);
+        game_font_pixel = layout.scale;
+        if (game_font == NULL)
+            fprintf(stderr, "could not open %s: %s\n", scene.font, TTF_GetError());
+    }
 
 #ifdef DESKTOP
     if (screenshot)

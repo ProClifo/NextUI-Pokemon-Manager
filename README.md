@@ -67,11 +67,12 @@ To refresh the ROM list from a newer No-Intro database, run `scripts/update-vani
 **Pokémon (view / transfer / evolve)** opens a PC box screen styled after Pokémon Emerald:
 
 - Each box shows its own wallpaper from the save (Gen 3 saves). Other games cycle through the 16 Emerald wallpapers.
-- Pokémon appear as their Gen 3 box icons, including Unown letters and eggs. Pokémon newer than Gen 3 show a "?" icon.
-- The panel on the left shows the Pokémon under the cursor: front sprite (shiny palette for shinies), name, level, gender, held item and OT.
+- Pokémon appear with the icons and front sprites of the save's own game: Red/Blue, Yellow, Gold, Silver, Crystal, Ruby/Sapphire, Emerald, FireRed/LeafGreen (LeafGreen shows its own Deoxys) or Platinum (used for every Gen 4 game, and for Black/White, which have no decompilation). Game Boy sprites are coloured the way the games colour them (Super Game Boy palettes for Red/Blue/Yellow, Game Boy Color palettes for Gold/Silver/Crystal), and Game Boy party icons keep their 16x16 size. Unown letters, Castform and Gen 4 forms, female differences, shiny palettes and eggs are shown. Art a game lacks comes from Emerald or Platinum; Pokémon newer than Gen 4 show a "?" icon.
+- The panel on the left shows the Pokémon under the cursor: front sprite, name, level, gender, held item and OT.
+- Text is drawn in the game's font (see [Game fonts](#game-fonts)) at the size the game draws it.
 - **D-pad** moves the hand cursor, **L/R** switch boxes (the first "box" is your party), **A** opens the Pokémon's actions, **B** goes back.
 
-The art isn't stored in this repository. `scripts/build-box-assets.py` generates it at build time from the [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC box view** switches between the two.
+The art isn't stored in this repository. It's generated at build time from the pret decompilations: the wallpapers, cursor and background by `scripts/build-box-assets.py` from [pret/pokeemerald](https://github.com/pret/pokeemerald), and each game's icons and sprites by `scripts/build-box-art.py`. Each game's art is packed into two sheets plus an index, so the SD card gets a few dozen files rather than thousands. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC box view** switches between the two.
 
 ### Game backgrounds
 
@@ -99,7 +100,7 @@ Picking a gift: event Pokémon are **generated fresh for your save**, as the rea
 
 ### Game fonts
 
-Each game's menus (and the messages shown from them) are drawn in that game's own font: Red/Blue/Yellow, Gold/Silver, Crystal, Ruby/Sapphire/Emerald, FireRed/LeafGreen and Diamond/Pearl/Platinum/HeartGold/SoulSilver. `scripts/build-fonts.py` turns the font graphics, width tables and character maps of the pret decompilations into TrueType pixel fonts at build time:
+Each game's menus (and the messages shown from them) and its PC box screen are drawn in that game's own font: Red/Blue/Yellow, Gold/Silver, Crystal, Ruby/Sapphire/Emerald, FireRed/LeafGreen and Diamond/Pearl/Platinum/HeartGold/SoulSilver. `scripts/build-fonts.py` turns the font graphics, width tables and character maps of the pret decompilations into TrueType pixel fonts at build time:
 
 - Every font pixel is a whole number of screen pixels at the sizes minui-list and minui-presenter draw (one file per use and UI scale), so text stays sharp; checked with the SDL_ttf version NextUI ships (2.0.13).
 - The fonts declare themselves bold, so SDL_ttf doesn't fake bold by smearing the pixels sideways.
@@ -211,7 +212,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 - [minui-list / minui-presenter](https://github.com/josegonzalez) by Jose Diaz-Gonzalez (MIT)
 - The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event file formats and import procedure
 - [NextUI](https://github.com/LoveRetro/NextUI)
-- PC box art from the [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation, generated at build time
+- PC box art from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeruby](https://github.com/pret/pokeruby), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), generated at build time
 - Game fonts from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), converted at build time
 - ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
 - Event files from [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery), bundled at build time

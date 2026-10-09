@@ -6,9 +6,13 @@ namespace PokemonManager.Core;
 /// <summary>
 /// A game's own menu font, as TrueType files sized for each place text is drawn (see scripts/build-fonts.py):
 /// minui-list's items and title, and minui-presenter's messages (drawn at <see cref="MessageSize"/>).
+/// <see cref="Native"/> is for the PC box viewer, opened at <see cref="NativeEm"/> times its scale.
 /// </summary>
 public sealed record GameFont(string List, string Title, string Message, int MessageSize, IReadOnlySet<char> Chars)
 {
+    public string? Native { get; init; }
+    public int NativeEm { get; init; }
+
     /// <summary>Whether every character of the text is in the font; otherwise the NextUI font is used.</summary>
     public bool Covers(IEnumerable<string?> texts)
         => texts.All(t => t is null || t.All(c => char.IsControl(c) || Chars.Contains(c)));
@@ -58,6 +62,8 @@ public sealed class GameFonts(string dir, int scale)
                 var chars = System.IO.File.ReadAllText(Path.Combine(dir, font.Value.GetProperty("chars").GetString()!));
                 var entry = new GameFont(File("list"), File("title"), File("message"), files.GetProperty("message_size").GetInt32(),
                     chars.ToHashSet());
+                if (font.Value.TryGetProperty("native", out var native) && System.IO.File.Exists(Path.Combine(dir, native.GetString()!)))
+                    entry = entry with { Native = Path.Combine(dir, native.GetString()!), NativeEm = font.Value.GetProperty("native_em").GetInt32() };
                 if (System.IO.File.Exists(entry.List) && System.IO.File.Exists(entry.Title) && System.IO.File.Exists(entry.Message))
                     fonts[font.Name] = entry;
             }

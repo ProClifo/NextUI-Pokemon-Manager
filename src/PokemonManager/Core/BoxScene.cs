@@ -1,30 +1,36 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using PKHeX.Core;
 
 namespace PokemonManager.Core;
 
 /// <summary>
-/// Describes a save's party and PC boxes for the pkmgr-box viewer: which wallpaper each box uses and
-/// which Gen 3 icon, sprite and details to show for every slot.
+/// Describes a save's party and PC boxes for the pkmgr-box viewer: which wallpaper each box uses, which
+/// icon, sprite and details to show for every slot, and the game's font.
 /// </summary>
 /// <remarks>
-/// Viewer box 0 is the party; viewer box n is PC box n - 1. Art lives in <c>res/box</c> inside the pak
-/// and is generated at build time by scripts/build-box-assets.py.
+/// Viewer box 0 is the party; viewer box n is PC box n - 1. Art lives in <c>res/box</c> inside the pak and
+/// is generated at build time: wallpapers, cursor and background by scripts/build-box-assets.py, and each
+/// game's own icons and sprites by scripts/build-box-art.py, as sheets in <c>art/&lt;set&gt;</c> whose
+/// index.json gives every image's place.
 /// </remarks>
 public sealed class BoxScene(string assetDir)
 {
     private const int WallpaperCount = 16;
     private const int PlainWallpaper = 15;
-    private const ushort LastGen3Species = 386;
+    private readonly Dictionary<string, ArtIndex?> _indexes = [];
 
     public string AssetDir { get; } = assetDir;
 
     public bool AssetsPresent => File.Exists(Path.Combine(AssetDir, "cursor.png"));
 
-    public JsonObject Build(SaveFile sav, string title, SlotRef start)
+    public JsonObject Build(SaveFile sav, string title, SlotRef start, GameFont? font = null)
     {
+        var sets = ArtSets(sav);
+        // Gen 3 Deoxys looks the way the game showing it draws it; LeafGreen's differs from FireRed's.
+        bool leafGreen = sav is SAV3FRLG { Version: GameVersion.LG };
         // The party is a 3x2 grid centred on the plain wallpaper.
-        var party = Box("PARTY", Wallpaper(PlainWallpaper), 3, 2, Enumerable.Range(0, 6).Select(i => i < sav.PartyCount ? sav.GetPartySlotAtIndex(i) : null));
+        var party = Box("PARTY", Wallpaper(PlainWallpaper), 3, 2, Enumerable.Range(0, 6).Select(i => i < sav.PartyCount ? sav.GetPartySlotAtIndex(i) : null), sets, leafGreen);
         party["offset_x"] = 40;
         party["offset_y"] = 48;
         var boxes = new JsonArray { (JsonNode)party };
@@ -33,11 +39,11 @@ public sealed class BoxScene(string assetDir)
             var mons = Enumerable.Range(0, sav.BoxSlotCount).Select(s => (PKM?)sav.GetBoxSlotAtIndex(b, s));
             int columns = 6;
             int rows = (sav.BoxSlotCount + columns - 1) / columns;
-            boxes.Add((JsonNode)Box(SlotRef.BoxName(sav, b), Wallpaper(WallpaperFor(sav, b)), columns, rows, mons));
+            boxes.Add((JsonNode)Box(SlotRef.BoxName(sav, b), Wallpaper(WallpaperFor(sav, b)), columns, rows, mons, sets, leafGreen));
         }
 
         var (box, slot) = ToViewer(start);
-        return new JsonObject
+        var scene = new JsonObject
         {
             ["title"] = title,
             ["background"] = Path.Combine(AssetDir, "background.png"),
@@ -45,6 +51,37 @@ public sealed class BoxScene(string assetDir)
             ["box"] = box,
             ["slot"] = slot,
             ["boxes"] = boxes,
+        };
+        // The viewer draws any text the game font lacks in the NextUI font.
+        if (font is { Native: { } native, NativeEm: > 0 })
+        {
+            scene["font"] = native;
+            scene["font_em"] = font.NativeEm;
+        }
+        return scene;
+    }
+
+    /// <summary>The art sets to take a save's icons and sprites from, best first: its own game's, then
+    /// Emerald's and Platinum's for anything that game lacks (Gen 5 saves use Platinum's).</summary>
+    public static string[] ArtSets(SaveFile sav)
+    {
+        var own = sav switch
+        {
+            SAV1 { Version: GameVersion.YW } => "y",
+            SAV1 => "rb",
+            SAV2 { Version: GameVersion.C } => "c",
+            SAV2 { Version: GameVersion.SI } => "silver",
+            SAV2 => "gold",
+            SAV3E => "e",
+            SAV3FRLG => "frlg",
+            SAV3 => "rs",
+            _ => "pt",
+        };
+        return own switch
+        {
+            "e" => ["e", "pt"],
+            "pt" => ["pt", "e"],
+            _ => [own, "e", "pt"],
         };
     }
 
@@ -66,11 +103,11 @@ public sealed class BoxScene(string assetDir)
 
     private string Wallpaper(int id) => Path.Combine(AssetDir, "wallpapers", $"{id:00}.png");
 
-    private JsonObject Box(string name, string wallpaper, int columns, int rows, IEnumerable<PKM?> mons)
+    private JsonObject Box(string name, string wallpaper, int columns, int rows, IEnumerable<PKM?> mons, string[] sets, bool leafGreen)
     {
         var slots = new JsonArray();
         foreach (var pk in mons)
-            slots.Add((JsonNode)(pk is { Species: > 0 } ? Slot(pk) : new JsonObject()));
+            slots.Add((JsonNode)(pk is { Species: > 0 } ? Slot(pk, sets, leafGreen) : new JsonObject()));
         return new JsonObject
         {
             ["name"] = name,
@@ -81,7 +118,7 @@ public sealed class BoxScene(string assetDir)
         };
     }
 
-    private JsonObject Slot(PKM pk)
+    private JsonObject Slot(PKM pk, string[] sets, bool leafGreen)
     {
         var lines = new JsonArray();
         if (pk.IsEgg)
@@ -101,40 +138,113 @@ public sealed class BoxScene(string assetDir)
         }
 
         var name = pk.IsEgg ? "EGG" : pk.IsNicknamed ? pk.Nickname : Names.Species(pk.Species).ToUpperInvariant();
-        return new JsonObject
+        var slot = new JsonObject { ["name"] = name, ["lines"] = lines };
+        if (Icon(pk, sets, leafGreen) is { } icon)
         {
-            ["name"] = name,
-            ["icon"] = IconPath(pk),
-            ["sprite"] = SpritePath(pk),
-            ["lines"] = lines,
-        };
+            slot["icon"] = icon.Sheet;
+            slot["icon_rect"] = new JsonArray(icon.X, icon.Y, 32, 64);
+        }
+        else
+        {
+            slot["icon"] = Path.Combine(AssetDir, "unknown.png");
+        }
+        if (Sprite(pk, sets, leafGreen) is { } sprite)
+        {
+            slot["sprite"] = sprite.Sheet;
+            slot["sprite_rect"] = new JsonArray(sprite.X, sprite.Y, sprite.W, sprite.H);
+        }
+        return slot;
     }
 
-    public string IconPath(PKM pk)
+    /// <summary>A picture in one of the art sheets.</summary>
+    public sealed record ArtImage(string Sheet, int X, int Y, int W, int H);
+
+    private sealed record ArtIndex(Dictionary<string, int[]> Icons, Dictionary<string, int[]> Sprites);
+
+    /// <summary>The box icon (both 32x32 frames), or null for species no set has (the viewer shows "?").</summary>
+    public ArtImage? Icon(PKM pk, string[] sets, bool leafGreen = false)
     {
-        var dir = Path.Combine(AssetDir, "icons");
-        if (pk.IsEgg)
-            return Path.Combine(dir, "egg.png");
-        if (pk.Species > LastGen3Species)
-            return Path.Combine(dir, "unknown.png");
-        if (pk.Species == (ushort)Species.Unown)
-            return Path.Combine(dir, $"201-{pk.Form}.png");
-        return Path.Combine(dir, $"{pk.Species}.png");
+        var names = pk.IsEgg ? ["egg"] : FormNames(pk, leafGreen);
+        foreach (var set in sets)
+        {
+            if (Index(set) is not { } index)
+                continue;
+            foreach (var n in names)
+            {
+                if (index.Icons.TryGetValue(n, out var xy))
+                    return new ArtImage(Path.Combine(AssetDir, "art", set, "icons.png"), xy[0], xy[1], 32, 64);
+            }
+        }
+        return null;
     }
 
-    /// <summary>Front sprite, or empty for species without Gen 3 art (the viewer then enlarges the icon).</summary>
-    public string SpritePath(PKM pk)
+    /// <summary>The front sprite (female and shiny where the game has them), or null for species no set has
+    /// (the viewer then enlarges the icon).</summary>
+    public ArtImage? Sprite(PKM pk, string[] sets, bool leafGreen = false)
     {
-        var dir = Path.Combine(AssetDir, "sprites");
+        var names = new List<string>();
         if (pk.IsEgg)
-            return Path.Combine(dir, "egg.png");
-        if (pk.Species > LastGen3Species)
-            return "";
-        var name = pk.Species switch
         {
-            (ushort)Species.Unown or (ushort)Species.Castform => $"{pk.Species}-{pk.Form}",
-            _ => pk.Species.ToString(),
-        };
-        return Path.Combine(dir, pk.IsShiny ? $"{name}-shiny.png" : $"{name}.png");
+            names.Add("egg");
+        }
+        else
+        {
+            foreach (var form in FormNames(pk, leafGreen))
+            {
+                foreach (var gender in pk.Gender == 1 ? new[] { "-f", "" } : [""])
+                {
+                    if (pk.IsShiny)
+                        names.Add($"{form}{gender}-shiny");
+                    names.Add($"{form}{gender}");
+                }
+            }
+        }
+        foreach (var set in sets)
+        {
+            if (Index(set) is not { } index)
+                continue;
+            foreach (var n in names)
+            {
+                if (index.Sprites.TryGetValue(n, out var r))
+                    return new ArtImage(Path.Combine(AssetDir, "art", set, "sprites.png"), r[0], r[1], r[2], r[3]);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Art names for a Pokémon's form, best first: "&lt;dex&gt;-&lt;form&gt;" (forms in PKHeX's order;
+    /// LeafGreen's Deoxys is "386-leafgreen"), then the plain species.</summary>
+    private static List<string> FormNames(PKM pk, bool leafGreen)
+    {
+        var names = new List<string>();
+        if (leafGreen && pk.Species == (ushort)Species.Deoxys)
+            names.Add("386-leafgreen");
+        if (pk.Form > 0 || pk.Species == (ushort)Species.Unown)
+            names.Add($"{pk.Species}-{pk.Form}");
+        names.Add(pk.Species.ToString());
+        return names;
+    }
+
+    private ArtIndex? Index(string set)
+    {
+        if (_indexes.TryGetValue(set, out var cached))
+            return cached;
+        ArtIndex? index = null;
+        var path = Path.Combine(AssetDir, "art", set, "index.json");
+        try
+        {
+            if (File.Exists(path))
+            {
+                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                Dictionary<string, int[]> Read(string kind) => doc.RootElement.GetProperty(kind).EnumerateObject()
+                    .ToDictionary(p => p.Name, p => p.Value.EnumerateArray().Select(v => v.GetInt32()).ToArray());
+                index = new ArtIndex(Read("icons"), Read("sprites"));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            Console.Error.WriteLine($"Couldn't read the box art index {path}: {ex.Message}");
+        }
+        return _indexes[set] = index;
     }
 }

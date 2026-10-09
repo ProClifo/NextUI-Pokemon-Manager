@@ -11,7 +11,9 @@ tools draw text at fixed sizes (times the device's UI scale of 2 or 3): minui-li
 its title at 14, minui-presenter's message at a size we pick and its button labels at 12. So each font
 is written once per use and scale: <name>-<scale>x-list.ttf, -title.ttf and -message.ttf. fonts.json
 records the files and the message size to pass to minui-presenter, and <name>.chars the characters the
-font covers (text with anything else falls back to the NextUI font). Requires Pillow and fontTools.
+font covers (text with anything else falls back to the NextUI font). <name>-native.ttf is for the PC box
+viewer, which draws on a scaled-up GBA screen: opened at native_em times its scale (in pixels), one font
+pixel is one GBA pixel, the size the game draws it. Requires Pillow and fontTools.
 
 The fonts declare themselves Bold: minui-list asks SDL_ttf for bold text, and SDL_ttf only fakes bold
 (by smearing glyphs sideways, which would ruin pixel art) when the font itself isn't bold.
@@ -156,6 +158,8 @@ def make(name, family, glyphs, cell_h, out_dir, scales):
         assert BUTTON_PX * text_px % button_px == 0
         files["message_size"] = BUTTON_PX * text_px // button_px
         entry[f"{scale}x"] = files
+    build(f"{name}-native.ttf", family, glyphs, cell_h, baseline, out_dir, UPEM // cell_h)
+    entry["native"], entry["native_em"] = f"{name}-native.ttf", cell_h
     MANIFEST[name] = entry
     with open(os.path.join(out_dir, f"{name}.chars"), "w", encoding="utf-8") as f:
         f.write("".join(sorted(glyphs)))
