@@ -804,6 +804,11 @@ public sealed class App
     /// </summary>
     private void GiveEventPokemon(SaveEntry entry, GalleryEntry file)
     {
+        if (TradeRules.CheckDistribution(entry.Sav) is { Ok: false } noDex)
+        {
+            _ui.Message(noDex.Message);
+            return;
+        }
         _ui.Busy($"Generating {file.Title}...");
         var result = EventPokemon.FromGallery(_gallery, file, entry.Sav);
         if (result.Pokemon is not { } pk)
@@ -827,7 +832,7 @@ public sealed class App
             EventPokemon.Source.GalleryCopy => $"PKHeX can't regenerate this event, so this is one of the original copies at random: {Names.Rolled(pk)}.",
             _ => "",
         };
-        // No trade rules: the real distributions didn't need the National Pokédex or any other progress.
+        // No trade rules: the real distributions didn't need the National Pokédex (only the Pokédex, checked above).
         PlaceConverted(entry, pk, $"Put {file.Title}", origin);
     }
 

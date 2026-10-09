@@ -83,12 +83,16 @@ public sealed class GiftTests : IDisposable
     [InlineData(GameVersion.W2)]
     public void BuiltInEventLibraryRedeems(GameVersion version)
     {
-        // A new game: distributions needed no National Pokédex or story progress.
+        // A new game with just the Pokédex: distributions needed no National Pokédex or other progress.
         var entry = _saves.Create(version, $"{version}.sav");
         var events = GiftService.BuiltInEvents(entry.Sav);
         Assert.NotEmpty(events);
 
         var ev = events.First(e => e.Encounter is not MysteryGift { IsEntity: false });
+        Assert.Contains("until you've received the Pokédex", GiftService.RedeemToBox(entry.Sav, ev.Encounter).Message);
+        Assert.False(TradeRules.HasPokedex(entry.Sav));
+        TestSaves.GivePokedex(entry.Sav);
+        Assert.True(TradeRules.HasPokedex(entry.Sav));
         var result = GiftService.RedeemToBox(entry.Sav, ev.Encounter);
         Assert.True(result.Ok, $"{ev.Name}: {result.Message}");
         entry = _saves.Roundtrip(entry);
@@ -101,6 +105,7 @@ public sealed class GiftTests : IDisposable
     public void DistributionsDontNeedTheNationalDex(GameVersion version, Species species)
     {
         var entry = _saves.Create(version, $"{version}.sav");
+        TestSaves.GivePokedex(entry.Sav);
         var ev = GiftService.BuiltInEvents(entry.Sav).First(e => e.Encounter.Species == (ushort)species);
         Assert.False(TradeRules.CheckReceive(TestSaves.Make(entry.Sav, species, 5), entry.Sav).Ok); // a trade would need it
         var result = GiftService.RedeemToBox(entry.Sav, ev.Encounter);

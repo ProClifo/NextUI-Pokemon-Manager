@@ -164,8 +164,8 @@ public static class GiftService
 
     /// <summary>
     /// Generates the gift Pokémon with the save's trainer details and places it in the first empty PC slot.
-    /// Works for every generation, including games without a Mystery Gift album. The trade rules don't apply:
-    /// the real distributions didn't need the National Pokédex or any other progress.
+    /// Works for every generation, including games without a Mystery Gift album. The trade rules don't apply
+    /// (the real distributions didn't need the National Pokédex), but the player must have the Pokédex.
     /// </summary>
     public static OpResult RedeemToBox(SaveFile sav, IEncounterable encounter)
     {
@@ -173,6 +173,8 @@ public static class GiftService
             return OpResult.Fail("This gift is an item, not a Pokémon. Use \"Add to Mystery Gift album\" instead.");
         if (encounter is not IEncounterConvertible)
             return OpResult.Fail("PKHeX can't generate a Pokémon from this event.");
+        if (TradeRules.CheckDistribution(sav) is { Ok: false } noDex)
+            return noDex;
         if (encounter is MysteryGift mg && !mg.IsCardCompatible(sav, out var why))
             return OpResult.Fail($"This gift isn't compatible with {Names.Game(sav)}. {why}".Trim());
 

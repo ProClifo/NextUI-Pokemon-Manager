@@ -23,6 +23,13 @@ public static class TradeRules
     private const int EventGotPokedex1 = 37;        // EVENT_GOT_POKEDEX: the Cable Club needs it
     private const int EventGaveMysteryEggToElm = 31; // the Trade Center needs it
     private const int EventMetBill = 1810;          // set at new game, cleared when Bill turns the Time Capsule on
+    // Set by Mr. Pokémon's house script right after `setflag ENGINE_POKEDEX` (maps/MrPokemonsHouse.asm); the
+    // engine flag itself lives outside PKHeX's event flags.
+    private const int EventRivalNewBarkTown2 = 1725;
+
+    // FLAG_SYS_POKEDEX_GET (include/constants/flags.h): SYSTEM_FLAGS + 1 in Ruby/Sapphire (0x800) and Emerald
+    // (0x860), SYS_FLAGS + 0x29 in FireRed/LeafGreen.
+    private const int FlagPokedexRS = 0x801, FlagPokedexE = 0x861, FlagPokedexFRLG = 0x829;
 
     // Gen 3 IsNationalPokedexEnabled: flag + var + the Pokédex magic byte (src/event_data.c)
     private const int FlagNationalDexE = 0x896, FlagNationalDexRS = 2102, FlagNationalDexFRLG = 0x840;
@@ -111,6 +118,36 @@ public static class TradeRules
         if (dest is SAV3E or SAV3FRLG && !NationalDex3((SAV3)dest) && !InRegionalDex(dest, pk.Species))
             return OpResult.Fail($"{Names.Game(dest)} can't receive {Names.Species(pk)} until it has the National Pokédex.");
         return OpResult.Success("");
+    }
+
+    /// <summary>
+    /// Whether the player has received the Pokédex, which distributions need. Gen 1-4 read the games' own
+    /// flag; Black/White have no decompilation, and register the Pokémon you have once you get the Pokédex,
+    /// so a Pokédex with anything caught counts.
+    /// </summary>
+    public static bool HasPokedex(SaveFile sav) => sav switch
+    {
+        SAV1 gen1 => gen1.GetEventFlag(EventGotPokedex1),
+        SAV2 gen2 => gen2.GetEventFlag(EventRivalNewBarkTown2),
+        SAV3E e => e.GetEventFlag(FlagPokedexE),
+        SAV3FRLG frlg => frlg.GetEventFlag(FlagPokedexFRLG),
+        SAV3 rs => rs.GetEventFlag(FlagPokedexRS),
+        SAV4 gen4 => PokedexObtained4(gen4),
+        SAV5 gen5 => Enumerable.Range(1, gen5.MaxSpeciesID).Any(s => gen5.GetCaught((ushort)s)),
+        _ => true,
+    };
+
+    /// <summary>Distributions can only be received once the player has the Pokédex.</summary>
+    public static OpResult CheckDistribution(SaveFile sav) => HasPokedex(sav)
+        ? OpResult.Success("")
+        : OpResult.Fail($"{Names.Game(sav)} can't receive distributions until you've received the Pokédex.");
+
+    /// <summary>The Pokédex block's pokedexObtained byte, just before nationalDexObtained (pokeplatinum include/pokedex.h).</summary>
+    private static bool PokedexObtained4(SAV4 sav)
+    {
+        int offset = sav switch { SAV4DP => 0x138, SAV4Pt => 0x318, _ => 0x336 };
+        var dex = sav.Dex.Data;
+        return offset < dex.Length && dex[offset] != 0;
     }
 
     /// <summary>Gen 1/2 trades (Cable Club / Trade Center) and Gen 1 &lt;-&gt; Gen 2 (Time Capsule).</summary>

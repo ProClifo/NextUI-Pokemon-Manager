@@ -122,6 +122,22 @@ public sealed class TestSaves : IDisposable
         return sav;
     }
 
+    /// <summary>The player has received the Pokédex (the games' own flags; see TradeRules.HasPokedex).</summary>
+    public static SaveFile GivePokedex(SaveFile sav)
+    {
+        switch (sav)
+        {
+            case SAV1 s1: s1.SetEventFlag(37, true); break;           // EVENT_GOT_POKEDEX
+            case SAV2 s2: s2.SetEventFlag(1725, true); break;         // set alongside ENGINE_POKEDEX
+            case SAV3E e: e.SetEventFlag(0x861, true); break;         // FLAG_SYS_POKEDEX_GET
+            case SAV3FRLG frlg: frlg.SetEventFlag(0x829, true); break;
+            case SAV3 rs: rs.SetEventFlag(0x801, true); break;
+            case SAV4 s4: s4.Dex.Data[s4 switch { SAV4DP => 0x138, SAV4Pt => 0x318, _ => 0x336 }] = 1; break;
+            case SAV5 s5: s5.Zukan.SetCaught(1); break;
+        }
+        return sav;
+    }
+
     public static PKM Make(SaveFile sav, Species species, int level = 30, int heldItem = 0)
     {
         var pk = sav.BlankPKM;
