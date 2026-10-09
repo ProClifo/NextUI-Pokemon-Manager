@@ -50,21 +50,11 @@ public readonly record struct SlotRef(int Box, int Slot)
     /// <summary>Where the slot is, for messages: "your party" or "BOX 1, slot 3".</summary>
     public string Describe(SaveFile sav) => IsParty ? "your party" : $"{BoxName(sav, Box)}, slot {Slot + 1}";
 
-    /// <summary>
-    /// Where a distribution Pokémon goes, as in the games: the party. Gen 1-3 distributions (trades at events,
-    /// distribution cartridges, the Colosseum bonus disc) needed room in the party; Gen 4/5's delivery person
-    /// sends the Pokémon to the PC when the party is full.
-    /// </summary>
+    /// <summary>Where a distribution Pokémon goes: the first free PC slot, never the party.</summary>
     public static OpResult<SlotRef> ForDistribution(SaveFile sav)
-    {
-        if (sav.PartyCount < 6)
-            return OpResult<SlotRef>.Success(Party(sav.PartyCount));
-        if (sav.Generation <= 3)
-            return OpResult<SlotRef>.Fail("Your party is full. Like the original distributions, this needs a free place in your party.");
-        return FirstEmptyBoxSlot(sav) is { } box
+        => FirstEmptyBoxSlot(sav) is { } box
             ? OpResult<SlotRef>.Success(box)
-            : OpResult<SlotRef>.Fail("Your party and every PC box are full.");
-    }
+            : OpResult<SlotRef>.Fail("Every PC box is full.");
 
     /// <summary>Finds the first empty, writable PC slot.</summary>
     public static SlotRef? FirstEmptyBoxSlot(SaveFile sav)

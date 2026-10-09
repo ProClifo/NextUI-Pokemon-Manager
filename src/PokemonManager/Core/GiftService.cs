@@ -163,7 +163,7 @@ public static class GiftService
     }
 
     /// <summary>
-    /// Generates the gift Pokémon with the save's trainer details and places it where the games did (the party).
+    /// Generates the gift Pokémon with the save's trainer details and places it in the PC.
     /// Works for every generation, including games without a Mystery Gift album. The trade rules don't apply
     /// (the real distributions didn't need the National Pokédex), but the player must have the Pokédex.
     /// </summary>
@@ -182,7 +182,6 @@ public static class GiftService
         var pk = EventPokemon.Generate(encounter, sav);
         if (pk is null)
             return OpResult.Fail("PKHeX couldn't generate a legal Pokémon from this event, so nothing was added.");
-        // Where the games put it: the party (Gen 4/5: the PC when the party is full).
         var target = SlotRef.ForDistribution(sav);
         if (target.Value is not { } slot)
             return OpResult.Fail(target.Message);

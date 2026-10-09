@@ -532,7 +532,7 @@ public sealed class App
         if (gift is DataMysteryGift data && GiftService.SupportsAlbum(sav))
             actions.Add(("Add to Mystery Gift album (pick up in-game)", () => GiftService.InjectCard(sav, data)));
         if (gift.IsEntity)
-            actions.Add(("Send the Pokémon to your party", () => GiftService.Redeem(sav, gift)));
+            actions.Add(("Send the Pokémon to your PC", () => GiftService.Redeem(sav, gift)));
         if (actions.Count == 0)
         {
             _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, and this gift isn't a Pokémon, so it can't be added.");
@@ -837,7 +837,7 @@ public sealed class App
         return (name[0] is 'E' or 'I' ? "an " : "a ") + name;
     }
 
-    /// <summary>Puts a Pokémon in the first free PC slot, or for a distribution where the games put it (the party).</summary>
+    /// <summary>Puts a Pokémon in the first free PC slot (a distribution needs the Pokédex too, checked by the callers).</summary>
     private void PlaceConverted(SaveEntry entry, PKM pk, string verb, string details = "", bool distribution = false)
     {
         var sav = entry.Sav;
