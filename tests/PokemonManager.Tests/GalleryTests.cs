@@ -179,10 +179,14 @@ public sealed class GalleryTests : IDisposable
 
         // Every ticket Emerald has a file for, the unofficial Old Sea Map included but marked illegal.
         var tickets = Tickets.For(gallery, profile, sav);
-        Assert.Equal(["Aurora Ticket", "Old Sea Map"], tickets.Select(t => t.Ticket.Name));
-        Assert.True(tickets[0].Legal);
-        Assert.False(tickets[1].Legal);
-        Assert.Empty(Tickets.For(gallery, profile with { Games = ["R"] }, sav)); // Ruby has the Eon Ticket only
+        // Emerald's Eon Ticket comes by Record Mixing (no file); with no Ruby/Sapphire ticket in this
+        // gallery it counts as undistributed.
+        Assert.Equal(["Eon Ticket", "Aurora Ticket", "Old Sea Map"], tickets.Select(t => t.Ticket.Name));
+        Assert.Null(tickets[0].File);
+        Assert.False(tickets[0].Legal);
+        Assert.True(tickets[1].Legal);
+        Assert.False(tickets[2].Legal);
+        Assert.Empty(Tickets.For(gallery, profile with { Games = ["R"] }, sav)); // no Eon Ticket file in this gallery
 
         var distributions = GalleryLists.Distributions(gallery, profile);
         Assert.Equal("WISHMKR Jirachi", Assert.Single(distributions).Title);

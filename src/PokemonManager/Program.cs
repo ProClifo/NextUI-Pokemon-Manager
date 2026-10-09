@@ -250,7 +250,10 @@ int GalleryList(List<string> a)
     var what = a.Count > 1 ? a[1] : "all";
     var shown = what switch
     {
-        "events" => Tickets.For(gallery, profile, sav.Sav).Select(t => t.File with { Title = $"{t.Ticket.Name} ({(t.Legal ? "legal" : "illegal")}): {t.File.Title}" }).ToList(),
+        "events" => Tickets.For(gallery, profile, sav.Sav)
+            .Select(t => (t.File ?? new GalleryEntry("(Record Mixing)", 3, [], null, true, GalleryKind.Gen3, 0, 0, GalleryFlags.EventItem, ""))
+                with { Title = $"{t.Ticket.Name} ({(t.Legal ? "legal" : "illegal")}): {t.File?.Title ?? "given as by Record Mixing"}" })
+            .ToList(),
         "distributions" => GalleryLists.Distributions(gallery, profile),
         _ => gallery.Entries.Where(e => profile.Matches(e, allLanguages, unreleased)).ToList(),
     };

@@ -324,4 +324,23 @@ public sealed class Gen3EventTests : IDisposable
         Assert.Single(GiftService.ListFiles(giftDir, rs));         // me3 only
         Assert.Empty(GiftService.ListFiles(giftDir, pt));
     }
+
+    [Fact]
+    public void EmeraldGetsTheEonTicketAsByRecordMixing()
+    {
+        var entry = _saves.Create(GameVersion.E, "Emerald.sav");
+        var result = Gen3Events.GiveEonTicketByRecordMixing((SAV3E)entry.Sav);
+        Assert.True(result.Ok, result.Message);
+        Assert.Contains("Hall of Fame", result.Message); // the fixture hasn't beaten the game
+
+        var sav = (SAV3E)_saves.Roundtrip(entry).Sav;
+        Assert.True(sav.Inventory.GetPouch(InventoryType.KeyItems).HasItem(Gen3Events.ItemEonTicket));
+        // FLAG_ENABLE_SHIP_SOUTHERN_ISLAND (0x8B3): Emerald's flags start at 0x1270 in SaveBlock1.
+        Assert.NotEqual(0, sav.Large[0x1270 + 0x8B3 / 8] & (1 << (0x8B3 % 8)));
+
+        // A second time only re-enables the ferry; the game never holds two tickets.
+        var again = Gen3Events.GiveEonTicketByRecordMixing(sav);
+        Assert.Contains("already have", again.Message);
+        Assert.Equal(1, sav.Inventory.GetPouch(InventoryType.KeyItems).Items.Count(i => i.Index == Gen3Events.ItemEonTicket));
+    }
 }

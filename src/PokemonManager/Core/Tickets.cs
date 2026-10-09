@@ -6,8 +6,11 @@ namespace PokemonManager.Core;
 /// <summary>A key item that unlocks an in-game event, and the games that have that event.</summary>
 public sealed record Ticket(string Name, string Key, string[] Games);
 
-/// <summary>The gallery file used to give a ticket to one save, and whether that's a legitimate distribution.</summary>
-public sealed record TicketChoice(Ticket Ticket, GalleryEntry File, bool Legal);
+/// <summary>
+/// The gallery file used to give a ticket to one save, and whether that's a legitimate distribution. No file
+/// means Emerald's Eon Ticket, which is given the way Record Mixing did (see <see cref="Gen3Events.GiveEonTicketByRecordMixing"/>).
+/// </summary>
+public sealed record TicketChoice(Ticket Ticket, GalleryEntry? File, bool Legal);
 
 /// <summary>
 /// The event tickets each game has. Every ticket a game has is offered, legitimate or not: when no official
@@ -18,7 +21,7 @@ public static class Tickets
 {
     public static readonly Ticket[] All =
     [
-        new("Eon Ticket", "eonticket", ["R", "S"]),
+        new("Eon Ticket", "eonticket", ["R", "S", "E"]),
         new("Aurora Ticket", "auroraticket", ["FR", "LG", "E"]),
         new("Mystic Ticket", "mysticticket", ["FR", "LG", "E"]),
         new("Old Sea Map", "oldseamap", ["E"]),
@@ -59,13 +62,24 @@ public static class Tickets
                 .Where(x => x.ForGame || (profile.Generation >= 4 && x.Entry.Games.Intersect(ticket.Games).Any()))
                 .Select(x => (x.Entry, Rank: Rank(x.Entry, profile) + (x.ForGame ? 0 : 4)))
                 .OrderBy(x => x.Rank);
+            bool found = false;
             foreach (var (entry, rank) in ranked)
             {
                 if (gallery.Load(entry) is { } gift && Works(gift, sav))
                 {
                     result.Add(new TicketChoice(ticket, entry, Legal: rank == 0));
+                    found = true;
                     break;
                 }
+            }
+
+            // Emerald got the Eon Ticket by Record Mixing with Ruby/Sapphire (Ruby/Sapphire's Mystery Event script
+            // doesn't run in Emerald). That's legitimate wherever Ruby/Sapphire's ticket was distributed.
+            if (!found && ticket.Key == "eonticket" && sav is SAV3E && games.Contains("E"))
+            {
+                bool distributed = gallery.Entries.Any(e => e.IsEventItem && e.Released && e.Generation == 3
+                    && e.Language == profile.Language && e.Games.Contains("R") && Letters(e.Title).Contains(ticket.Key));
+                result.Add(new TicketChoice(ticket, null, distributed));
             }
         }
         return result;

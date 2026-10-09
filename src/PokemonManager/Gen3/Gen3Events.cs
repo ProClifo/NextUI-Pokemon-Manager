@@ -348,6 +348,39 @@ public static class Gen3Events
         return !was;
     }
 
+    // pokeemerald include/constants/flags.h and items.h
+    private const int FlagSysGameClearE = 0x864;             // FLAG_SYS_GAME_CLEAR
+    private const int FlagEnableShipSouthernIslandE = 0x8B3; // FLAG_ENABLE_SHIP_SOUTHERN_ISLAND
+    public const ushort ItemEonTicket = 275;
+
+    /// <summary>
+    /// Gives Emerald the Eon Ticket the way Record Mixing with a Ruby/Sapphire holding it did, which is how
+    /// Emerald players got it outside Japan: the ticket goes into Key Items (unless the bag or PC already has
+    /// one) and the Lilycove ferry to Southern Island is enabled (ReceiveGiftItem in record_mixing.c).
+    /// </summary>
+    public static OpResult GiveEonTicketByRecordMixing(SAV3E sav)
+    {
+        var bag = sav.Inventory;
+        var keyItems = bag.GetPouch(InventoryType.KeyItems);
+        var pc = bag.Pouches.FirstOrDefault(p => p.Type == InventoryType.PCItems);
+        bool had = keyItems.HasItem(ItemEonTicket) || pc?.HasItem(ItemEonTicket) == true;
+        if (!had)
+        {
+            if (keyItems.GiveItem(bag, ItemEonTicket, 1) <= 0 || !keyItems.HasItem(ItemEonTicket))
+                return OpResult.Fail("The Key Items pocket is full.");
+            bag.CopyTo(sav);
+        }
+        sav.SetEventFlag(FlagEnableShipSouthernIslandE, true);
+
+        var message = had
+            ? "You already have the Eon Ticket; the ferry to Southern Island is now enabled."
+            : "The Eon Ticket was added to your Key Items, as if received through Record Mixing.";
+        message += "\nShow it to the sailor at the Lilycove City harbor to sail to Southern Island.";
+        if (!sav.GetEventFlag(FlagSysGameClearE))
+            message += "\nThe ferry only runs once you've entered the Hall of Fame.";
+        return OpResult.Success(message);
+    }
+
     /// <summary>Describes what event data the save currently holds.</summary>
     public static string Status(SAV3 sav)
     {

@@ -623,12 +623,30 @@ public sealed class App
         if (!ticket.Legal)
         {
             var profile = ProfileFor(entry);
+            var source = ticket.File is { } f ? $"Use \"{StripItemPrefix(f.Title)}\" anyway?" : "Add it anyway?";
             if (!_ui.Confirm(
                     $"{ticket.Ticket.Name} was never officially distributed for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}. " +
-                    $"PKHeX will flag Pokémon met through it as illegal.\n\nUse \"{StripItemPrefix(ticket.File.Title)}\" anyway?", "USE IT", "CANCEL"))
+                    $"PKHeX will flag Pokémon met through it as illegal.\n\n{source}", "USE IT", "CANCEL"))
                 return;
         }
-        GiveGalleryFile(entry, ticket.File);
+        if (ticket.File is { } file)
+        {
+            GiveGalleryFile(entry, file);
+            return;
+        }
+        if (entry.Sav is not SAV3E emerald)
+            return;
+        if (!_ui.Confirm($"Give {Names.Game(emerald)} the Eon Ticket, as if received by Record Mixing with Ruby/Sapphire?", "GIVE", "CANCEL"))
+            return;
+        var result = Gen3Events.GiveEonTicketByRecordMixing(emerald);
+        if (!result.Ok)
+        {
+            entry.Reload();
+            _ui.Message(result.Message);
+            return;
+        }
+        if (TryWrite(entry, out _))
+            _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
     }
 
     private void DistributionsMenu(SaveEntry entry)
