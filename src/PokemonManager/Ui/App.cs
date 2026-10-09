@@ -393,6 +393,8 @@ public sealed class App
     /// <returns>True if the source slot no longer holds this Pokémon.</returns>
     private bool TransferFlow(SaveEntry source, SlotRef from, TransferMode mode)
     {
+        if (PartyTradeBlocked(source, from))
+            return false;
         var dest = PickOtherSave(source, mode == TransferMode.Move ? "Move to which game?" : "Copy to which game?");
         if (dest is null)
             return false;
@@ -458,10 +460,21 @@ public sealed class App
         return mode == TransferMode.Move;
     }
 
+    /// <summary>Party Pokémon trade only where the game allows it (a Pokémon Center); says why not.</summary>
+    private bool PartyTradeBlocked(SaveEntry entry, SlotRef slot)
+    {
+        if (!slot.IsParty || TradeLocation.PartyTradeBlocked(entry.Sav, slot.Get(entry.Sav)) is not { } reason)
+            return false;
+        _ui.Message(reason);
+        return true;
+    }
+
     // ---------------------------------------------------------------- trade evolution
 
     private bool EvolveFlow(SaveEntry entry, SlotRef slot)
     {
+        if (PartyTradeBlocked(entry, slot))
+            return false;
         var pk = slot.Get(entry.Sav);
         var options = TradeEvolution.GetOptions(pk);
         if (options.Count == 0)

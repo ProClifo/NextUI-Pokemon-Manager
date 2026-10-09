@@ -156,6 +156,7 @@ Rules the app always enforces:
 - A transferred or imported Pokémon only moves into an empty PC slot (distributions too). Nothing is overwritten.
 - The destination save is written first, then the source save. If the second write fails, the Pokémon ends up in both saves instead of being lost.
 - You can't move your last party Pokémon.
+- A party Pokémon can only be transferred or trade-evolved if its save was made in a Pokémon Center (any floor), as trades happen at the link rooms there. Ruby/Sapphire's Pokémon League center has no link room, so it doesn't count (Emerald's does). The map is read from the save (Gen 1–3, map numbers from the pret decompilations). Boxed Pokémon aren't limited.
 - Japanese and international Gen 1/2 games can't trade with each other, as on real hardware.
 
 ### Gen 3 events: what goes where
