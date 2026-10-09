@@ -111,7 +111,7 @@ public sealed class App
         {
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
             List<OfficialRomFilter.Hidden> unofficial;
-            (all, unofficial) = OfficialRomFilter.Apply(all, RomIndex, _paths.ExtraSavesDir);
+            (all, unofficial) = OfficialRomFilter.Apply(all, RomIndex);
             _hidden.AddRange(unofficial.Select(h => (h.Save, h.Check.Describe())));
         }
         _saves = SaveOrder.ByLastPlayed(all, RomIndex.FindRoms, SaveOrder.ReadRecents(_paths.RecentFile, _paths.SdRoot));
@@ -383,7 +383,7 @@ public sealed class App
         var others = GetSaves().Where(s => s.Path != exclude.Path).ToList();
         if (others.Count == 0)
         {
-            _ui.Message("No other Pokémon saves were found. Put the other game's save in NextUI's Saves folder or in PokemonManager/Saves.");
+            _ui.Message("No other Pokémon saves were found. Put the other game's save in the SD card's Saves folder.");
             return null;
         }
         var choice = _ui.Choose(title, others.Select(s => s.Label).ToList());
@@ -1004,7 +1004,7 @@ public sealed class App
     private const string HelpText =
         "Pokémon Manager (built on PKHeX)\n" +
         "\n" +
-        "Saves are read from the Saves folder, plus PokemonManager/Saves.\n" +
+        "Saves are read from the SD card's Saves folder.\n" +
         "A backup is written to PokemonManager/Backups before every change.\n" +
         "\n" +
         "Each game's menu has Events (every ticket the game has, like the Aurora Ticket), Distributions (Pokémon " +

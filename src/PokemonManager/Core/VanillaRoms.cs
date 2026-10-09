@@ -236,29 +236,22 @@ internal static partial class VanillaRoms
 }
 
 /// <summary>
-/// Splits scanned saves into those made with official ROMs and the rest. Saves the user put in
-/// PokemonManager/Saves have no ROM on the card and are always kept.
+/// Splits scanned saves into those made with official ROMs and the rest.
 /// </summary>
 public static class OfficialRomFilter
 {
     public sealed record Hidden(SaveEntry Save, RomCheck Check);
 
     public static (List<SaveEntry> Shown, List<Hidden> Hidden) Apply(
-        IEnumerable<SaveEntry> saves, IEnumerable<string> romRoots, string? cacheFile, string? exemptDir)
-        => Apply(saves, new VanillaRoms.Index(romRoots, cacheFile), exemptDir);
+        IEnumerable<SaveEntry> saves, IEnumerable<string> romRoots, string? cacheFile)
+        => Apply(saves, new VanillaRoms.Index(romRoots, cacheFile));
 
-    internal static (List<SaveEntry> Shown, List<Hidden> Hidden) Apply(IEnumerable<SaveEntry> saves, VanillaRoms.Index index, string? exemptDir)
+    internal static (List<SaveEntry> Shown, List<Hidden> Hidden) Apply(IEnumerable<SaveEntry> saves, VanillaRoms.Index index)
     {
-        var exempt = exemptDir is null ? null : Path.GetFullPath(exemptDir) + Path.DirectorySeparatorChar;
         var shown = new List<SaveEntry>();
         var hidden = new List<Hidden>();
         foreach (var save in saves)
         {
-            if (exempt is not null && Path.GetFullPath(save.Path).StartsWith(exempt, StringComparison.Ordinal))
-            {
-                shown.Add(save);
-                continue;
-            }
             var check = index.Check(save.Path);
             if (check.Status == RomStatus.Official)
                 shown.Add(save);

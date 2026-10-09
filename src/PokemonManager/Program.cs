@@ -71,7 +71,7 @@ int Scan()
 {
     var paths = AppPaths.FromEnvironment(sd, data);
     var saves = SaveLibrary.Scan(paths.SaveRoots);
-    var (shown, hidden) = OfficialRomFilter.Apply(saves, paths.RomRoots, paths.RomCheckCache, paths.ExtraSavesDir);
+    var (shown, hidden) = OfficialRomFilter.Apply(saves, paths.RomRoots, paths.RomCheckCache);
     foreach (var s in shown)
         Console.WriteLine($"{s.Path}\t{s.Label}\tofficial");
     foreach (var h in hidden)

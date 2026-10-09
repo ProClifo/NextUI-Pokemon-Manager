@@ -130,7 +130,6 @@ SDCARD/
 ├── Saves/                     ← NextUI's saves; scanned automatically
 └── PokemonManager/
     ├── Backups/               ← automatic backups (last 20 per save)
-    ├── Saves/                 ← optional: extra saves to manage (listed when their ROM is on the card)
     └── rom-check-cache.txt    ← cached ROM checks
 ```
 

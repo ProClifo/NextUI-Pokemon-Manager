@@ -40,7 +40,7 @@ public sealed class OfficialRomTests : IDisposable
     }
 
     private (List<SaveEntry> Shown, List<OfficialRomFilter.Hidden> Hidden) Filter(params SaveEntry[] saves)
-        => OfficialRomFilter.Apply(saves, [_roms], Path.Combine(_saves.Dir, "cache.txt"), Path.Combine(_saves.Dir, "Extra"));
+        => OfficialRomFilter.Apply(saves, [_roms], Path.Combine(_saves.Dir, "cache.txt"));
 
     [Fact]
     public void TableCoversTheMainSeries()
@@ -84,13 +84,6 @@ public sealed class OfficialRomTests : IDisposable
     {
         var (_, hidden) = Filter(Save("Mystery.sav"));
         Assert.Equal(RomStatus.RomNotFound, Assert.Single(hidden).Check.Status);
-    }
-
-    [Fact]
-    public void ManuallyAddedSavesAreExempt()
-    {
-        var extra = new SaveEntry(Path.Combine(_saves.Dir, "Extra", "from-my-pc.sav"), _sav);
-        Assert.Single(Filter(extra).Shown);
     }
 
     [Fact]

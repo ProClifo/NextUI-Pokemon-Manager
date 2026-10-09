@@ -40,13 +40,12 @@ public sealed class AppPaths
         ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "fonts"));
 
     public string BackupDir => Path.Combine(DataDir, "Backups");
-    public string ExtraSavesDir => Path.Combine(DataDir, "Saves");
     public string SettingsFile => Path.Combine(DataDir, "settings.txt");
     public string RomCheckCache => Path.Combine(DataDir, "rom-check-cache.txt");
 
     public void EnsureCreated()
     {
-        foreach (var dir in new[] { DataDir, BackupDir, ExtraSavesDir, TempDir })
+        foreach (var dir in new[] { DataDir, BackupDir, TempDir })
             Directory.CreateDirectory(dir);
     }
 
@@ -57,7 +56,7 @@ public sealed class AppPaths
         var tmp = Path.Combine(Path.GetTempPath(), "pokemon-manager");
         return new AppPaths
         {
-            SaveRoots = [Path.Combine(sd, "Saves"), Path.Combine(data, "Saves")],
+            SaveRoots = [Path.Combine(sd, "Saves")],
             RomRoots = [Path.Combine(sd, "Roms")],
             DataDir = data,
             TempDir = tmp,
