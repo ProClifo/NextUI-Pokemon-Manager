@@ -29,6 +29,8 @@ public sealed class App
     private readonly (int Width, int Height)? _screen =
         GameBackgrounds.ScreenSize(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE"));
     private readonly Dictionary<string, string?> _backgroundCache = new();
+    private readonly Dictionary<string, GameProfile> _profiles = new();
+    private readonly GalleryArchive _gallery;
 
     public App(IUi ui, AppPaths paths)
     {
@@ -38,6 +40,7 @@ public sealed class App
         _library = new SaveLibrary(paths.BackupDir);
         _boxViewer = new BoxViewer(new BoxScene(paths.BoxAssetsDir), paths.TempDir);
         _backgrounds = new GameBackgrounds(paths.BackgroundsDir);
+        _gallery = new GalleryArchive(paths.GalleryFile);
         _settings = AppSettings.Load(paths.SettingsFile);
     }
 
@@ -81,6 +84,7 @@ public sealed class App
         _hidden = [];
         _romIndex = null;
         _backgroundCache.Clear();
+        _profiles.Clear();
         if (_settings.OnlyOfficialRoms && all.Count != 0)
         {
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
@@ -129,16 +133,37 @@ public sealed class App
         while (true)
         {
             var sav = entry.Sav;
+            var actions = new List<(string Label, Action Run)> { ("Pokémon", () => BrowseMenu(entry)) };
+            if (sav is SAV2 { Version: GameVersion.C } crystal)
+                actions.Add((crystal.IsEnabledGSBallMobileEvent ? "GS Ball Event (enabled)" : "Enable GS Ball Event", () => GsBallFlow(entry)));
+            if (sav.Generation >= 3)
+                actions.Add(("Events", () => EventsMenu(entry)));
+            actions.Add(("Distributions", () => DistributionsMenu(entry)));
+            actions.Add(("Gallery", () => GalleryMenu(entry)));
+            actions.Add(("More", () => MoreMenu(entry)));
+
+            var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected, BackgroundFor(entry));
+            if (choice is null)
+                return;
+            selected = choice.Value;
+            RunSafely(actions[choice.Value].Run, entry);
+        }
+    }
+
+    private void MoreMenu(SaveEntry entry)
+    {
+        int selected = 0;
+        while (true)
+        {
             var actions = new List<(string Label, Action Run)>
             {
-                ("Pokémon (view / transfer / evolve)", () => BrowseMenu(entry)),
                 ("Trade evolutions", () => TradeEvolutionMenu(entry)),
-                (sav.Generation == 3 ? "Mystery Gifts, Events & e-Reader" : "Mystery Gifts & Events", () => GiftMenu(entry)),
                 ("Import Pokémon from file", () => ImportMenu(entry)),
+                ("Gift files on SD card", () => GiftFilesMenu(entry, GiftService.ListFiles(_paths.GiftsDir, entry.Sav))),
                 ("Restore a backup", () => RestoreMenu(entry)),
                 ("Save info", () => _ui.Message(SaveInfo(entry))),
             };
-            var choice = _ui.Choose(entry.Label, actions.Select(a => a.Label).ToList(), selected, BackgroundFor(entry));
+            var choice = _ui.Choose($"{entry.Label}: more", actions.Select(a => a.Label).ToList(), selected);
             if (choice is null)
                 return;
             selected = choice.Value;
@@ -459,27 +484,6 @@ public sealed class App
 
     // ---------------------------------------------------------------- gifts & events
 
-    private void GiftMenu(SaveEntry entry)
-    {
-        while (true)
-        {
-            var sav = entry.Sav;
-            var files = GiftService.ListFiles(_paths.GiftsDir, sav);
-            var items = new List<(string Label, Action Run)>
-            {
-                ($"Gift files on SD card ({files.Count})", () => GiftFilesMenu(entry, files)),
-                ("PKHeX event library", () => EventLibraryMenu(entry)),
-            };
-            if (sav is SAV3 sav3)
-                items.Add(("Current event status", () => _ui.Message(Gen3Events.Status(sav3))));
-
-            var choice = _ui.Choose(sav.Generation == 3 ? "Mystery Gifts, Events & e-Reader" : "Mystery Gifts & Events", items.Select(i => i.Label).ToList());
-            if (choice is null)
-                return;
-            items[choice.Value].Run();
-        }
-    }
-
     private void GiftFilesMenu(SaveEntry entry, List<GiftFile> files)
     {
         if (files.Count == 0)
@@ -553,42 +557,197 @@ public sealed class App
             _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
     }
 
-    private void EventLibraryMenu(SaveEntry entry)
-    {
-        _ui.Busy("Loading PKHeX's event library...");
-        var events = GiftService.BuiltInEvents(entry.Sav);
-        if (events.Count == 0)
-        {
-            _ui.Message($"PKHeX has no built-in events for {Names.Game(entry.Sav)}.");
-            return;
-        }
+    // ---------------------------------------------------------------- events, distributions, gallery
 
+    private GameProfile ProfileFor(SaveEntry entry)
+    {
+        if (!_profiles.TryGetValue(entry.Path, out var profile))
+            _profiles[entry.Path] = profile = GameProfile.For(entry.Sav, RomIndex.FindRoms(entry.Path));
+        return profile;
+    }
+
+    private bool GalleryAvailable()
+    {
+        if (_gallery.Entries.Count != 0)
+            return true;
+        _ui.Message("The event gallery is missing from this copy of the pak (res/gallery.zip). Reinstall Pokémon Manager.");
+        return false;
+    }
+
+    private void EventsMenu(SaveEntry entry)
+    {
+        if (!GalleryAvailable())
+            return;
+        var profile = ProfileFor(entry);
+        var events = GalleryLists.Events(_gallery, profile);
         int selected = 0;
         while (true)
         {
-            var choice = _ui.Choose($"Event library ({events.Count})", events.Select(e => e.Name).ToList(), selected);
+            var labels = events.Select(e => StripItemPrefix(e.Title)).ToList();
+            int status = -1;
+            if (entry.Sav is SAV3)
+            {
+                status = labels.Count;
+                labels.Add("[Current event status]");
+            }
+            if (labels.Count == 0)
+            {
+                _ui.Message($"No event items were distributed for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}.");
+                return;
+            }
+
+            var choice = _ui.Choose("Events", labels, selected);
             if (choice is null)
                 return;
             selected = choice.Value;
-            var ev = events[choice.Value];
-            if (ev.Encounter is MysteryGift mg)
-            {
-                GiftActions(entry, mg);
-                continue;
-            }
-
-            if (!_ui.Confirm($"Send {ev.Name} to a PC box in {Names.Game(entry.Sav)}?", "SEND", "CANCEL"))
-                continue;
-            var result = GiftService.RedeemToBox(entry.Sav, ev.Encounter);
-            if (!result.Ok)
-            {
-                entry.Reload();
-                _ui.Message(result.Message);
-                continue;
-            }
-            if (TryWrite(entry, out _))
-                _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
+            if (choice == status)
+                _ui.Message(Gen3Events.Status((SAV3)entry.Sav));
+            else
+                GiveGalleryFile(entry, events[choice.Value]);
         }
+    }
+
+    private void DistributionsMenu(SaveEntry entry)
+    {
+        if (!GalleryAvailable())
+            return;
+        var profile = ProfileFor(entry);
+        var list = GalleryLists.Distributions(_gallery, profile);
+        if (list.Count == 0)
+        {
+            _ui.Message($"The gallery has no notable distributions for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}. Try the Gallery.");
+            return;
+        }
+        int selected = 0;
+        while (true)
+        {
+            var choice = _ui.Choose($"Distributions ({list.Count})", list.Select(e => e.Title).ToList(), selected);
+            if (choice is null)
+                return;
+            selected = choice.Value;
+            GiveGalleryFile(entry, list[choice.Value]);
+        }
+    }
+
+    private void GalleryMenu(SaveEntry entry)
+    {
+        if (!GalleryAvailable())
+            return;
+        var profile = ProfileFor(entry);
+        var files = _gallery.Entries
+            .Where(e => profile.Matches(e, _settings.GalleryAllLanguages, _settings.GalleryUnreleased))
+            .ToList();
+        if (files.Count == 0)
+        {
+            _ui.Message($"The gallery has nothing for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}.");
+            return;
+        }
+        GalleryFolder(entry, files, "");
+    }
+
+    /// <summary>Browses one gallery folder. Folders that only lead to one other folder are skipped through.</summary>
+    private void GalleryFolder(SaveEntry entry, List<GalleryEntry> files, string folder)
+    {
+        var view = GalleryTree.Open(files, folder);
+        int selected = 0;
+        while (true)
+        {
+            var labels = view.Folders.Select(f => $"{GalleryTree.Name(f)}/").ToList();
+            labels.AddRange(view.Files.Select(GalleryLabel));
+            // Language folders say nothing once the list is filtered to one language.
+            var path = string.Join('/', view.Path.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                .Where(p => _settings.GalleryAllLanguages || !GalleryLanguage.Tags.Contains(p)));
+            var title = path.Length == 0 ? $"Gallery ({files.Count})" : $"Gallery: {path}";
+            var choice = _ui.Choose(title, labels, selected);
+            if (choice is null)
+                return;
+            selected = choice.Value;
+            if (choice < view.Folders.Count)
+                GalleryFolder(entry, files, view.Folders[choice.Value]);
+            else
+                GiveGalleryFile(entry, view.Files[choice.Value - view.Folders.Count]);
+        }
+    }
+
+    private string GalleryLabel(GalleryEntry e)
+    {
+        var label = e.Title;
+        if (_settings.GalleryAllLanguages && e.Language is { } language)
+            label += $" ({language})";
+        return label;
+    }
+
+    /// <summary>"Item AuroraTicket (UK)" -> "Aurora Ticket (UK)".</summary>
+    private static string StripItemPrefix(string title)
+    {
+        if (title.StartsWith("Item ", StringComparison.Ordinal))
+            title = title[5..];
+        return title.Replace("AuroraTicket", "Aurora Ticket").Replace("MysticTicket", "Mystic Ticket");
+    }
+
+    private void GiveGalleryFile(SaveEntry entry, GalleryEntry file)
+    {
+        var gift = _gallery.Load(file);
+        if (gift is null)
+        {
+            _ui.Message("That gallery file couldn't be read.");
+            return;
+        }
+        if (gift.Pokemon is { } pk)
+            PlacePokemon(entry, pk, $"Put {file.Title}");
+        else if (gift.Card is { } card)
+            GiftActions(entry, card);
+        else if (gift.Gen3 is { } g3)
+        {
+            if (entry.Sav is not SAV3 sav3 || !Gen3Events.IsApplicable(sav3, g3))
+            {
+                _ui.Message($"{StripItemPrefix(file.Title)} can't be added to {Names.Game(entry.Sav)}: it's for a different game or language version.");
+                return;
+            }
+            InjectGen3(entry, g3);
+        }
+    }
+
+    /// <summary>Converts a Pokémon for this save if needed and puts it in the first free PC slot.</summary>
+    private void PlacePokemon(SaveEntry entry, PKM pk, string verb)
+    {
+        var sav = entry.Sav;
+        var check = TransferService.Prepare(pk, sav, _settings.AllowUnofficialTransfers, out var prepared);
+        if (!check.Ok || prepared is null)
+        {
+            _ui.Message(check.Message);
+            return;
+        }
+        var target = SlotRef.FirstEmptyBoxSlot(sav);
+        if (target is not { } slot)
+        {
+            _ui.Message("Every PC box is full.");
+            return;
+        }
+        if (!_ui.Confirm($"{verb} ({Names.Summary(prepared.Converted)}) into {SlotRef.BoxName(sav, slot.Box)}, slot {slot.Slot + 1}?"))
+            return;
+        slot.Set(sav, prepared.Converted);
+        if (TryWrite(entry, out _))
+            _ui.Message($"Added {Names.Summary(slot.Get(sav))}.\nLegality: {Names.Legality(slot.Get(sav))}\n\n{SaveStateWarning}");
+    }
+
+    private void GsBallFlow(SaveEntry entry)
+    {
+        if (entry.Sav is not SAV2 sav)
+            return;
+        const string HowTo =
+            "After entering the Hall of Fame, walk into the Goldenrod City Pokémon Center: a woman will give you the GS Ball. " +
+            "Take it to Kurt in Azalea Town, then put it in the Ilex Forest shrine to meet Celebi.";
+        if (sav.IsEnabledGSBallMobileEvent)
+        {
+            _ui.Message($"The GS Ball event is already enabled.\n\n{HowTo}");
+            return;
+        }
+        if (!_ui.Confirm("Enable the GS Ball event? This turns on the event the 3DS Virtual Console release unlocked.", "ENABLE", "CANCEL"))
+            return;
+        sav.EnableGSBallMobileEvent();
+        if (TryWrite(entry, out _))
+            _ui.Message($"GS Ball event enabled.\n\n{HowTo}\n\n{SaveStateWarning}");
     }
 
     // ---------------------------------------------------------------- files
@@ -631,23 +790,7 @@ public sealed class App
             return;
         }
 
-        var check = TransferService.Prepare(pk, sav, _settings.AllowUnofficialTransfers, out var prepared);
-        if (!check.Ok || prepared is null)
-        {
-            _ui.Message(check.Message);
-            return;
-        }
-        var target = SlotRef.FirstEmptyBoxSlot(sav);
-        if (target is not { } slot)
-        {
-            _ui.Message("Every PC box is full.");
-            return;
-        }
-        if (!_ui.Confirm($"Put {Names.Summary(prepared.Converted)} into {SlotRef.BoxName(sav, slot.Box)}, slot {slot.Slot + 1}?"))
-            return;
-        slot.Set(sav, prepared.Converted);
-        if (TryWrite(entry, out _))
-            _ui.Message($"Imported {Names.Summary(slot.Get(sav))}.\nLegality: {Names.Legality(slot.Get(sav))}\n\n{SaveStateWarning}");
+        PlacePokemon(entry, pk, $"Import {Path.GetFileName(path)}");
     }
 
     private void RestoreMenu(SaveEntry entry)
@@ -691,6 +834,8 @@ public sealed class App
                 $"Unofficial transfers: {(_settings.AllowUnofficialTransfers ? "ON" : "OFF")}",
                 $"Official ROMs only: {(_settings.OnlyOfficialRoms ? "ON" : "OFF")}",
                 $"PC box view: {(_settings.PcBoxView ? "ON" : "OFF (lists)")}",
+                $"Show all languages in gallery: {(_settings.GalleryAllLanguages ? "ON" : "OFF")}",
+                $"Show unreleased files in gallery: {(_settings.GalleryUnreleased ? "ON" : "OFF")}",
                 "Show welcome screen again",
             };
             var choice = _ui.Choose("Settings", items);
@@ -717,6 +862,18 @@ public sealed class App
             {
                 _settings.PcBoxView = !_settings.PcBoxView;
                 _boxViewFailed = false;
+            }
+            else if (choice == 3)
+            {
+                _settings.GalleryAllLanguages = !_settings.GalleryAllLanguages;
+            }
+            else if (choice == 4)
+            {
+                if (!_settings.GalleryUnreleased && !_ui.Confirm(
+                        "Unreleased files are debug and test data that were never distributed. PKHeX flags their " +
+                        "Pokémon as illegal, and some may not work in-game. Show them in the gallery?", "SHOW", "CANCEL"))
+                    continue;
+                _settings.GalleryUnreleased = !_settings.GalleryUnreleased;
             }
             else
             {
@@ -757,7 +914,10 @@ public sealed class App
         "Saves are read from the Saves folder, plus PokemonManager/Saves.\n" +
         "A backup is written to PokemonManager/Backups before every change.\n" +
         "\n" +
-        "Put gift files in PokemonManager/Gifts:\n" +
+        "Each game's menu has Events (event items like the Aurora Ticket), Distributions (notable Pokémon " +
+        "giveaways) and the Gallery (every event file for that game and language, from Project Pokémon's EventsGallery).\n" +
+        "\n" +
+        "Your own gift files go in PokemonManager/Gifts (More > Gift files):\n" +
         "Gen 3: .wc3 .wn3 .me3 .ect .ecb\n" +
         "Gen 4+: .pgt .pcd .wc4 .pgf .wc6 .wc7 .wc8 .wc9...\n" +
         "Put Pokémon files (.pk3 etc.) in PokemonManager/Import.\n" +

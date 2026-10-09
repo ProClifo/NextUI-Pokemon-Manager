@@ -22,7 +22,7 @@ public sealed class Gen3EventTests : IDisposable
 
     public void Dispose() => _saves.Dispose();
 
-    private static byte[] MakeScript(bool rubySapphire)
+    internal static byte[] MakeScript(bool rubySapphire)
     {
         var script = new byte[Gen3Events.ScriptSize];
         script[4] = 0x33;   // RAM_SCRIPT_MAGIC
@@ -35,7 +35,7 @@ public sealed class Gen3EventTests : IDisposable
         return script;
     }
 
-    private static byte[] MakeWonderCard(string title, bool japanese = false)
+    internal static byte[] MakeWonderCard(string title, bool japanese = false)
     {
         int cardSize = japanese ? Gen3Events.CardSizeJP : Gen3Events.CardSize;
         var card = new WonderCard3(new byte[cardSize]) { CardID = 1000, Title = title };

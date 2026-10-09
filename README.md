@@ -8,7 +8,11 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
   - Gen 3: Wonder Cards (`.wc3`), Wonder News (`.wn3`), Mystery Events (`.me3`, e.g. the Eon Ticket e-Card), e-Card Trainers (`.ect`) and e-Reader Berries (`.ecb`). These are the formats of the PKHeX *WC3 plugin* and suloku's *Gen III Mystery Gift Tool*, and injection produces the same save data as WC3 plugin 2.6.0 (see below).
   - Gen 4–7: Wonder Cards are placed in the in-game Mystery Gift album so you pick them up from the delivery person, as if you'd downloaded them (`.pgt .pcd .wc4 .pgf .wc6 .wc7 .wb7`...).
   - Any generation: a gift Pokémon can be sent straight to a PC box (`.wc8 .wb8 .wa8 .wc9 .wa9` included).
-  - **Built-in event library**: every official distribution PKHeX knows about (e.g. WISHMKR Jirachi, 10 ANIV Celebi, GB-era Mew) can be generated with correct event data and sent to your PC.
+- **Event gallery built in.** The Gen 1–5 files of Project Pokémon's [EventsGallery](https://github.com/projectpokemon/EventsGallery) ship with the pak, filtered to the game and language of each save:
+  - **Events**: key items that unlock in-game events, e.g. Aurora Ticket, Mystic Ticket, Eon Ticket, Old Sea Map, Member Card, Oak's Letter, Secret Key, Enigma Stone, Liberty Pass.
+  - **Distributions**: notable Pokémon giveaways (mythical and legendary Pokémon, e.g. WISHMKR Jirachi, Aura Mew, Movie Darkrai), each listed once.
+  - **Gallery**: every file for the game, in the gallery's own folders.
+  - Crystal gets **Enable GS Ball Event** instead of Events.
 - **Import/export** PKHeX Pokémon files (`.pk1`–`.pk9`...).
 - **Automatic backups** before every change, and a *Restore a backup* option.
 
@@ -75,11 +79,23 @@ A save's menu shows art for its game: Ruby, Sapphire, Emerald, FireRed or LeafGr
 
 | Menu | What it does |
 | --- | --- |
-| Pokémon (view / transfer / evolve) | Browse the party and boxes. For each Pokémon: view summary, move or copy to another game, trade evolve, export to file. |
-| Trade evolutions | Every Pokémon in the save that evolves by trade, plus *Evolve all that are ready* (no item needed, or already holding the right one). |
-| Mystery Gifts, Events & e-Reader | Gift files from your SD card, PKHeX's event library and (Gen 3) the current Mystery Gift/Event status. |
-| Import Pokémon from file | Puts a `.pk*` file from `PokemonManager/Import` into the first free PC slot. |
-| Restore a backup | Rolls the save back to one of the automatic backups. |
+| Pokémon | Browse the party and boxes. For each Pokémon: view summary, move or copy to another game, trade evolve, export to file. |
+| Events (Gen 3–5) | Key items for in-game events, for this game and language. Gen 3 also shows the current Mystery Gift/Event status. |
+| Enable GS Ball Event (Crystal) | Turns on the GS Ball event, as the 3DS Virtual Console release did. |
+| Distributions | Notable Pokémon giveaways for this game and language. Copies of one distribution that differ only in PID/IVs (hundreds of MYSTRY Mew, for example) are listed once. |
+| Gallery | Every gallery file for this game and language, in the gallery's folders. |
+| More | Trade evolutions (incl. *Evolve all that are ready*), import a `.pk*` file from `PokemonManager/Import`, gift files from `PokemonManager/Gifts`, restore a backup, save info. |
+
+Picking a gift: Pokémon files go to the first free PC slot. Gen 4/5 Wonder Cards can go to the in-game Mystery Gift album (pick them up from the delivery person) or, for Pokémon, straight to the PC. Gen 3 cards are injected as described under *Gen 3 events* below.
+
+### Event gallery
+
+The gallery is [projectpokemon/EventsGallery](https://github.com/projectpokemon/EventsGallery) at a pinned commit, Gen 1–5 only (the generations NextUI emulates). The build bundles the files PKHeX can read into `res/gallery.zip` with an index, so the SD card holds one 3 MB file instead of 7,500 small ones.
+
+- **Game**: from the ROM header, e.g. `BPEE` = Emerald, `CPUE` = Platinum, `IRBO` = Black 2; otherwise from the save. Cards only show for the games named in their file name (a HeartGold/SoulSilver card doesn't show for Platinum). Pokémon files show for every game of their generation, since they can be traded between them.
+- **Language**: from the ROM header's region letter (`E`/`P` English, `D` German, `F` French, `I` Italian, `S` Spanish, `J` Japanese, `K` Korean); otherwise from the save (Gen 4/5) or the player's own Pokémon (Gen 3). Gen 1–2 only distinguish Japanese, Korean and international.
+- **Settings → Show all languages in gallery** (off by default) lists every language in the Gallery. Events and Distributions always stick to the game's language.
+- **Settings → Show unreleased files in gallery** (off by default) adds the gallery's *Unreleased* folder: debug and test data that was never distributed.
 
 ### ⚠️ Save states
 
@@ -166,6 +182,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 - [NextUI](https://github.com/LoveRetro/NextUI)
 - PC box art from the [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation, generated at build time
 - ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
+- Event files from [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery), bundled at build time
 
 Pokémon is © Nintendo / Creatures Inc. / GAME FREAK inc. This project is not affiliated with or endorsed by them.
 

@@ -1,5 +1,3 @@
-using System.IO.Compression;
-using System.Text;
 using PKHeX.Core;
 
 namespace PokemonManager.Core;
@@ -12,8 +10,6 @@ namespace PokemonManager.Core;
 /// </summary>
 public sealed class GameBackgrounds(string assetDir)
 {
-    private const int GbaCodeOffset = 0xAC;
-
     /// <summary>First three letters of the GBA game code; the fourth is the region/language.</summary>
     private static readonly Dictionary<string, string> GbaCodes = new()
     {
@@ -50,40 +46,9 @@ public sealed class GameBackgrounds(string assetDir)
     public static string? GameFromGbaCode(string code)
         => code.Length >= 3 && GbaCodes.TryGetValue(code[..3].ToUpperInvariant(), out var game) ? game : null;
 
-    /// <summary>Reads the game code from a .gba file or the first .gba inside a .zip.</summary>
+    /// <summary>The game named by a GBA ROM's header (a .gba file or one inside a .zip).</summary>
     public static string? GameFromRom(string romPath)
-    {
-        try
-        {
-            if (romPath.EndsWith(".gba", StringComparison.OrdinalIgnoreCase))
-            {
-                using var file = File.OpenRead(romPath);
-                return GameFromHeader(file);
-            }
-            if (romPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-            {
-                using var zip = ZipFile.OpenRead(romPath);
-                var entry = zip.Entries.FirstOrDefault(e => e.Name.EndsWith(".gba", StringComparison.OrdinalIgnoreCase));
-                if (entry is null)
-                    return null;
-                using var stream = entry.Open();
-                return GameFromHeader(stream);
-            }
-        }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
-        {
-        }
-        return null;
-    }
-
-    private static string? GameFromHeader(Stream stream)
-    {
-        var header = new byte[GbaCodeOffset + 4];
-        int read = 0, n;
-        while (read < header.Length && (n = stream.Read(header, read, header.Length - read)) > 0)
-            read += n;
-        return read < header.Length ? null : GameFromGbaCode(Encoding.ASCII.GetString(header, GbaCodeOffset, 4));
-    }
+        => RomHeader.ReadGameCode(romPath) is { } code ? GameFromGbaCode(code) : null;
 
     /// <summary>Emerald saves are told apart by PKHeX; Ruby/Sapphire and FireRed/LeafGreen share a format.</summary>
     public static string? GameFromSave(SaveFile sav) => sav.Version switch

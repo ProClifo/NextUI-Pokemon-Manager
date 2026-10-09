@@ -19,6 +19,10 @@ public sealed class AppPaths
     public string BackgroundsDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_BACKGROUNDS")
         ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "backgrounds"));
 
+    /// <summary>The bundled EventsGallery files (res/gallery.zip in the pak).</summary>
+    public string GalleryFile { get; init; } = Environment.GetEnvironmentVariable("PKMGR_GALLERY")
+        ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "gallery.zip"));
+
     public string GiftsDir => Path.Combine(DataDir, "Gifts");
     public string ImportDir => Path.Combine(DataDir, "Import");
     public string ExportDir => Path.Combine(DataDir, "Export");
@@ -56,6 +60,10 @@ public sealed class AppSettings
     /// <summary>Browse Pokémon on a Gen 3 style PC box screen instead of lists (on by default).</summary>
     public bool PcBoxView { get; set; } = true;
     public bool SeenWelcome { get; set; }
+    /// <summary>List gallery files in every language, not just the game's (off by default).</summary>
+    public bool GalleryAllLanguages { get; set; }
+    /// <summary>List the gallery's unreleased files: debug and test cards never distributed (off by default).</summary>
+    public bool GalleryUnreleased { get; set; }
 
     public static AppSettings Load(string path)
     {
@@ -74,6 +82,8 @@ public sealed class AppSettings
                 case "seen_welcome": s.SeenWelcome = on; break;
                 case "only_official_roms": s.OnlyOfficialRoms = on; break;
                 case "pc_box_view": s.PcBoxView = on; break;
+                case "gallery_all_languages": s.GalleryAllLanguages = on; break;
+                case "gallery_unreleased": s.GalleryUnreleased = on; break;
             }
         }
         return s;
@@ -89,6 +99,8 @@ public sealed class AppSettings
                 $"seen_welcome={SeenWelcome.ToString().ToLowerInvariant()}",
                 $"only_official_roms={OnlyOfficialRoms.ToString().ToLowerInvariant()}",
                 $"pc_box_view={PcBoxView.ToString().ToLowerInvariant()}",
+                $"gallery_all_languages={GalleryAllLanguages.ToString().ToLowerInvariant()}",
+                $"gallery_unreleased={GalleryUnreleased.ToString().ToLowerInvariant()}",
             ]);
         }
         catch (IOException)

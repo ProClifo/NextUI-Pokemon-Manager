@@ -31,6 +31,8 @@ try
         "redeem-event" => RedeemEvent(rest),
         "gen3-status" => Gen3Status(rest),
         "box-scene" => BoxSceneCommand(rest),
+        "gallery-build" => GalleryBuild(rest),
+        "gallery" => GalleryList(rest),
         "help" or "--help" or "-h" => Usage(0),
         _ => Usage(2),
     };
@@ -225,6 +227,38 @@ static SlotRef ParseSlot(string text)
     return parts[0] is "p" or "P" ? SlotRef.Party(slot) : new SlotRef(int.Parse(parts[0]) - 1, slot);
 }
 
+int GalleryBuild(List<string> a)
+{
+    if (a.Count < 2)
+        return Usage(2);
+    var (added, skipped) = GalleryBuilder.Build(a[0], a[1], Console.Error);
+    return Print($"{added} gallery files bundled into {a[1]} ({skipped} unreadable files skipped)");
+}
+
+int GalleryList(List<string> a)
+{
+    bool allLanguages = TakeFlag(a, "--all-languages");
+    bool unreleased = TakeFlag(a, "--unreleased");
+    if (a.Count < 1)
+        return Usage(2);
+    var paths = AppPaths.FromEnvironment(sd, data);
+    var sav = SaveLibrary.Load(a[0]) ?? throw new InvalidOperationException("Not a Pokémon save.");
+    var roms = new VanillaRoms.Index(paths.RomRoots, null).FindRoms(a[0]);
+    var profile = GameProfile.For(sav.Sav, roms);
+    var gallery = new GalleryArchive(paths.GalleryFile);
+    var what = a.Count > 1 ? a[1] : "all";
+    var shown = what switch
+    {
+        "events" => GalleryLists.Events(gallery, profile),
+        "distributions" => GalleryLists.Distributions(gallery, profile),
+        _ => gallery.Entries.Where(e => profile.Matches(e, allLanguages, unreleased)).ToList(),
+    };
+    Console.WriteLine($"{Names.Game(sav.Sav)}: Gen {profile.Generation}, games {string.Join('/', profile.Games)}, {GalleryLanguage.Name(profile.Language)}");
+    foreach (var e in shown)
+        Console.WriteLine($"  {e.Title}  [{e.Folder}]");
+    return Print($"{shown.Count} files");
+}
+
 static string? TakeOption(List<string> a, string name)
 {
     int i = a.IndexOf(name);
@@ -267,6 +301,9 @@ static int Usage(int code)
           redeem-event <save> <index>          send a built-in event Pokémon to the PC
           gen3-status <save>                   Gen 3 Mystery Gift / Event status
           box-scene <save> <out.json> [assets] [slot]   scene file for the PC box viewer (testing)
+          gallery-build <EventsGallery dir> <out.zip>   bundle the Gen 1-5 EventsGallery files (build time)
+          gallery <save> [events|distributions|all] [--all-languages] [--unreleased]
+                                               gallery files the game menus would list
           selftest | version
         """);
     return code;

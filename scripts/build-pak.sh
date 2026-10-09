@@ -6,6 +6,7 @@
 #                                      for platform in tg5040, tg5050, my355, h700
 #
 # Needs the .NET 10 SDK, curl, zip, git and Python 3 with Pillow (for the PC box art).
+# The event gallery is bundled from projectpokemon/EventsGallery at a pinned commit.
 # The PC box viewer is built with Docker (scripts/build-native.sh); without Docker the pak still
 # works and shows Pokémon as lists.
 set -euo pipefail
@@ -18,6 +19,7 @@ PAK="$BUILD/Pokemon Manager.pak"
 MINUI_LIST_VERSION="${MINUI_LIST_VERSION:-0.15.4}"
 MINUI_PRESENTER_VERSION="${MINUI_PRESENTER_VERSION:-0.13.4}"
 POKEEMERALD_COMMIT="${POKEEMERALD_COMMIT:-731ad5bfd6e6f265508d0efcca0ba42f9dcf5881}"
+EVENTSGALLERY_COMMIT="${EVENTSGALLERY_COMMIT:-154d81be88453f6f78ec1d6d86e85fe0f2f5c240}"
 PLATFORMS=(tg5040 tg5050 my355 h700)
 
 VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$ROOT/pak.json")"
@@ -78,6 +80,17 @@ git clone -q --filter=blob:none --sparse https://github.com/pret/pokeemerald.git
 git -C "$EMERALD" checkout -q "$POKEEMERALD_COMMIT"
 git -C "$EMERALD" sparse-checkout set --no-cone     '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk'     '/src/pokemon_icon.c' '/include/constants/species.h' '/include/constants/pokedex.h'
 python3 "$ROOT/scripts/build-box-assets.py" "$EMERALD" "$PAK/res/box"
+
+echo "==> Event gallery (projectpokemon/EventsGallery ${EVENTSGALLERY_COMMIT:0:7}, Gen 1-5)"
+GALLERY="$BUILD/EventsGallery"
+git clone -q --filter=blob:none --sparse https://github.com/projectpokemon/EventsGallery.git "$GALLERY"
+git -C "$GALLERY" checkout -q "$EVENTSGALLERY_COMMIT"
+git -C "$GALLERY" sparse-checkout set --no-cone \
+    '/Released/Gen 1/' '/Released/Gen 2/' '/Released/Gen 3/' '/Released/Gen 4/' '/Released/Gen 5/' \
+    '/Unreleased/Gen 1/' '/Unreleased/Gen 2/' '/Unreleased/Gen 3/' '/Unreleased/Gen 4/' '/Unreleased/Gen 5/' \
+    '!*.png' '!*.raw' '!*.json' '!*.txt'
+dotnet run --project "$ROOT/src/PokemonManager/PokemonManager.csproj" -c Release -- \
+    gallery-build "$GALLERY" "$PAK/res/gallery.zip" 2>"$BUILD/gallery-skipped.log"
 
 echo "==> Per-game menu backgrounds"
 python3 "$ROOT/scripts/build-backgrounds.py" "$ROOT/assets/backgrounds" "$PAK/res/backgrounds"
