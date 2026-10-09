@@ -57,7 +57,7 @@ public sealed class MinUi : IUi
             ? ["--font-default", f.Message, "--font-size-default", f.MessageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)]
             : [];
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -68,14 +68,14 @@ public sealed class MinUi : IUi
         // that wrap-around, so reopen the list at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
-            int? result = ChooseOnce(title, items, selected, background, tags, out bool crashed);
+            int? result = ChooseOnce(title, items, selected, background, tags, images, out bool crashed);
             if (!crashed || attempt == MaxCrashRetries)
                 return result;
             selected = 0;
         }
     }
 
-    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, out bool crashed)
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, out bool crashed)
     {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
@@ -89,8 +89,9 @@ public sealed class MinUi : IUi
                 // (✅ or ☠️, which the fonts don't have) just left of it; show_confirm keeps A selecting the item.
                 row["options"] = new JsonArray { (JsonNode)tag };
                 var features = new JsonObject { ["show_confirm"] = true };
-                if (TagIcon(tag) is { } icon)
-                    features["images"] = new JsonObject { ["default"] = icon };
+                var image = images is not null && i < images.Count ? images[i] : TagIcon(tag);
+                if (image is not null && File.Exists(image))
+                    features["images"] = new JsonObject { ["default"] = image };
                 row["features"] = features;
             }
             array.Add((JsonNode)row);
@@ -115,7 +116,7 @@ public sealed class MinUi : IUi
         ];
         if (background is not null && File.Exists(background))
             args = [.. args, "--background-image", background];
-        if (tags is not null && tags.Any(t => t is { Length: > 0 }))
+        if (images is null && tags is not null && tags.Any(t => t is { Length: > 0 }))
             args = [.. args, "--options-selected-only"];
         args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK"])];
         int code = Run("minui-list", args);
@@ -266,14 +267,14 @@ public sealed class ConsoleUi : IUi
 {
     public GameFont? Font { get; set; }
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null)
     {
         if (items.Count == 0)
             return null;
         Console.WriteLine();
         Console.WriteLine($"== {title} ==");
         for (int i = 0; i < items.Count; i++)
-            Console.WriteLine($"{i + 1,3}. {items[i]}{(tags is not null && i < tags.Count && tags[i] is { } tag ? $"  [{tag}]" : "")}");
+            Console.WriteLine($"{i + 1,3}. {items[i]}{(tags is not null && i < tags.Count && tags[i] is { } tag ? $"  [{tag.Replace('\t', ' ')}]" : "")}");
         Console.Write("Choose (blank = back): ");
         var line = Console.ReadLine();
         if (line is null || !int.TryParse(line.Trim(), out var n) || n < 1 || n > items.Count)

@@ -27,6 +27,7 @@ POKEGOLD_COMMIT="${POKEGOLD_COMMIT:-ef0201d8daf47e8b3ea1518eacf890f37d4cd5e8}"
 POKECRYSTAL_COMMIT="${POKECRYSTAL_COMMIT:-3bc8daa4173e96a7f4011dad3922eb6fa5dad5c6}"
 POKERUBY_COMMIT="${POKERUBY_COMMIT:-5784633ce4ef7ade1a7f2d2d0c288e3d5e6cdd7f}"
 POKEFIRERED_COMMIT="${POKEFIRERED_COMMIT:-037335f4c725d7c9aecdac87066f2002b4bd7e14}"
+POKEHEARTGOLD_COMMIT="${POKEHEARTGOLD_COMMIT:-9d8b7591f09b65804da2fb2dfd56f320633e0d36}"
 POKEPLATINUM_COMMIT="${POKEPLATINUM_COMMIT:-c248fb3f8cc9934ded800e489567c5c0eeee92eb}"
 PLATFORMS=(tg5040 tg5050 my355 h700)
 
@@ -96,7 +97,7 @@ sparse_clone() {
     git -C "$DECOMP/$repo" checkout -q "$commit"
     git -C "$DECOMP/$repo" sparse-checkout set --no-cone "$@"
 }
-GB_ART=('/gfx/pokemon/' '/gfx/icons/' '/gfx/stats/' '/gfx/sprites/' '/gfx/sprites.asm' '/data/pokemon/' '/data/sgb/'
+GB_ART=('/gfx/pokemon/' '/gfx/icons/' '/gfx/stats/' '/gfx/sprites/' '/gfx/overworld/' '/gfx/sprites.asm' '/data/pokemon/' '/data/sgb/'
     '/data/icon_pointers.asm' '/engine/gfx/mon_icons.asm')
 sparse_clone pokered "$POKERED_COMMIT" '/gfx/font/' '/constants/charmap.asm' "${GB_ART[@]}"
 sparse_clone pokeyellow "$POKEYELLOW_COMMIT" "${GB_ART[@]}"
@@ -104,13 +105,20 @@ sparse_clone pokegold "$POKEGOLD_COMMIT" '/gfx/font/' '/constants/charmap.asm' "
 sparse_clone pokecrystal "$POKECRYSTAL_COMMIT" '/gfx/font/' '/constants/charmap.asm' "${GB_ART[@]}"
 sparse_clone pokeruby "$POKERUBY_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c'
 sparse_clone pokeemerald "$POKEEMERALD_COMMIT" '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk' \
-    '/src/pokemon_icon.c' '/graphics/fonts/' '/charmap.txt' '/src/fonts.c'
-sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/fonts/' '/charmap.txt' '/src/text.c' '/graphics/pokemon/' '/src/pokemon_icon.c'
-sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/fonts/' '/tools/msgenc/charmap.txt' '/res/pokemon/' '/generated/species.txt'
+    '/src/pokemon_icon.c' '/graphics/fonts/' '/charmap.txt' '/src/fonts.c' '/graphics/object_events/pics/people/'
+sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/fonts/' '/charmap.txt' '/src/text.c' '/graphics/pokemon/' '/src/pokemon_icon.c' \
+    '/graphics/object_events/pics/people/'
+sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/fonts/' '/tools/msgenc/charmap.txt' '/res/pokemon/' '/generated/species.txt' \
+    '/res/graphics/field_sprites/player/'
+# HeartGold's player sprites (MMODEL_HERO, MMODEL_HEROINE)
+sparse_clone pokeheartgold "$POKEHEARTGOLD_COMMIT" '/files/data/mmodel/mmodel/mmodel_00000069.NSBTX' '/files/data/mmodel/mmodel/mmodel_00000070.NSBTX'
 
 echo "==> PC box art"
 python3 "$ROOT/scripts/build-box-assets.py" "$DECOMP/pokeemerald" "$PAK/res/box"
 python3 "$ROOT/scripts/build-box-art.py" "$DECOMP" "$PAK/res/box/art"
+
+echo "==> Players' overworld sprites (main menu)"
+python3 "$ROOT/scripts/build-trainers.py" "$DECOMP" "$PAK/res/trainers"
 
 echo "==> Game fonts"
 python3 "$ROOT/scripts/build-fonts.py" "$DECOMP" "$PAK/res/fonts"

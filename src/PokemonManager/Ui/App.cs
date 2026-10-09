@@ -33,6 +33,7 @@ public sealed class App
     private readonly Dictionary<string, List<TicketChoice>> _tickets = new();
     private readonly GalleryArchive _gallery;
     private readonly GameFonts _fonts;
+    private readonly int _uiScale;
 
     public App(IUi ui, AppPaths paths)
     {
@@ -43,8 +44,8 @@ public sealed class App
         _boxViewer = new BoxViewer(new BoxScene(paths.BoxAssetsDir), paths.TempDir);
         _backgrounds = new GameBackgrounds(paths.BackgroundsDir);
         _gallery = new GalleryArchive(paths.GalleryFile);
-        _fonts = new GameFonts(paths.FontsDir,
-            GameFonts.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE")));
+        _uiScale = GameFonts.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE"));
+        _fonts = new GameFonts(paths.FontsDir, _uiScale);
         _settings = AppSettings.Load(paths.SettingsFile);
     }
 
@@ -60,9 +61,10 @@ public sealed class App
         while (true)
         {
             var saves = GetSaves();
-            // "[ENG] Emerald"; the highlighted game shows its trainer and ID on the right.
+            // "[ENG] Emerald", with "NAME <player sprite> ID" on the right of every save.
             var items = saves.Select(s => $"[{ProfileFor(s).ShownLanguage ?? ProfileFor(s).Language}] {Names.Game(s.Sav)}").ToList();
-            var tags = saves.Select(s => (string?)$"{s.Sav.OT}  ID {s.Sav.DisplayTID:D5}").ToList();
+            var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
+            var tags = saves.Select((s, i) => (string?)$"{s.Sav.OT}{(sprites[i] is null ? "  " : "\t")}{s.Sav.DisplayTID:D5}").ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
                 items.Add($"[{_hidden.Count} hidden: not official ROMs]");
@@ -70,7 +72,7 @@ public sealed class App
             int settings = items.Count; items.Add("[Settings]");
             int help = items.Count; items.Add("[Help]");
 
-            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags);
+            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags, images: sprites);
             if (choice is null)
                 return 0;
             if (choice == hidden) { ShowHidden(); continue; }
@@ -533,6 +535,38 @@ public sealed class App
     }
 
     private static string LegalTag(bool legal) => legal ? "Legal" : "Illegal";
+
+    /// <summary>
+    /// The player's overworld sprite in this save's game, boy or girl (scripts/build-trainers.py), or an empty
+    /// path where there's none: Black/White have no decompilation to take it from.
+    /// </summary>
+    private string? TrainerSprite(SaveFile sav)
+    {
+        var set = sav switch
+        {
+            SAV1 { Version: GameVersion.YW } => "y",
+            SAV1 => "rb",
+            SAV2 { Version: GameVersion.C } => "c",
+            SAV2 => "gs",
+            SAV3E => "e",
+            SAV3FRLG => "frlg",
+            SAV3 => "rs",
+            SAV4DP => "dp",
+            SAV4Pt => "pt",
+            SAV4HGSS => "hgss",
+            _ => null,
+        };
+        if (set is null)
+            return null;
+        var gender = sav.Gender == 1 ? "f" : "m";
+        foreach (var name in new[] { $"{set}-{gender}", $"{set}-m" }) // Red/Blue/Yellow and Gold/Silver have only a boy
+        {
+            var path = Path.Combine(_paths.TrainersDir, $"{name}-{_uiScale}x.png");
+            if (File.Exists(path))
+                return path;
+        }
+        return null;
+    }
 
     private List<TicketChoice> TicketsFor(SaveEntry entry)
     {

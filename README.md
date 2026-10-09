@@ -56,7 +56,7 @@ By default the app only lists saves made with **unmodified, official Pokémon RO
 - A save is matched to its ROM by name, the way NextUI names saves: `Roms/.../Pokemon Emerald.gba` ↔ `Saves/GBA/Pokemon Emerald.gba.sav`, `Pokemon Emerald.sav` or `Pokemon Emerald.srm`. Zipped ROMs work too.
 - The ROM's CRC32 is compared with the 175 retail dumps of the main-series games (Red/Green/Blue/Yellow through Black 2/White 2, all regions and revisions) from the No-Intro database. Zipped ROMs are checked without unzipping, and trimmed DS ROMs are recognised.
 - Each ROM is hashed once and the result is cached in `PokemonManager/rom-check-cache.txt`, so only the first scan is slow.
-- The main menu lists each save as its language and game, e.g. **[ENG] Emerald** or **[JPN] Ruby**; the highlighted one shows its trainer name and ID on the right.
+- The main menu lists each save as its language and game, e.g. **[ENG] Emerald** or **[JPN] Ruby**, with the trainer's name, the player's overworld sprite from that game (boy or girl) and the trainer ID on the right. The sprites come from the pret decompilations at build time (`scripts/build-trainers.py`; HeartGold/SoulSilver's are decoded from the game's DS textures). Black/White have no decompilation, so their saves show just the name and ID.
 - Hidden saves appear as **[N hidden: not official ROMs]** in the main menu. Select it to see each file and the reason.
 - To manage other saves anyway, turn off **Settings → Official ROMs only**, or copy the save into `PokemonManager/Saves`. Saves there have no ROM on the card and are always shown.
 

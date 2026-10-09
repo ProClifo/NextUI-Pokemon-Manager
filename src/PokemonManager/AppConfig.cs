@@ -24,6 +24,10 @@ public sealed class AppPaths
         ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "gallery.zip"));
 
     /// <summary>The games' menu fonts (res/fonts in the pak).</summary>
+    /// <summary>The players' overworld sprites for the main menu (res/trainers in the pak, from scripts/build-trainers.py).</summary>
+    public string TrainersDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_TRAINERS")
+        ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "trainers"));
+
     /// <summary>The Legal/Illegal icons (res/icons in the pak, from scripts/build-icons.py).</summary>
     public string IconsDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_ICONS")
         ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "icons"));
