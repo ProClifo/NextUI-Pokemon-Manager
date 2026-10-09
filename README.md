@@ -57,7 +57,7 @@ By default the app only lists saves made with **unmodified, official Pokémon RO
 - The ROM's CRC32 is compared with the 175 retail dumps of the main-series games (Red/Green/Blue/Yellow through Black 2/White 2, all regions and revisions) from the No-Intro database. Zipped ROMs are checked without unzipping, and trimmed DS ROMs are recognised.
 - Each ROM is hashed once and the result is cached in `PokemonManager/rom-check-cache.txt`, so only the first scan is slow.
 - The main menu lists each save as its language and game, e.g. **[ENG] Emerald** or **[JPN] Ruby**, with the trainer's name, the player's overworld sprite from that game (boy or girl) and the trainer ID on the right. The sprites come from the pret decompilations at build time (`scripts/build-trainers.py`; HeartGold/SoulSilver's are decoded from the game's DS textures). Black/White have no decompilation, so their saves show just the name and ID.
-- Only saves with their ROM on the card are listed (matched by name, as above). Hidden saves appear as **[N hidden: no ROM or not official]** in the main menu. Select it to see each file and the reason.
+- Only saves with their ROM on the card (matched by name, as above) that have received the Pokédex are listed. The Pokédex is read the same way as for distributions (see *Trade rules*). Hidden saves appear as **[N hidden saves]** in the main menu. Select it to see each file and the reason.
 - To manage saves from unofficial ROMs anyway, turn off **Settings → Official ROMs only**. A save without its ROM is never listed.
 
 To refresh the ROM list from a newer No-Intro database, run `scripts/update-vanilla-roms.py <libretro-database>/metadat/no-intro`.
