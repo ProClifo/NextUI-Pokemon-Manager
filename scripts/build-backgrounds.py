@@ -6,7 +6,9 @@ Usage: scripts/build-backgrounds.py <source dir> <output dir>
 Each <game>.png (GBA-sized, 240x160) becomes <game>/<W>x<H>.png for every supported screen,
 plus <game>/original.png. Images are scaled by a whole number so pixels stay sharp: the
 largest scale that crops at most 15% of the art on either axis, centred; any remaining space
-is filled with the art's own edge colours. Requires Pillow.
+is filled with the art's own edge colours. Panoramas (at least twice as wide as tall, like the
+Gold/Silver/Crystal title strips) are scaled to fill the screen's height instead and cropped at the
+sides, so their scenery isn't smeared outwards. Requires Pillow.
 """
 import os
 import sys
@@ -31,7 +33,7 @@ def pick_scale(w, h, sw, sh):
 def render(src, sw, sh):
     src = src.convert("RGBA")
     w, h = src.size
-    k = pick_scale(w, h, sw, sh)
+    k = max(1, sh // h) if w >= 2 * h else pick_scale(w, h, sw, sh)
     scaled = src.resize((w * k, h * k), Image.NEAREST)
     out = Image.new("RGBA", (sw, sh))
     ox, oy = (sw - scaled.width) // 2, (sh - scaled.height) // 2
