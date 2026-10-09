@@ -133,6 +133,7 @@ public sealed class App
         while (true)
         {
             var sav = entry.Sav;
+            Legality.For(sav); // legality reports in this save's menus are for this game and trainer
             var actions = new List<(string Label, Action Run)> { ("Pokémon", () => BrowseMenu(entry)) };
             if (sav is SAV2 { Version: GameVersion.C } crystal)
                 actions.Add((crystal.IsEnabledGSBallMobileEvent ? "GS Ball Event (enabled)" : "Enable GS Ball Event", () => GsBallFlow(entry)));
@@ -693,8 +694,8 @@ public sealed class App
             _ui.Message("That gallery file couldn't be read.");
             return;
         }
-        if (gift.Pokemon is { } pk)
-            PlacePokemon(entry, pk, $"Put {file.Title}");
+        if (gift.Pokemon is not null)
+            GiveEventPokemon(entry, file);
         else if (gift.Card is { } card)
             GiftActions(entry, card);
         else if (gift.Gen3 is { } g3)
@@ -708,27 +709,67 @@ public sealed class App
         }
     }
 
+    /// <summary>
+    /// Gives a gallery Pokémon the way the distribution did: a new Pokémon (PID, nature, IVs...) generated
+    /// for this save, which must pass PKHeX's legality check.
+    /// </summary>
+    private void GiveEventPokemon(SaveEntry entry, GalleryEntry file)
+    {
+        _ui.Busy($"Generating {file.Title}...");
+        var result = EventPokemon.FromGallery(_gallery, file, entry.Sav);
+        if (result.Pokemon is not { } pk)
+        {
+            _ui.Message(result.Message);
+            return;
+        }
+        if (!result.Legal)
+        {
+            if (file.Released)
+            {
+                _ui.Message($"PKHeX flags {file.Title} as illegal in {Names.Game(entry.Sav)}, so it wasn't added.\n\n{result.Message}");
+                return;
+            }
+            if (!_ui.Confirm($"This unreleased file is flagged as illegal by PKHeX:\n{result.Message}\n\nAdd it anyway?", "ADD", "CANCEL"))
+                return;
+        }
+        var origin = result.Source switch
+        {
+            EventPokemon.Source.Generated => $"Generated like the original distribution: {Names.Rolled(pk)}.",
+            EventPokemon.Source.GalleryCopy => $"PKHeX can't regenerate this event, so this is one of the original copies at random: {Names.Rolled(pk)}.",
+            _ => "",
+        };
+        PlaceConverted(entry, pk, $"Put {file.Title}", origin);
+    }
+
     /// <summary>Converts a Pokémon for this save if needed and puts it in the first free PC slot.</summary>
     private void PlacePokemon(SaveEntry entry, PKM pk, string verb)
     {
-        var sav = entry.Sav;
-        var check = TransferService.Prepare(pk, sav, _settings.AllowUnofficialTransfers, out var prepared);
+        var check = TransferService.Prepare(pk, entry.Sav, _settings.AllowUnofficialTransfers, out var prepared);
         if (!check.Ok || prepared is null)
         {
             _ui.Message(check.Message);
             return;
         }
+        PlaceConverted(entry, prepared.Converted, verb);
+    }
+
+    private void PlaceConverted(SaveEntry entry, PKM pk, string verb, string details = "")
+    {
+        var sav = entry.Sav;
         var target = SlotRef.FirstEmptyBoxSlot(sav);
         if (target is not { } slot)
         {
             _ui.Message("Every PC box is full.");
             return;
         }
-        if (!_ui.Confirm($"{verb} ({Names.Summary(prepared.Converted)}) into {SlotRef.BoxName(sav, slot.Box)}, slot {slot.Slot + 1}?"))
+        if (!_ui.Confirm($"{verb} ({Names.Summary(pk)}) into {SlotRef.BoxName(sav, slot.Box)}, slot {slot.Slot + 1}?"))
             return;
-        slot.Set(sav, prepared.Converted);
+        slot.Set(sav, pk);
         if (TryWrite(entry, out _))
-            _ui.Message($"Added {Names.Summary(slot.Get(sav))}.\nLegality: {Names.Legality(slot.Get(sav))}\n\n{SaveStateWarning}");
+        {
+            var extra = details.Length == 0 ? "" : $"\n{details}";
+            _ui.Message($"Added {Names.Summary(slot.Get(sav))}.{extra}\nLegality: {Names.Legality(slot.Get(sav))}\n\n{SaveStateWarning}");
+        }
     }
 
     private void GsBallFlow(SaveEntry entry)

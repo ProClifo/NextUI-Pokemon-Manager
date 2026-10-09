@@ -59,7 +59,8 @@ public sealed class GiftTests : IDisposable
     public void GiftFromFileRedeemsToBox()
     {
         var entry = _saves.Create(GameVersion.SW, "Sword.sav");
-        var wc8 = FirstPokemonGift(EncounterEvent.MGDB_G8);
+        // HOME gifts are only legal with a HOME tracker, which only HOME itself can add.
+        var wc8 = FirstPokemonGift(EncounterEvent.MGDB_G8.Where(g => !g.IsHOMEGift));
         var path = Path.Combine(_saves.Dir, "gift.wc8");
         File.WriteAllBytes(path, wc8.Data.ToArray());
 

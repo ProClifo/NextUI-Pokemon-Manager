@@ -122,39 +122,54 @@ public sealed class GalleryTests : IDisposable
         Assert.Equal("Wondercards", GalleryTree.Name(released.Folders[1]));
     }
 
-    [Fact]
-    public void BuilderIndexesAndBundlesFiles()
+    private static byte[] Bytes(PKM pk)
+    {
+        var bytes = new byte[pk.SIZE_PARTY];
+        pk.WriteDecryptedDataParty(bytes);
+        return bytes;
+    }
+
+    /// <summary>A copy of a real event Pokémon from PKHeX's event database, as the gallery would hold it.</summary>
+    private static PKM EventCopy(SaveFile sav, Species species, string ot)
+    {
+        var ev = GiftService.BuiltInEvents(sav).First(e => e.Encounter.Species == (ushort)species && e.Name.Contains(ot));
+        return ((IEncounterConvertible)ev.Encounter).ConvertToPKM(sav);
+    }
+
+    private string WriteGallery(Action<Action<string, byte[]>> files)
     {
         var root = Path.Combine(_saves.Dir, "EventsGallery");
-        void Write(string rel, byte[] data)
+        files((rel, data) =>
         {
             var path = Path.Combine(root, rel);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllBytes(path, data);
-        }
+        });
+        return root;
+    }
 
-        static byte[] Bytes(PKM pk)
-        {
-            var bytes = new byte[pk.SIZE_PARTY];
-            pk.WriteDecryptedDataParty(bytes);
-            return bytes;
-        }
-
+    [Fact]
+    public void BuilderIndexesAndBundlesFiles()
+    {
         var sav = _saves.Create(GameVersion.E, "Emerald.sav").Sav;
-        var jirachi = TestSaves.Make(sav, Species.Jirachi, 5);
-        var pikachu = TestSaves.Make(sav, Species.Pikachu, 5);
-        Write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (C579) (ENG).pk3", Bytes(jirachi));
-        Write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (6E7E) (ENG).pk3", Bytes(jirachi));
-        Write("Released/Gen 3/ENG/Toys R Us/RSEFL - TRU Pikachu (ENG).pk3", Bytes(pikachu));
-        Write("Released/Gen 3/ENG/Wondercards/E - Item AuroraTicket (ENG) (UK).wc3", Gen3EventTests.MakeWonderCard("AURORA TICKET"));
-        Write("Released/Gen 3/ENG/Wondercards/notes.txt", [1, 2, 3]);
-        Write("Released/Gen 3/ENG/broken.pk3", [1, 2, 3]);
-        Write("Released/Gen 4/hex extracted cards/ENG/x.pcd", new byte[856]);
+        var root = WriteGallery(write =>
+        {
+            write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (C579) (ENG).pk3", Bytes(EventCopy(sav, Species.Jirachi, "WISHMKR")));
+            write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (6E7E) (ENG).pk3", Bytes(EventCopy(sav, Species.Jirachi, "WISHMKR")));
+            write("Released/Gen 3/ENG/Wondercards/E - Item AuroraTicket (ENG) (UK).wc3", Gen3EventTests.MakeWonderCard("AURORA TICKET"));
+            write("Released/Gen 3/ENG/Wondercards/notes.txt", [1, 2, 3]);
+            write("Released/Gen 3/ENG/broken.pk3", [1, 2, 3]);
+            // A wild-caught Mew can't exist: released files PKHeX calls illegal are left out...
+            write("Released/Gen 3/ENG/Fake/RSEFL - Fake Mew (ENG).pk3", Bytes(TestSaves.Make(sav, Species.Mew, 10)));
+            // ...but unreleased debug files are kept for the "show unreleased" setting.
+            write("Unreleased/Gen 3/ENG/RSEFL - Debug Mew (ENG).pk3", Bytes(TestSaves.Make(sav, Species.Mew, 10)));
+            write("Released/Gen 4/hex extracted cards/ENG/x.pcd", new byte[856]);
+        });
 
         var zip = Path.Combine(_saves.Dir, "gallery.zip");
         var (added, skipped) = GalleryBuilder.Build(root, zip);
         Assert.Equal(4, added);
-        Assert.Equal(1, skipped);
+        Assert.Equal(2, skipped);
 
         var gallery = new GalleryArchive(zip);
         var profile = new GameProfile(3, ["E"], "ENG");
@@ -165,8 +180,47 @@ public sealed class GalleryTests : IDisposable
         var distributions = GalleryLists.Distributions(gallery, profile);
         Assert.Equal("WISHMKR Jirachi", Assert.Single(distributions).Title);
         Assert.Equal((ushort)Species.Jirachi, gallery.Load(distributions[0])?.Pokemon?.Species);
+        Assert.Contains(gallery.Entries, e => e is { Released: false, Species: (ushort)Species.Mew });
 
         Assert.Empty(GalleryLists.Events(gallery, profile with { Language = "GER" }));
         Assert.Empty(GalleryLists.Events(gallery, profile with { Games = ["FR"] }));
+    }
+
+    [Fact]
+    public void DistributionsAreGeneratedFreshAndLegal()
+    {
+        var sav = _saves.Create(GameVersion.E, "Emerald.sav").Sav;
+        var copy = EventCopy(sav, Species.Jirachi, "WISHMKR");
+        var root = WriteGallery(write => write("Released/Gen 3/ENG/WSHMKR Jirachi/RSEFL - WISHMKR Jirachi (C579) (ENG).pk3", Bytes(copy)));
+        var zip = Path.Combine(_saves.Dir, "gallery.zip");
+        GalleryBuilder.Build(root, zip);
+        var gallery = new GalleryArchive(zip);
+        var entry = Assert.Single(gallery.Entries);
+
+        var pids = new HashSet<uint>();
+        for (int i = 0; i < 5; i++)
+        {
+            var result = EventPokemon.FromGallery(gallery, entry, sav);
+            var pk = Assert.IsAssignableFrom<PKM>(result.Pokemon);
+            Assert.True(result.Legal);
+            Assert.Equal(EventPokemon.Source.Generated, result.Source);
+            Assert.True(Legality.IsLegal(pk), Legality.FirstProblem(pk));
+            // Still the WISHMKR distribution: its OT and ID, not the player's.
+            Assert.Equal(copy.OriginalTrainerName, pk.OriginalTrainerName);
+            Assert.Equal(copy.TID16, pk.TID16);
+            pids.Add(pk.PID);
+        }
+        Assert.True(pids.Count > 1, "every recipient should get their own Pokémon");
+    }
+
+    [Fact]
+    public void GameBoyEventsAreLegalOnCartridges()
+    {
+        Legality.UseCartridgeEra();
+        var sav = _saves.Create(GameVersion.RD, "Red.sav").Sav;
+        var mew = GiftService.BuiltInEvents(sav).First(e => e.Encounter.Species == (ushort)Species.Mew);
+        var pk = EventPokemon.Generate(mew.Encounter, sav);
+        Assert.NotNull(pk);
+        Assert.True(Legality.IsLegal(pk!));
     }
 }

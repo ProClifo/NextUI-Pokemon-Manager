@@ -170,28 +170,15 @@ public static class GiftService
     {
         if (encounter is MysteryGift { IsEntity: false })
             return OpResult.Fail("This gift is an item, not a Pokémon. Use \"Add to Mystery Gift album\" instead.");
-        if (encounter is not IEncounterConvertible convertible)
+        if (encounter is not IEncounterConvertible)
             return OpResult.Fail("PKHeX can't generate a Pokémon from this event.");
         if (encounter is MysteryGift mg && !mg.IsCardCompatible(sav, out var why))
             return OpResult.Fail($"This gift isn't compatible with {Names.Game(sav)}. {why}".Trim());
 
-        PKM pk;
-        try
-        {
-            pk = convertible.ConvertToPKM(sav);
-        }
-        catch (Exception ex)
-        {
-            return OpResult.Fail($"PKHeX couldn't generate this event: {ex.Message}");
-        }
-
-        if (pk.GetType() != sav.PKMType)
-        {
-            var check = TransferService.Prepare(pk, sav, allowUnofficial: false, out var prepared);
-            if (!check.Ok || prepared is null)
-                return check;
-            pk = prepared.Converted;
-        }
+        // A new Pokémon for this recipient, as the real distribution made, and only if it's legal.
+        var pk = EventPokemon.Generate(encounter, sav);
+        if (pk is null)
+            return OpResult.Fail("PKHeX couldn't generate a legal Pokémon from this event, so nothing was added.");
 
         var target = SlotRef.FirstEmptyBoxSlot(sav);
         if (target is not { } slot)

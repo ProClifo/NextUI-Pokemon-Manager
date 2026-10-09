@@ -99,6 +99,14 @@ public static class Names
         return string.Join('\n', lines);
     }
 
+    /// <summary>The randomly rolled parts of a Pokémon: nature (Gen 3+), IVs/DVs and shininess.</summary>
+    public static string Rolled(PKM pk)
+    {
+        var ivs = $"IVs {pk.IV_HP}/{pk.IV_ATK}/{pk.IV_DEF}/{pk.IV_SPA}/{pk.IV_SPD}/{pk.IV_SPE}";
+        var nature = pk.Format >= 3 ? $"{GameInfo.Strings.natures[(int)pk.Nature]} nature, " : "";
+        return $"{nature}{ivs}{(pk.IsShiny ? ", shiny" : "")}";
+    }
+
     public static string Legality(PKM pk)
     {
         try

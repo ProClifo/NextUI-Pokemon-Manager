@@ -8,6 +8,7 @@ using PokemonManager.Ui;
 //   pkmgr ui                      on-device menus (default; uses minui-list/minui-presenter when on PATH)
 //   pkmgr <command> ...           scriptable commands, see Usage below
 
+Legality.UseCartridgeEra();
 var argList = args.ToList();
 string? sd = TakeOption(argList, "--sd");
 string? data = TakeOption(argList, "--data");
@@ -232,7 +233,7 @@ int GalleryBuild(List<string> a)
     if (a.Count < 2)
         return Usage(2);
     var (added, skipped) = GalleryBuilder.Build(a[0], a[1], Console.Error);
-    return Print($"{added} gallery files bundled into {a[1]} ({skipped} unreadable files skipped)");
+    return Print($"{added} gallery files bundled into {a[1]} ({skipped} unreadable or illegal files skipped)");
 }
 
 int GalleryList(List<string> a)

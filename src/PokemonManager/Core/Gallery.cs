@@ -264,8 +264,13 @@ public static class GalleryBuilder
 
     private static readonly string[] SkippedFolders = ["hex extracted cards", "Wondercard Fulls"];
 
+    /// <summary>
+    /// Bundles every file PKHeX can read. Released Pokémon files that PKHeX's legality check rejects are
+    /// left out, so the menus only hand out legal Pokémon; unreleased (debug/test) files are kept as they are.
+    /// </summary>
     public static (int Added, int Skipped) Build(string galleryRoot, string outZip, TextWriter? log = null)
     {
+        Legality.UseCartridgeEra();
         var entries = new List<(GalleryEntry Entry, string Source)>();
         int skipped = 0;
         foreach (var top in new[] { "Released", "Unreleased" })
@@ -281,11 +286,11 @@ public static class GalleryBuilder
                     if (!GalleryGift.Extensions.Contains(Path.GetExtension(file).ToLowerInvariant())
                         || rel.Split('/').Any(p => SkippedFolders.Contains(p, StringComparer.OrdinalIgnoreCase)))
                         continue;
-                    var entry = Describe(rel, gen, top == "Released", File.ReadAllBytes(file));
+                    var entry = Describe(rel, gen, top == "Released", File.ReadAllBytes(file), out var problem);
                     if (entry is null)
                     {
                         skipped++;
-                        log?.WriteLine($"skipped (unreadable): {rel}");
+                        log?.WriteLine($"skipped ({problem}): {rel}");
                         continue;
                     }
                     entries.Add((entry, file));
@@ -309,11 +314,20 @@ public static class GalleryBuilder
         return (entries.Count, skipped);
     }
 
-    public static GalleryEntry? Describe(string relativePath, int generation, bool released, byte[] data)
+    public static GalleryEntry? Describe(string relativePath, int generation, bool released, byte[] data, out string problem)
     {
+        problem = "";
         var gift = GalleryGift.Load(relativePath, data);
         if (gift is null)
+        {
+            problem = "unreadable";
             return null;
+        }
+        if (released && gift.Pokemon is { } file && !Legality.IsLegal(file))
+        {
+            problem = $"illegal: {Legality.FirstProblem(file)}";
+            return null;
+        }
         var (games, title) = GalleryNames.Parse(Path.GetFileName(relativePath), generation);
         var language = GalleryNames.LanguageFromPath(relativePath)
                        ?? (gift.Pokemon is { } pk ? GalleryLanguage.FromLanguageId(pk.Language) : null);
