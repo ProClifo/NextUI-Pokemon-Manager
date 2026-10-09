@@ -23,6 +23,10 @@ public sealed class AppPaths
     public string GalleryFile { get; init; } = Environment.GetEnvironmentVariable("PKMGR_GALLERY")
         ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "gallery.zip"));
 
+    /// <summary>The games' menu fonts (res/fonts in the pak).</summary>
+    public string FontsDir { get; init; } = Environment.GetEnvironmentVariable("PKMGR_FONTS")
+        ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "res", "fonts"));
+
     public string GiftsDir => Path.Combine(DataDir, "Gifts");
     public string ImportDir => Path.Combine(DataDir, "Import");
     public string ExportDir => Path.Combine(DataDir, "Export");

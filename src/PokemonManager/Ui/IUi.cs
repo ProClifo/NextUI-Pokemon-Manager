@@ -1,3 +1,5 @@
+using PokemonManager.Core;
+
 namespace PokemonManager.Ui;
 
 /// <summary>
@@ -6,6 +8,9 @@ namespace PokemonManager.Ui;
 /// </summary>
 public interface IUi
 {
+    /// <summary>The font screens are drawn with (a game's own font in its menus); null for the NextUI font.</summary>
+    GameFont? Font { get; set; }
+
     /// <summary>
     /// Shows a list and returns the chosen index, or null when the user backs out. The optional
     /// background image is drawn behind the list where the UI supports it, and <paramref name="tags"/>

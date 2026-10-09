@@ -32,6 +32,7 @@ public sealed class App
     private readonly Dictionary<string, GameProfile> _profiles = new();
     private readonly Dictionary<string, List<TicketChoice>> _tickets = new();
     private readonly GalleryArchive _gallery;
+    private readonly GameFonts _fonts;
 
     public App(IUi ui, AppPaths paths)
     {
@@ -42,6 +43,8 @@ public sealed class App
         _boxViewer = new BoxViewer(new BoxScene(paths.BoxAssetsDir), paths.TempDir);
         _backgrounds = new GameBackgrounds(paths.BackgroundsDir);
         _gallery = new GalleryArchive(paths.GalleryFile);
+        _fonts = new GameFonts(paths.FontsDir,
+            GameFonts.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE")));
         _settings = AppSettings.Load(paths.SettingsFile);
     }
 
@@ -130,6 +133,28 @@ public sealed class App
     // ---------------------------------------------------------------- save menu
 
     private void SaveMenu(SaveEntry entry)
+    {
+        // The game's menus are drawn in the game's own font.
+        var previousFont = _ui.Font;
+        try
+        {
+            _ui.Font = _fonts.For(entry.Sav, ProfileFor(entry).Language);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Couldn't pick the game font: {ex.Message}");
+        }
+        try
+        {
+            SaveMenuLoop(entry);
+        }
+        finally
+        {
+            _ui.Font = previousFont;
+        }
+    }
+
+    private void SaveMenuLoop(SaveEntry entry)
     {
         int selected = 0;
         while (true)

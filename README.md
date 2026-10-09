@@ -37,7 +37,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
 
 ### Building it yourself
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow, and Docker for the PC box viewer. Without Docker the pak still builds and shows Pokémon as lists.
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow and fontTools, and Docker for the PC box viewer. Without Docker the pak still builds and shows Pokémon as lists.
 
 ```sh
 scripts/build-pak.sh          # -> dist/PokemonManager.pak.zip and dist/PokemonManager-<platform>-sdcard.zip
@@ -96,6 +96,15 @@ Every item in these lists is marked **Legal** or **Illegal**:
 **Which Pokémon count as distributions.** At build time PKHeX checks every mythical, legendary and alternate-form Pokémon in the gallery: is there a legal non-event way to get it in a handheld game of that language? That covers catching, gifts, in-game trades, breeding and transfers from earlier handheld generations; GameCube games don't count. The ones with no other way make up the Distributions list. Language matters: a Faraway Island Mew is only legitimate in Japanese Emerald (the Old Sea Map was only distributed there), so Mew is event-only in every other language, while Deoxys, Lugia and Ho-Oh aren't, because their ticket encounters are legitimate in English Emerald.
 
 Picking a gift: event Pokémon are **generated fresh for your save**, as the real distributions did. PKHeX works out which distribution a gallery file came from and rolls a new PID, nature, IVs and so on with that event's own method, keeping the event's OT and ID. Each Pokémon must pass PKHeX's legality check for your game before it's added; generation is retried until one does. For the few events PKHeX can't recreate (the Berry Glitch Shiny Zigzagoon), you get a random legal copy from the gallery's originals. Pokémon that weren't generated per player (e.g. one specific traded Pokémon) are given as they are. Released files that PKHeX flags as illegal aren't bundled at all, and unreleased ones ask before adding an illegal Pokémon. Gen 1/2 Pokémon are judged as cartridge-era games, so the GB event Mews count as legal. The new Pokémon goes to the first free PC slot. Gen 4/5 Wonder Cards can go to the in-game Mystery Gift album (pick them up from the delivery person) or, for Pokémon, straight to the PC. Gen 3 cards are injected as described under *Gen 3 events* below.
+
+### Game fonts
+
+Each game's menus (and the messages shown from them) are drawn in that game's own font: Red/Blue/Yellow, Gold/Silver, Crystal, Ruby/Sapphire/Emerald, FireRed/LeafGreen and Diamond/Pearl/Platinum/HeartGold/SoulSilver. `scripts/build-fonts.py` turns the font graphics, width tables and character maps of the pret decompilations into TrueType pixel fonts at build time:
+
+- Every font pixel is a whole number of screen pixels at the sizes minui-list and minui-presenter draw (one file per use and UI scale), so text stays sharp; checked with the SDL_ttf version NextUI ships (2.0.13).
+- The fonts declare themselves bold, so SDL_ttf doesn't fake bold by smearing the pixels sideways.
+- A screen with a character the game font doesn't have (e.g. Japanese event names) uses the NextUI font instead.
+- Black/White and Black 2/White 2 have no decompilation to take a font from, and Japanese/Korean games keep the NextUI font.
 
 ### Event gallery
 
@@ -203,6 +212,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 - The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event file formats and import procedure
 - [NextUI](https://github.com/LoveRetro/NextUI)
 - PC box art from the [pret/pokeemerald](https://github.com/pret/pokeemerald) decompilation, generated at build time
+- Game fonts from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), converted at build time
 - ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
 - Event files from [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery), bundled at build time
 

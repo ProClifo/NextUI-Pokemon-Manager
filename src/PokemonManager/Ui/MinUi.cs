@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using PokemonManager.Core;
 
 namespace PokemonManager.Ui;
 
@@ -29,6 +30,18 @@ public sealed class MinUi : IUi
     }
 
     public static bool IsAvailable() => FindOnPath("minui-list") is not null && FindOnPath("minui-presenter") is not null;
+
+    public GameFont? Font { get; set; }
+
+    /// <summary>minui-list's font options, when the game font has every character the list shows.</summary>
+    private string[] ListFont(params IEnumerable<string?>[] texts)
+        => Font is { } f && f.Covers(texts.SelectMany(t => t)) ? ["--font-large", f.List, "--font-medium", f.Title] : [];
+
+    /// <summary>minui-presenter's font options, when the game font has every character of the message and buttons.</summary>
+    private string[] MessageFont(params string[] texts)
+        => Font is { } f && f.Covers(texts)
+            ? ["--font-default", f.Message, "--font-size-default", f.MessageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)]
+            : [];
 
     public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null)
     {
@@ -84,6 +97,7 @@ public sealed class MinUi : IUi
         ];
         if (background is not null && File.Exists(background))
             args = [.. args, "--background-image", background];
+        args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK"])];
         int code = Run("minui-list", args);
         // Killed by a signal: .NET reports 128 + the signal number (139 = SIGSEGV).
         crashed = code > 128;
@@ -111,9 +125,12 @@ public sealed class MinUi : IUi
         if (pages.Count == 1)
         {
             Run("minui-presenter",
+            [
                 "--message", Escape(pages[0]),
                 "--confirm-show", "--confirm-text", "OK",
-                "--timeout", "0");
+                "--timeout", "0",
+                .. MessageFont(pages[0], "OK"),
+            ]);
             return;
         }
 
@@ -123,26 +140,32 @@ public sealed class MinUi : IUi
             items.Add((JsonNode)new JsonObject { ["text"] = $"{pages[i]}\n\n({i + 1}/{pages.Count}, LEFT/RIGHT to scroll)", ["alignment"] = "top" });
         File.WriteAllText(file, new JsonObject { ["items"] = items }.ToJsonString());
         Run("minui-presenter",
+        [
             "--file", file,
             "--confirm-show", "--confirm-text", "OK",
-            "--timeout", "0");
+            "--timeout", "0",
+            .. MessageFont([.. pages, "OK", "LEFT/RIGHT to scroll", "(0123456789)"]),
+        ]);
     }
 
     public bool Confirm(string text, string yes = "YES", string no = "NO")
     {
         StopBusy();
         int code = Run("minui-presenter",
+        [
             "--message", Escape(text),
             "--confirm-show", "--confirm-text", yes,
             "--cancel-show", "--cancel-text", no,
-            "--timeout", "0");
+            "--timeout", "0",
+            .. MessageFont(text, yes, no),
+        ]);
         return code == 0;
     }
 
     public void Busy(string text)
     {
         StopBusy();
-        var psi = Start("minui-presenter", "--message", Escape(text), "--timeout", "-1");
+        var psi = Start("minui-presenter", ["--message", Escape(text), "--timeout", "-1", .. MessageFont(text)]);
         try
         {
             _busy = Process.Start(psi);
@@ -221,6 +244,8 @@ public sealed class MinUi : IUi
 /// </summary>
 public sealed class ConsoleUi : IUi
 {
+    public GameFont? Font { get; set; }
+
     public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null)
     {
         if (items.Count == 0)
