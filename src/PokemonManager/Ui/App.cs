@@ -577,7 +577,7 @@ public sealed class App
         if (gift is DataMysteryGift data && GiftService.SupportsAlbum(sav))
             actions.Add(("Add to Mystery Gift album (pick up in-game)", () => GiftService.InjectCard(sav, data)));
         if (gift.IsEntity)
-            actions.Add(("Send the Pokémon straight to a PC box", () => GiftService.RedeemToBox(sav, gift, !_settings.AllowIllegalTransfers)));
+            actions.Add(("Send the Pokémon straight to a PC box", () => GiftService.RedeemToBox(sav, gift)));
         if (actions.Count == 0)
         {
             _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, and this gift isn't a Pokémon, so it can't be added.");
@@ -822,11 +822,7 @@ public sealed class App
             EventPokemon.Source.GalleryCopy => $"PKHeX can't regenerate this event, so this is one of the original copies at random: {Names.Rolled(pk)}.",
             _ => "",
         };
-        if (!_settings.AllowIllegalTransfers && TradeRules.CheckReceive(pk, entry.Sav) is { Ok: false } refused)
-        {
-            _ui.Message(refused.Message);
-            return;
-        }
+        // No trade rules: the real distributions didn't need the National Pokédex or any other progress.
         PlaceConverted(entry, pk, $"Put {file.Title}", origin);
     }
 

@@ -99,9 +99,10 @@ public static class TradeRules
     }
 
     /// <summary>
-    /// Whether this save can take in <paramref name="pk"/> from outside (gifts and imports): Game Boy games
-    /// received event Pokémon by trade, so their link rooms must be open; Emerald and FireRed/LeafGreen need
-    /// the National Pokédex for Pokémon outside their regional Pokédex.
+    /// Whether this save can take in <paramref name="pk"/> from another game (imported files): Game Boy games
+    /// trade in their link rooms, so those must be open; Emerald and FireRed/LeafGreen need the National
+    /// Pokédex for Pokémon outside their regional Pokédex. Not used for distributions (Distributions, Gallery,
+    /// Wonder Cards), which the real games received without any of this.
     /// </summary>
     public static OpResult CheckReceive(PKM pk, SaveFile dest)
     {

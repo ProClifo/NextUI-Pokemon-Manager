@@ -151,7 +151,7 @@ By default Pokémon only move the way the real games allowed, and only once each
 | Gen 4 → Gen 5 | Poké Transfer | The Gen 5 game has the National Pokédex (documented, not decompiled); no Eggs; no Gen 4 HM moves. |
 | Gen 1/2 → Gen 3+, anything backwards | — | Not possible in the games. |
 
-Gifts, Wonder Card Pokémon sent to the PC and imported files follow the receiving side of these rules: Game Boy games need their link room open (their event Pokémon arrived by trade), and Emerald and FireRed/LeafGreen need the National Pokédex for Pokémon outside their regional Pokédex. Pal Park's once-a-day and six-Pokémon limits aren't applied.
+Imported files follow the receiving side of these rules: Game Boy games need their link room open, and Emerald and FireRed/LeafGreen need the National Pokédex for Pokémon outside their regional Pokédex. Distributions (the Distributions and Gallery menus, and Wonder Card Pokémon sent to the PC) don't: the real distributions didn't need the National Pokédex or any other progress. Pal Park's once-a-day and six-Pokémon limits aren't applied.
 
 Rules the app always enforces:
 

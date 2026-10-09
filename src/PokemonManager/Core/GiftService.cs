@@ -164,9 +164,10 @@ public static class GiftService
 
     /// <summary>
     /// Generates the gift Pokémon with the save's trainer details and places it in the first empty PC slot.
-    /// Works for every generation, including games without a Mystery Gift album.
+    /// Works for every generation, including games without a Mystery Gift album. The trade rules don't apply:
+    /// the real distributions didn't need the National Pokédex or any other progress.
     /// </summary>
-    public static OpResult RedeemToBox(SaveFile sav, IEncounterable encounter, bool gameRules = true)
+    public static OpResult RedeemToBox(SaveFile sav, IEncounterable encounter)
     {
         if (encounter is MysteryGift { IsEntity: false })
             return OpResult.Fail("This gift is an item, not a Pokémon. Use \"Add to Mystery Gift album\" instead.");
@@ -179,9 +180,6 @@ public static class GiftService
         var pk = EventPokemon.Generate(encounter, sav);
         if (pk is null)
             return OpResult.Fail("PKHeX couldn't generate a legal Pokémon from this event, so nothing was added.");
-        if (gameRules && TradeRules.CheckReceive(pk, sav) is { Ok: false } refused)
-            return refused;
-
         var target = SlotRef.FirstEmptyBoxSlot(sav);
         if (target is not { } slot)
             return OpResult.Fail("Every PC box is full.");

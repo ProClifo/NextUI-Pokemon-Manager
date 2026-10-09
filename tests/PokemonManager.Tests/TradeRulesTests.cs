@@ -85,7 +85,7 @@ public sealed class TradeRulesTests : IDisposable
         fr.NationalDex = true;
         Assert.True(TradeRules.CheckTransfer(treecko, em, fr).Ok);
 
-        // Gifts and imports follow the same rule.
+        // Imported files follow the same rule (distributions don't; see GiftTests).
         var fresh = (SAV3)Save(GameVersion.LG);
         Assert.False(TradeRules.CheckReceive(TestSaves.Make(fresh, Species.Jirachi, 5), fresh).Ok);
         Assert.True(TradeRules.CheckReceive(TestSaves.Make(fresh, Species.Mew, 5), fresh).Ok);

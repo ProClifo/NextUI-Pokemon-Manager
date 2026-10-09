@@ -83,10 +83,8 @@ public sealed class GiftTests : IDisposable
     [InlineData(GameVersion.W2)]
     public void BuiltInEventLibraryRedeems(GameVersion version)
     {
+        // A new game: distributions needed no National Pokédex or story progress.
         var entry = _saves.Create(version, $"{version}.sav");
-        // Event Pokémon reach Game Boy games by trade, and Gen 3 games outside their regional Pokédex
-        // need the National Pokédex.
-        TestSaves.Progress(entry.Sav);
         var events = GiftService.BuiltInEvents(entry.Sav);
         Assert.NotEmpty(events);
 
@@ -95,5 +93,18 @@ public sealed class GiftTests : IDisposable
         Assert.True(result.Ok, $"{ev.Name}: {result.Message}");
         entry = _saves.Roundtrip(entry);
         Assert.Equal(ev.Encounter.Species, new SlotRef(0, 0).Get(entry.Sav).Species);
+    }
+
+    [Theory]
+    [InlineData(GameVersion.E, Species.Celebi)]   // outside the Hoenn Pokédex
+    [InlineData(GameVersion.LG, Species.Jirachi)] // outside the Kanto Pokédex
+    public void DistributionsDontNeedTheNationalDex(GameVersion version, Species species)
+    {
+        var entry = _saves.Create(version, $"{version}.sav");
+        var ev = GiftService.BuiltInEvents(entry.Sav).First(e => e.Encounter.Species == (ushort)species);
+        Assert.False(TradeRules.CheckReceive(TestSaves.Make(entry.Sav, species, 5), entry.Sav).Ok); // a trade would need it
+        var result = GiftService.RedeemToBox(entry.Sav, ev.Encounter);
+        Assert.True(result.Ok, result.Message);
+        Assert.Equal((ushort)species, new SlotRef(0, 0).Get(entry.Sav).Species);
     }
 }
