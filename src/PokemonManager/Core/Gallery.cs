@@ -599,22 +599,55 @@ public sealed record GameProfile(int Generation, IReadOnlyList<string> Games, st
 public static class GalleryLists
 {
     /// <summary>
-    /// Released distributions of Pokémon that can't be obtained legally any other way in this game's
-    /// language. The gallery keeps every known copy of a distribution (e.g. hundreds of MYSTRY Mew), which
-    /// differ only in PID/IVs; the list shows each distribution once.
+    /// The Distributions menu: one distribution of each Pokémon that can't be obtained legally any other way in
+    /// this game's language and that the previous generation's menus don't already provide (Gen 4 gets Mew,
+    /// Celebi, Jirachi and Deoxys from Gen 3 by Pal Park, Gen 5 everything up to Arceus by Poké Transfer). The
+    /// gallery keeps every known copy and variant of a distribution; the rest stay in the Gallery.
     /// </summary>
     public static List<GalleryEntry> Distributions(GalleryArchive gallery, GameProfile profile)
+        => Candidates(gallery, profile)
+            .Where(c => !FromEarlierGeneration(profile, c.Entry.Species))
+            .GroupBy(c => c.Entry.Species)
+            .Select(g => g
+                .OrderBy(c => Preferred.Contains(c.Entry.Title) ? 0 : 1)
+                .ThenBy(c => c.Entry.Language is null || c.Entry.Language == profile.Language ? 0 : 1)
+                .ThenBy(c => c.Entry.Title.Contains("Shiny", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                .ThenByDescending(c => c.Copies)
+                .ThenBy(c => c.Entry.Title, StringComparer.OrdinalIgnoreCase)
+                .First().Entry)
+            .OrderBy(e => e.Species)
+            .ToList();
+
+    /// <summary>The distribution picked when a Pokémon has several (otherwise: the game's own language, then the most copies).</summary>
+    private static readonly HashSet<string> Preferred = new(StringComparer.OrdinalIgnoreCase)
     {
-        var list = Curated.TryGetValue((profile.Generation, profile.Language), out var picks)
-            ? All(gallery, profile).Where(e => picks.Contains(e.Title)).ToList()
-            : All(gallery, profile);
+        "Aura Mew", "10 ANIV Celebi", "WISHMKR Jirachi", "Manaphy Egg",
+    };
+
+    /// <summary>
+    /// Pokémon the previous generation's menus provide in every language that can transfer them: Pal Park only
+    /// takes Gen 3 Pokémon of the same language (there are no Korean Gen 3 games); Poké Transfer takes any.
+    /// </summary>
+    private static bool FromEarlierGeneration(GameProfile profile, ushort species) => profile.Generation switch
+    {
+        4 => profile.Language != GalleryLanguage.Korean && species <= 386,
+        5 => species <= 493,
+        _ => false,
+    };
+
+    private sealed record Candidate(GalleryEntry Entry, int Copies);
+
+    /// <summary>Every distribution that could go on the menu, before one per Pokémon is picked.</summary>
+    private static List<Candidate> Candidates(GalleryArchive gallery, GameProfile profile)
+    {
+        var list = All(gallery, profile);
         if (profile.Language == GalleryLanguage.English)
             return list;
 
         // Event-only Pokémon with no distribution in this language come from elsewhere, so the Pokédex can always
         // be completed: a distribution that really was given out in this language but isn't in the gallery
-        // (generated in the save's language), else the English one, as an English Pokémon traded over.
-        var have = list.Select(e => e.Species).ToHashSet();
+        // (generated in the save's language), else an English one, as an English Pokémon traded over.
+        var have = list.Select(c => c.Entry.Species).ToHashSet();
         var missing = gallery.EventOnlyPokemon(profile.Generation, profile.Language).Select(p => p.Species)
             .Concat(Tickets.Unreachable(gallery, profile.Generation, profile.Language))
             .Where(s => !have.Contains(s))
@@ -623,14 +656,13 @@ public static class GalleryLists
         if (missing.Count == 0)
             return list;
         var englishProfile = profile with { Language = GalleryLanguage.English };
-        var english = Distributions(gallery, englishProfile);
+        var english = Candidates(gallery, englishProfile);
         // Ticket-only Pokémon (e.g. Lugia and Ho-Oh, behind the Mystic Ticket) aren't English distributions, since
         // English games had the ticket; any English distribution of them will do.
         var anyEnglish = gallery.Entries
             .Where(e => e.Species > 0 && missing.Contains(e.Species) && englishProfile.Matches(e, allLanguages: false, unreleased: false))
             .Let(GalleryGroups.Group)
-            .OrderByDescending(g => g.Copies.Count)
-            .Select(g => g.Copies[0] with { Title = g.Title })
+            .Select(g => new Candidate(g.Copies[0] with { Title = g.Title }, g.Copies.Count))
             .ToList();
         foreach (var species in missing.Order())
         {
@@ -639,13 +671,13 @@ public static class GalleryLists
                                                                && GalleryNames.DisplayTitle(e.Title).Equals(d.Title, StringComparison.OrdinalIgnoreCase)))
                 .FirstOrDefault(e => e is not null);
             if (native is not null)
-                list.Add(native with { Title = GalleryNames.DisplayTitle(native.Title), Language = profile.Language });
-            else if (english.Any(e => e.Species == species))
-                list.AddRange(english.Where(e => e.Species == species));
-            else if (anyEnglish.FirstOrDefault(e => e.Species == species) is { } other)
-                list.Add(other);
+                list.Add(new Candidate(native with { Title = GalleryNames.DisplayTitle(native.Title), Language = profile.Language }, 1));
+            else if (english.Any(c => c.Entry.Species == species))
+                list.AddRange(english.Where(c => c.Entry.Species == species));
+            else
+                list.AddRange(anyEnglish.Where(c => c.Entry.Species == species));
         }
-        return list.OrderBy(e => e.Species).ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase).ToList();
+        return list;
     }
 
     /// <summary>
@@ -657,23 +689,12 @@ public static class GalleryLists
         (3, "CHANNEL Jirachi", [GalleryLanguage.French, GalleryLanguage.Italian, GalleryLanguage.German, GalleryLanguage.Spanish]),
     ];
 
-    /// <summary>
-    /// Games whose Distributions menu offers a chosen few rather than everything event-only (the rest stay in
-    /// the Gallery): English Gen 3 has one distribution each of Mew, Celebi and Jirachi.
-    /// </summary>
-    private static readonly Dictionary<(int Generation, string Language), HashSet<string>> Curated = new()
-    {
-        [(3, GalleryLanguage.English)] = new(StringComparer.OrdinalIgnoreCase) { "Aura Mew", "10 ANIV Celebi", "WISHMKR Jirachi" },
-    };
-
-    private static List<GalleryEntry> All(GalleryArchive gallery, GameProfile profile)
+    private static List<Candidate> All(GalleryArchive gallery, GameProfile profile)
         => gallery.Entries
             .Where(e => e.Species > 0 && profile.Matches(e, allLanguages: false, unreleased: false)
                         && gallery.IsEventOnly(e.Generation, profile.Language, e.Species, e.Form))
             .Let(GalleryGroups.Group)
-            .Select(g => g.Copies[0] with { Title = g.Title })
-            .OrderBy(e => e.Species)
-            .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
+            .Select(g => new Candidate(g.Copies[0] with { Title = g.Title }, g.Copies.Count))
             .ToList();
 }
 
