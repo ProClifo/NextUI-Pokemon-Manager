@@ -60,7 +60,9 @@ public sealed class App
         while (true)
         {
             var saves = GetSaves();
-            var items = saves.Select(s => s.Label).ToList();
+            // "[ENG] Emerald"; the highlighted game shows its trainer and ID on the right.
+            var items = saves.Select(s => $"[{ProfileFor(s).ShownLanguage ?? ProfileFor(s).Language}] {Names.Game(s.Sav)}").ToList();
+            var tags = saves.Select(s => (string?)$"{s.Sav.OT}  ID {s.Sav.DisplayTID:D5}").ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
                 items.Add($"[{_hidden.Count} hidden: not official ROMs]");
@@ -68,7 +70,7 @@ public sealed class App
             int settings = items.Count; items.Add("[Settings]");
             int help = items.Count; items.Add("[Help]");
 
-            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items);
+            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags);
             if (choice is null)
                 return 0;
             if (choice == hidden) { ShowHidden(); continue; }

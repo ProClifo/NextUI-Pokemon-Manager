@@ -522,8 +522,14 @@ public sealed record GameProfile(int Generation, IReadOnlyList<string> Games, st
 
         var games = romGame is not null && GameGeneration(romGame) == gen ? [romGame] : GamesFromSave(sav);
         var language = (romGame is not null ? romLanguage : null) ?? LanguageFromSave(sav);
-        return new GameProfile(gen, games, GalleryLanguage.ForGeneration(language, gen));
+        return new GameProfile(gen, games, GalleryLanguage.ForGeneration(language, gen)) { ShownLanguage = language };
     }
+
+    /// <summary>
+    /// The language to show for the game: the ROM's or save's own, before Gen 1/2's international games are
+    /// lumped together as <see cref="GalleryLanguage.International"/>.
+    /// </summary>
+    public string? ShownLanguage { get; init; }
 
     private static int GameGeneration(string game) => game switch
     {
