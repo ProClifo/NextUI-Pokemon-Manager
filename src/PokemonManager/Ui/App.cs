@@ -728,12 +728,13 @@ public sealed class App
         while (true)
         {
             var labels = view.Folders.Select(f => $"{GalleryTree.Name(f)}/").ToList();
-            labels.AddRange(view.Files.Select(GalleryLabel));
+            labels.AddRange(view.Items.Select(GalleryLabel));
             // Language folders say nothing once the list is filtered to one language.
             var path = string.Join('/', view.Path.Split('/', StringSplitOptions.RemoveEmptyEntries)
                 .Where(p => _settings.GalleryAllLanguages || !GalleryLanguage.Tags.Contains(p)));
-            var title = path.Length == 0 ? $"Gallery ({files.Count})" : $"Gallery: {path}";
-            var tags = view.Folders.Select(_ => (string?)null).Concat(view.Files.Select(f => (string?)LegalTag(IsLegalFor(f, profile)))).ToList();
+            var title = path.Length == 0 ? "Gallery" : $"Gallery: {path}";
+            var tags = view.Folders.Select(_ => (string?)null)
+                .Concat(view.Items.Select(i => (string?)LegalTag(i.Copies.Any(f => IsLegalFor(f, profile))))).ToList();
             var choice = _ui.Choose(title, labels, selected, tags: tags);
             if (choice is null)
                 return;
@@ -741,7 +742,7 @@ public sealed class App
             if (choice < view.Folders.Count)
                 GalleryFolder(entry, files, view.Folders[choice.Value], profile);
             else
-                GiveGalleryFile(entry, view.Files[choice.Value - view.Folders.Count]);
+                GiveGalleryFile(entry, PickCopy(view.Items[choice.Value - view.Folders.Count], profile));
         }
     }
 
@@ -754,13 +755,17 @@ public sealed class App
         ? e.IsFileLegal
         : e.Released && (e.Language is null || e.Language == profile.Language);
 
-    private string GalleryLabel(GalleryEntry e)
+    /// <summary>One of an item's copies at random, a legal one when there is one (the copies differ only in
+    /// IDs and the like, and Pokémon are regenerated for the save anyway).</summary>
+    private static GalleryEntry PickCopy(GalleryTree.Item item, GameProfile profile)
     {
-        var label = e.Title;
-        if (_settings.GalleryAllLanguages && e.Language is { } language)
-            label += $" ({language})";
-        return label;
+        var legal = item.Copies.Where(f => IsLegalFor(f, profile)).ToList();
+        var pool = legal.Count > 0 ? legal : item.Copies;
+        return pool[Random.Shared.Next(pool.Count)];
     }
+
+    private string GalleryLabel(GalleryTree.Item item)
+        => _settings.GalleryAllLanguages && item.Language is { } language ? $"{item.Title} - {language}" : item.Title;
 
     /// <summary>"Item AuroraTicket (UK)" -> "Aurora Ticket (UK)".</summary>
     private static string StripItemPrefix(string title)

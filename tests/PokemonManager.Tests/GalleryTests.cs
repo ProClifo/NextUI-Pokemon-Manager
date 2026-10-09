@@ -46,10 +46,12 @@ public sealed class GalleryTests : IDisposable
         Assert.Equal("PCNYb Shiny Raikou", GalleryNames.GroupKey("PCNYb 0510 Shiny Raikou"));
         Assert.Equal("10 ANIV Celebi", GalleryNames.GroupKey("10 ANIV Celebi"));
         Assert.Equal("WSHMKR Jirachi (Salac Berry)", GalleryNames.GroupKey("WSHMKR Jirachi (Salac Berry)"));
+        Assert.Equal("WSHMKR Jirachi", GalleryNames.DisplayTitle("WSHMKR Jirachi (Salac Berry)"));
+        Assert.Equal("MYSTRY Mew", GalleryNames.DisplayTitle("MYSTRY (118 of 430) Mew (BA7609E8)"));
     }
 
     private static GalleryEntry Entry(string path, int gen, string[] games, string? lang, GalleryKind kind = GalleryKind.Card, bool released = true)
-        => new(path, gen, games, lang, released, kind, 0, 0, GalleryFlags.None, Path.GetFileNameWithoutExtension(path));
+        => new(path, gen, games, lang, released, kind, 0, 0, GalleryFlags.None, GalleryNames.Parse(path, gen).Title);
 
     [Fact]
     public void ProfileFiltersByGameLanguageAndRelease()
@@ -114,12 +116,35 @@ public sealed class GalleryTests : IDisposable
             Entry("Unreleased/Gen 3/ENG/E - Item Old Sea Map (debug)(ENG).wc3", 3, ["E"], "ENG", released: false),
         };
         var root = GalleryTree.Open(files, "");
-        Assert.Equal(["ENG", "Unreleased"], root.Folders);
+        Assert.Equal(["ENG"], root.Folders);
+        Assert.Equal(["Item Old Sea Map"], root.Items.Select(i => i.Title)); // a folder with one item shows it here
 
         var released = GalleryTree.Open(files.Take(2).ToList(), "");
         Assert.Equal("ENG", released.Path); // the lone language folder is skipped
-        Assert.Equal(["ENG/Aura Mew", "ENG/Wondercards"], released.Folders);
-        Assert.Equal("Wondercards", GalleryTree.Name(released.Folders[1]));
+        Assert.Empty(released.Folders);
+        Assert.Equal(["Aura Mew", "Item AuroraTicket"], released.Items.Select(i => i.Title));
+    }
+
+    [Fact]
+    public void TreeListsCopiesOnceWithoutParentheses()
+    {
+        var files = new List<GalleryEntry>
+        {
+            Entry("Released/Gen 3/ENG/WISHMKR/RSE - WISHMKR Jirachi (1910) (ENG).pk3", 3, [], "ENG", GalleryKind.Pokemon),
+            Entry("Released/Gen 3/ENG/WISHMKR/RSE - WISHMKR Jirachi (4CB7) (ENG).pk3", 3, [], "ENG", GalleryKind.Pokemon),
+            Entry("Released/Gen 3/ENG/WISHMKR/RSE - Shiny WSHMKR Jirachi (Ganlon Berry) (ENG).pk3", 3, [], "ENG", GalleryKind.Pokemon),
+            Entry("Released/Gen 3/ENG/WISHMKR/RSE - Shiny WSHMKR Jirachi (Salac Berry) (ENG).pk3", 3, [], "ENG", GalleryKind.Pokemon),
+            Entry("Released/Gen 3/ENG/Aura Mew/RSEFL - Aura Mew (65C6) (ENG).pk3", 3, [], "ENG", GalleryKind.Pokemon),
+            Entry("Released/Gen 3/ENG/Aura Mew/RSEFL - Aura Mew (77D1) (ENG).pk3", 3, [], "ENG", GalleryKind.Pokemon),
+        };
+        var view = GalleryTree.Open(files, "ENG/WISHMKR");
+        Assert.Equal(["Shiny WSHMKR Jirachi", "WISHMKR Jirachi"], view.Items.Select(i => i.Title));
+        Assert.All(view.Items, i => Assert.Equal(2, i.Copies.Count));
+
+        // Aura Mew's folder holds one distribution (two copies), so it's listed in the parent instead.
+        var root = GalleryTree.Open(files, "");
+        Assert.Equal(["ENG/WISHMKR"], root.Folders);
+        Assert.Equal("Aura Mew", Assert.Single(root.Items).Title);
     }
 
     private static byte[] Bytes(PKM pk)

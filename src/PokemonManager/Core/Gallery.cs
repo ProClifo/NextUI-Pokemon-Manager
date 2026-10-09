@@ -176,6 +176,9 @@ public static partial class GalleryNames
     [GeneratedRegex(@"\s+")]
     private static partial Regex Spaces();
 
+    [GeneratedRegex(@"\([^()]*\)")]
+    private static partial Regex Parenthesized();
+
     // Trainer IDs written into a title, e.g. "PCNYb 0510 Shiny Raikou".
     [GeneratedRegex(@"(?<!\S)\d{3,5}(?!\S)")]
     private static partial Regex StandaloneNumber();
@@ -247,6 +250,16 @@ public static partial class GalleryNames
     /// <summary>Title without per-copy IDs and regions, so the copies of one distribution group together.</summary>
     public static string GroupKey(string title)
         => Spaces().Replace(StandaloneNumber().Replace(VariantTag().Replace(title, ""), ""), " ").Trim();
+
+    /// <summary>
+    /// The name the menus show: the group key without anything in parentheses either (IDs, regions, berries,
+    /// notes). Copies with the same display title are listed once; one of them is picked when it's chosen.
+    /// </summary>
+    public static string DisplayTitle(string title)
+    {
+        var shown = Spaces().Replace(Parenthesized().Replace(GroupKey(title), " "), " ").Trim();
+        return shown.Length > 0 ? shown : title;
+    }
 
     private static string Letters(string text) => new(text.ToLowerInvariant().Where(char.IsAsciiLetter).ToArray());
 }
@@ -562,7 +575,7 @@ public static class GalleryLists
         => gallery.Entries
             .Where(e => e.Species > 0 && profile.Matches(e, allLanguages: false, unreleased: false)
                         && gallery.IsEventOnly(e.Generation, profile.Language, e.Species, e.Form))
-            .GroupBy(e => GalleryNames.GroupKey(e.Title), StringComparer.OrdinalIgnoreCase)
+            .GroupBy(e => GalleryNames.DisplayTitle(e.Title), StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First() with { Title = g.Key })
             .OrderBy(e => e.Species)
             .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
@@ -572,11 +585,15 @@ public static class GalleryLists
 /// <summary>Folder navigation over a filtered set of gallery files.</summary>
 public static class GalleryTree
 {
-    public sealed record View(string Path, List<string> Folders, List<GalleryEntry> Files);
+    /// <summary>One menu entry: the copies of a distribution in one folder that share a display title.</summary>
+    public sealed record Item(string Title, string? Language, List<GalleryEntry> Copies);
+
+    public sealed record View(string Path, List<string> Folders, List<Item> Items);
 
     /// <summary>
-    /// The folders and files directly inside <paramref name="folder"/>. A folder holding nothing but one
-    /// other folder (often a language folder once the list is filtered to one language) is skipped through.
+    /// The folders and items inside <paramref name="folder"/>. A folder holding nothing but one other folder
+    /// (often a language folder once the list is filtered to one language) is skipped through, and a folder
+    /// with only one item in it shows that item here instead.
     /// </summary>
     public static View Open(IReadOnlyList<GalleryEntry> files, string folder)
     {
@@ -597,7 +614,17 @@ public static class GalleryTree
                         folders.Add(child);
                 }
             }
-            if (folders.Count == 1 && direct.Count == 0)
+            var items = Group(direct);
+            foreach (var child in folders.ToList())
+            {
+                var inside = Group(files.Where(e => e.Folder == child || e.Folder.StartsWith(child + "/", StringComparison.Ordinal)));
+                if (inside.Count == 1)
+                {
+                    items.Add(inside[0]);
+                    folders.Remove(child);
+                }
+            }
+            if (folders.Count == 1 && items.Count == 0)
             {
                 folder = folders[0];
                 continue;
@@ -606,10 +633,17 @@ public static class GalleryTree
                 .OrderBy(f => f == "Unreleased")
                 .ThenBy(f => f, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            direct.Sort((a, b) => string.Compare(a.Title, b.Title, StringComparison.OrdinalIgnoreCase));
-            return new View(folder, folders, direct);
+            items.Sort((a, b) => string.Compare(a.Title, b.Title, StringComparison.OrdinalIgnoreCase));
+            return new View(folder, folders, items);
         }
     }
+
+    /// <summary>Groups copies of the same distribution (same folder, language and display title).</summary>
+    private static List<Item> Group(IEnumerable<GalleryEntry> files)
+        => files
+            .GroupBy(e => (e.Folder, e.Language, Title: GalleryNames.DisplayTitle(e.Title).ToUpperInvariant()))
+            .Select(g => new Item(GalleryNames.DisplayTitle(g.First().Title), g.Key.Language, g.ToList()))
+            .ToList();
 
     public static string Name(string folder) => folder[(folder.LastIndexOf('/') + 1)..];
 }

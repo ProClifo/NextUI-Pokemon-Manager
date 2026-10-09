@@ -120,9 +120,10 @@ public static class EventPokemon
         {
             // PKHeX can't recreate a few distributions (e.g. the Berry Glitch Shiny Zigzagoon's RNG), so hand
             // out one of the real copies the gallery has recorded instead.
-            var key = GalleryNames.GroupKey(entry.Title);
+            var key = GalleryNames.DisplayTitle(entry.Title);
             var copies = gallery.Entries
-                .Where(e => e.Kind == GalleryKind.Pokemon && e.Folder == entry.Folder && GalleryNames.GroupKey(e.Title) == key)
+                .Where(e => e.Kind == GalleryKind.Pokemon && e.Folder == entry.Folder && e.Language == entry.Language
+                            && string.Equals(GalleryNames.DisplayTitle(e.Title), key, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(_ => random.Next())
                 .ToList();
             foreach (var copy in copies)
