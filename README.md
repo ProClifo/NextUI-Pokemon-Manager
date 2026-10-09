@@ -2,7 +2,7 @@
 
 A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing Pokémon save files on your handheld:
 
-- **Transfer Pokémon between games.** Move or copy a Pokémon from one save to another. PKHeX converts the data between generations (Gen 1↔2, Gen 1/2→7, 3→4→5→6→7→8...). Moving between games of the same era counts as a trade, so trade evolutions trigger.
+- **Transfer Pokémon between games.** Transfer (move) a Pokémon from one save to another. PKHeX converts the data between generations (Gen 1↔2, Gen 1/2→7, 3→4→5→6→7→8...). Moving between games of the same era counts as a trade, so trade evolutions trigger.
 - **Trade evolutions.** Evolve Kadabra, Machoke, Graveler, Haunter, Onix + Metal Coat, Scyther + Metal Coat, Seadra + Dragon Scale, Clamperl, Boldore and the rest without a second console. You can evolve one Pokémon or every Pokémon that's ready.
 - **Mystery Gifts, Mystery Events and e-Reader cards.**
   - Gen 3: Wonder Cards (`.wc3`), Wonder News (`.wn3`), Mystery Events (`.me3`, e.g. the Eon Ticket e-Card), e-Card Trainers (`.ect`) and e-Reader Berries (`.ecb`). These are the formats of the PKHeX *WC3 plugin* and suloku's *Gen III Mystery Gift Tool*, and injection produces the same save data as WC3 plugin 2.6.0 (see below).
@@ -80,7 +80,7 @@ A save's menu shows art for its game: Ruby, Sapphire, Emerald, FireRed or LeafGr
 
 | Menu | What it does |
 | --- | --- |
-| Pokémon | Browse the party and boxes. For each Pokémon: view summary, move or copy to another game, trade evolve, export to file. |
+| Pokémon | Browse the party and boxes. For each Pokémon: *Transfer* (move it to another game), *Summary*, *Evolve* (trade evolution) or *Cancel*. |
 | Events | Every event ticket the game has, legitimate or not (see below). Games with a single event show it on the game menu instead: *Eon Ticket* (Ruby/Sapphire), *Enigma Stone* (HeartGold/SoulSilver), *Liberty Pass* (Black/White), *GS Ball* (Crystal). |
 | Mew / Celebi | Gen 1/2: legal event Pokémon generated for the save like the Game Boy era distributions, from PKHeX's events. *Mew* in Red/Blue/Yellow (the international or Japanese Mew, whichever is legal for the save's language) and in Korean Gold/Silver, which can't link with Gen 1 (an international Mew, as if moved up by Time Capsule and traded over). *Celebi* in Gold/Silver/Crystal outside Japan: the Pokémon Center New York Celebi, since the GS Ball event only ran on Japanese cartridges. |
 | Distributions | Gen 3–5: one distribution of each Pokémon you can't legally get any other way in this game's language and that the previous generation doesn't already provide (Gen 4 gets Mew, Celebi, Jirachi and Deoxys from Gen 3 by Pal Park, except in Korean games, which have no Gen 3; Gen 5 gets everything up to Arceus by Poké Transfer). Where there are several, it's Aura Mew, 10 ANIV Celebi, WISHMKR Jirachi and the Manaphy Egg, else the one in the game's language that most players received (most copies in the gallery). Every other distribution and copy is in the Gallery. Gen 1/2 games have no Distributions menu. |
@@ -131,7 +131,6 @@ SDCARD/
 └── PokemonManager/
     ├── Gifts/                 ← put .wc3 .wn3 .me3 .ect .ecb .pgt .pcd .pgf .wc6 .wc7 .wc8 .wc9 ... here
     ├── Import/                ← .pk1 – .pk9 files to import
-    ├── Export/                ← exported Pokémon land here (one folder per save)
     ├── Backups/               ← automatic backups (last 20 per save)
     ├── Saves/                 ← optional: extra saves to manage (always shown, even with "Official ROMs only")
     └── rom-check-cache.txt    ← cached ROM checks

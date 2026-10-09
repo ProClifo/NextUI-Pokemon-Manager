@@ -341,16 +341,14 @@ public sealed class App
             var pk = slot.Get(entry.Sav);
             if (pk.Species == 0)
                 return; // moved away or slot compacted
-            var options = TradeEvolution.GetOptions(pk);
+            // Transfer moves the Pokémon (no copies: that would be a clone); Evolve is a trade evolution.
             var actions = new List<(string Label, Func<bool> Run)>
             {
-                ("View summary", () => { _ui.Message(Names.Details(pk)); return false; }),
-                ("Move to another game", () => TransferFlow(entry, slot, TransferMode.Move)),
-                ("Copy to another game", () => TransferFlow(entry, slot, TransferMode.Copy)),
+                ("Transfer", () => TransferFlow(entry, slot, TransferMode.Move)),
+                ("Summary", () => { _ui.Message(Names.Details(pk)); return false; }),
+                ("Evolve", () => EvolveFlow(entry, slot)),
+                ("Cancel", () => true),
             };
-            if (options.Count != 0)
-                actions.Add(("Trade evolve", () => EvolveFlow(entry, slot)));
-            actions.Add(("Export to file", () => { ExportFlow(entry, slot); return false; }));
 
             var choice = _ui.Choose($"{slot}: {Names.Summary(pk)}", actions.Select(a => a.Label).ToList());
             if (choice is null)
@@ -942,18 +940,6 @@ public sealed class App
     }
 
     // ---------------------------------------------------------------- files
-
-    private void ExportFlow(SaveEntry entry, SlotRef slot)
-    {
-        var pk = slot.Get(entry.Sav);
-        var dir = Path.Combine(_paths.ExportDir, Path.GetFileNameWithoutExtension(entry.Path));
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, Sanitize(pk.FileName));
-        var bytes = new byte[pk.SIZE_PARTY];
-        pk.WriteDecryptedDataParty(bytes);
-        File.WriteAllBytes(path, bytes);
-        _ui.Message($"Saved {Names.Summary(pk)} to\n{Path.GetRelativePath(_paths.DataDir, path)}\n(inside PokemonManager on the SD card).");
-    }
 
     private void ImportMenu(SaveEntry entry)
     {

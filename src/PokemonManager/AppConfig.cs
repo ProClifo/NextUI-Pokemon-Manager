@@ -29,7 +29,6 @@ public sealed class AppPaths
 
     public string GiftsDir => Path.Combine(DataDir, "Gifts");
     public string ImportDir => Path.Combine(DataDir, "Import");
-    public string ExportDir => Path.Combine(DataDir, "Export");
     public string BackupDir => Path.Combine(DataDir, "Backups");
     public string ExtraSavesDir => Path.Combine(DataDir, "Saves");
     public string SettingsFile => Path.Combine(DataDir, "settings.txt");
@@ -37,7 +36,7 @@ public sealed class AppPaths
 
     public void EnsureCreated()
     {
-        foreach (var dir in new[] { DataDir, GiftsDir, ImportDir, ExportDir, BackupDir, ExtraSavesDir, TempDir })
+        foreach (var dir in new[] { DataDir, GiftsDir, ImportDir, BackupDir, ExtraSavesDir, TempDir })
             Directory.CreateDirectory(dir);
     }
 
