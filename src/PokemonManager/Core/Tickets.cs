@@ -33,6 +33,36 @@ public static class Tickets
         new("Liberty Pass", "libertypass", ["B", "W"]),
     ];
 
+    /// <summary>
+    /// The Pokémon only reachable with a ticket (its island or event), which PKHeX counts as ordinary catches:
+    /// without the ticket in the game's language they need a distribution instead.
+    /// </summary>
+    public static readonly (string Key, ushort[] Species)[] Unlocks =
+    [
+        ("auroraticket", [(ushort)Species.Deoxys]),
+        ("mysticticket", [(ushort)Species.Lugia, (ushort)Species.HoOh]),
+        ("membercard", [(ushort)Species.Darkrai]),
+        ("oaksletter", [(ushort)Species.Shaymin]),
+        ("libertypass", [(ushort)Species.Victini]),
+    ];
+
+    /// <summary>Whether a ticket was officially distributed in this generation and language (any game).</summary>
+    public static bool IsDistributed(GalleryArchive gallery, int generation, string language, string key)
+        => gallery.Entries.Any(e => e.IsEventItem && e.Released && e.Generation == generation && e.Language == language
+                                    && Letters(e.Title).Contains(key));
+
+    /// <summary>Ticket-only Pokémon whose ticket wasn't distributed in this generation and language.</summary>
+    public static IEnumerable<ushort> Unreachable(GalleryArchive gallery, int generation, string language)
+        => Unlocked(gallery, generation, language, distributed: false);
+
+    /// <summary>Ticket-only Pokémon whose ticket was distributed in this generation and language (Events has it).</summary>
+    public static IEnumerable<ushort> Reachable(GalleryArchive gallery, int generation, string language)
+        => Unlocked(gallery, generation, language, distributed: true);
+
+    private static IEnumerable<ushort> Unlocked(GalleryArchive gallery, int generation, string language, bool distributed)
+        => All.Where(t => Generation(t) == generation && IsDistributed(gallery, generation, language, t.Key) == distributed)
+            .SelectMany(t => Unlocks.Where(u => u.Key == t.Key).SelectMany(u => u.Species));
+
     private static int Generation(Ticket ticket) => ticket.Games[0] switch
     {
         "R" or "S" or "E" or "FR" or "LG" => 3,

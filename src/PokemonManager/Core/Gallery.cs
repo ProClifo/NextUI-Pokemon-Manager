@@ -21,6 +21,19 @@ public static class GalleryLanguage
 
     public static readonly string[] Tags = [Japanese, English, French, Italian, German, Spanish, Korean];
 
+    /// <summary>The save language of a gallery code (international Gen 1/2 counts as English), or null.</summary>
+    public static LanguageID? ToLanguageId(string? code) => code switch
+    {
+        Japanese => LanguageID.Japanese,
+        English or International => LanguageID.English,
+        French => LanguageID.French,
+        Italian => LanguageID.Italian,
+        German => LanguageID.German,
+        Spanish => LanguageID.Spanish,
+        Korean => LanguageID.Korean,
+        _ => null,
+    };
+
     public static string? FromLanguageId(int language) => (LanguageID)language switch
     {
         LanguageID.Japanese => Japanese,
@@ -407,8 +420,11 @@ public sealed class GalleryArchive(string zipPath) : IDisposable
 
     /// <summary>Whether this Pokémon can only be obtained from an event in games of the given generation and language.</summary>
     public bool IsEventOnly(int generation, string language, ushort species, byte form)
-        => (_eventOnly ??= LoadEventOnly()).TryGetValue((generation, language), out var set)
-           && set.Contains((species, EventOnly.KeyForm(species, form, generation)));
+        => EventOnlyPokemon(generation, language).Contains((species, EventOnly.KeyForm(species, form, generation)));
+
+    /// <summary>Every Pokémon (species and form) that's event-only in games of this generation and language.</summary>
+    public IReadOnlySet<(ushort Species, byte Form)> EventOnlyPokemon(int generation, string language)
+        => (_eventOnly ??= LoadEventOnly()).TryGetValue((generation, language), out var set) ? set : new HashSet<(ushort, byte)>();
 
     private Dictionary<(int, string), HashSet<(ushort, byte)>> LoadEventOnly()
     {
@@ -588,9 +604,58 @@ public static class GalleryLists
     /// differ only in PID/IVs; the list shows each distribution once.
     /// </summary>
     public static List<GalleryEntry> Distributions(GalleryArchive gallery, GameProfile profile)
-        => Curated.TryGetValue((profile.Generation, profile.Language), out var picks)
+    {
+        var list = Curated.TryGetValue((profile.Generation, profile.Language), out var picks)
             ? All(gallery, profile).Where(e => picks.Contains(e.Title)).ToList()
             : All(gallery, profile);
+        if (profile.Language == GalleryLanguage.English)
+            return list;
+
+        // Event-only Pokémon with no distribution in this language come from elsewhere, so the Pokédex can always
+        // be completed: a distribution that really was given out in this language but isn't in the gallery
+        // (generated in the save's language), else the English one, as an English Pokémon traded over.
+        var have = list.Select(e => e.Species).ToHashSet();
+        var missing = gallery.EventOnlyPokemon(profile.Generation, profile.Language).Select(p => p.Species)
+            .Concat(Tickets.Unreachable(gallery, profile.Generation, profile.Language))
+            .Where(s => !have.Contains(s))
+            .Except(Tickets.Reachable(gallery, profile.Generation, profile.Language))
+            .ToHashSet();
+        if (missing.Count == 0)
+            return list;
+        var englishProfile = profile with { Language = GalleryLanguage.English };
+        var english = Distributions(gallery, englishProfile);
+        // Ticket-only Pokémon (e.g. Lugia and Ho-Oh, behind the Mystic Ticket) aren't English distributions, since
+        // English games had the ticket; any English distribution of them will do.
+        var anyEnglish = gallery.Entries
+            .Where(e => e.Species > 0 && missing.Contains(e.Species) && englishProfile.Matches(e, allLanguages: false, unreleased: false))
+            .Let(GalleryGroups.Group)
+            .OrderByDescending(g => g.Copies.Count)
+            .Select(g => g.Copies[0] with { Title = g.Title })
+            .ToList();
+        foreach (var species in missing.Order())
+        {
+            var native = AlsoDistributedIn.Where(d => d.Generation == profile.Generation && d.Languages.Contains(profile.Language))
+                .Select(d => gallery.Entries.FirstOrDefault(e => e.Generation == d.Generation && e.Species == species && e.Released
+                                                               && GalleryNames.DisplayTitle(e.Title).Equals(d.Title, StringComparison.OrdinalIgnoreCase)))
+                .FirstOrDefault(e => e is not null);
+            if (native is not null)
+                list.Add(native with { Title = GalleryNames.DisplayTitle(native.Title), Language = profile.Language });
+            else if (english.Any(e => e.Species == species))
+                list.AddRange(english.Where(e => e.Species == species));
+            else if (anyEnglish.FirstOrDefault(e => e.Species == species) is { } other)
+                list.Add(other);
+        }
+        return list.OrderBy(e => e.Species).ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// Distributions that were given out in more languages than the gallery has files for (Pokémon Channel's
+    /// Jirachi came with every European release); PKHeX generates them in any of these languages.
+    /// </summary>
+    private static readonly (int Generation, string Title, string[] Languages)[] AlsoDistributedIn =
+    [
+        (3, "CHANNEL Jirachi", [GalleryLanguage.French, GalleryLanguage.Italian, GalleryLanguage.German, GalleryLanguage.Spanish]),
+    ];
 
     /// <summary>
     /// Games whose Distributions menu offers a chosen few rather than everything event-only (the rest stay in

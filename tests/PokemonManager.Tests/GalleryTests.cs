@@ -230,6 +230,18 @@ public sealed class GalleryTests : IDisposable
         Assert.Equal("WISHMKR Jirachi", Assert.Single(distributions).Title);
         Assert.Equal((ushort)Species.Jirachi, gallery.Load(distributions[0])?.Pokemon?.Species);
 
+        // German games have no Jirachi file of their own, so they get the English distribution (an English
+        // Pokémon, as if traded from an English game) and can still complete the Pokédex.
+        // Lugia too: there's no German Mystic Ticket, so Navel Rock can't be reached.
+        var germanList = GalleryLists.Distributions(gallery, profile with { Language = "GER" });
+        Assert.Equal(["10 ANIV Lugia", "WISHMKR Jirachi"], germanList.Select(d => d.Title));
+        var german = germanList[1];
+        Assert.Equal("ENG", german.Language);
+        var germanSave = _saves.Create(GameVersion.E, "German.sav", language: LanguageID.German).Sav;
+        var given = EventPokemon.FromGallery(gallery, german, germanSave);
+        Assert.True(given.Legal, given.Message);
+        Assert.Equal((int)LanguageID.English, given.Pokemon!.Language);
+
         var debugMew = Assert.Single(gallery.Entries, e => e is { Released: false, Species: (ushort)Species.Mew });
         Assert.False(debugMew.IsFileLegal);
         Assert.True(gallery.Entries.Single(e => e.Title.Contains("Lugia")).IsFileLegal);

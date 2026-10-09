@@ -163,4 +163,23 @@ public sealed class GiftTests : IDisposable
             Assert.Equal(0, new SlotRef(0, 0).Get(sav).Species);
         }
     }
+
+    [Theory]
+    [InlineData(GameVersion.GD, LanguageID.English)]
+    [InlineData(GameVersion.C, LanguageID.English)]
+    [InlineData(GameVersion.SI, LanguageID.Korean)]
+    public void Gen2CelebiAndKoreanMewAreLegal(GameVersion version, LanguageID language)
+    {
+        var sav = _saves.Create(version, $"{version}{language}.sav", language: language).Sav;
+        var celebi = GiftService.Celebi(sav);
+        Assert.NotNull(celebi);
+        Assert.True(Legality.IsLegal(celebi, sav), Legality.FirstProblem(celebi));
+        if (language == LanguageID.Korean)
+        {
+            var mew = GiftService.Mew(sav);
+            Assert.NotNull(mew);
+            Assert.Equal((ushort)Species.Mew, mew.Species);
+            Assert.True(Legality.IsLegal(mew, sav), Legality.FirstProblem(mew));
+        }
+    }
 }

@@ -200,7 +200,31 @@ public static class GiftService
     public static PKM? Mew(SaveFile sav, Random? random = null)
     {
         random ??= Random.Shared;
+        if (sav is SAV2 gen2)
+        {
+            // Korean Gold/Silver can't link with any Gen 1 game: an international Mew moved up by Time Capsule
+            // and traded over.
+            var red = BlankSaveFile.Get(GameVersion.RD, gen2.OT, LanguageID.English);
+            return Mew(red, random) is { } mew && EntityConverter.ConvertToType(mew, sav.PKMType, out _) is { } pk2 && Legality.IsLegal(pk2, sav)
+                ? pk2
+                : null;
+        }
         foreach (var ev in BuiltInEvents(sav).Where(e => e.Encounter.Species == (ushort)Species.Mew).OrderBy(_ => random.Next()))
+        {
+            if (EventPokemon.Generate(ev.Encounter, sav) is { } pk && Legality.IsLegal(pk, sav))
+                return pk;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// A legal event Celebi for a Gen 2 game outside Japan, generated as the distribution did: the Pokémon Center
+    /// New York one from PKHeX's Game Boy era events (the GS Ball event only ran on Japanese cartridges).
+    /// </summary>
+    public static PKM? Celebi(SaveFile sav, Random? random = null)
+    {
+        random ??= Random.Shared;
+        foreach (var ev in BuiltInEvents(sav).Where(e => e.Encounter.Species == (ushort)Species.Celebi).OrderBy(_ => random.Next()))
         {
             if (EventPokemon.Generate(ev.Encounter, sav) is { } pk && Legality.IsLegal(pk, sav))
                 return pk;

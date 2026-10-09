@@ -75,17 +75,24 @@ public static class EventPokemon
         or EncounterGift1 or EncounterGift2 or EncounterGift3 or EncounterGift3Colo or EncounterGift3NY
         or EncounterTrade4RanchGift or EncounterStatic5Entree;
 
-    /// <summary>A freshly generated, legal copy of the event <paramref name="encounter"/> for this save, or null.</summary>
-    public static PKM? Generate(IEncounterable encounter, SaveFile sav)
+    /// <summary>
+    /// A freshly generated, legal copy of the event <paramref name="encounter"/> for this save, or null. With
+    /// <paramref name="language"/>, it's generated for a game of that language (a distribution from another
+    /// language's games, traded over) rather than the save's.
+    /// </summary>
+    public static PKM? Generate(IEncounterable encounter, SaveFile sav, LanguageID? language = null)
     {
         if (encounter is not IEncounterConvertible convertible)
             return null;
+        ITrainerInfo trainer = language is { } lang && (int)lang != sav.Language
+            ? new SimpleTrainerInfo(sav) { Language = (int)lang }
+            : sav;
         for (int i = 0; i < Attempts; i++)
         {
             PKM pk;
             try
             {
-                pk = convertible.ConvertToPKM(sav);
+                pk = convertible.ConvertToPKM(trainer);
             }
             catch (Exception)
             {
@@ -113,7 +120,9 @@ public static class EventPokemon
         Legality.UseCartridgeEra();
         var analysis = new LegalityAnalysis(file);
         bool perRecipient = analysis.Valid && IsPerRecipient(analysis.EncounterMatch);
-        if (perRecipient && Generate(analysis.EncounterMatch, sav) is { } generated)
+        // A distribution from another language's games (see GalleryLists.Distributions) is generated in that language.
+        var language = sav.Generation >= 3 ? GalleryLanguage.ToLanguageId(entry.Language) : null;
+        if (perRecipient && Generate(analysis.EncounterMatch, sav, language) is { } generated)
             return new Result(generated, true, Source.Generated, "");
 
         if (perRecipient)

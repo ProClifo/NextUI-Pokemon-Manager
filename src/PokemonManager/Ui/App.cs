@@ -164,9 +164,13 @@ public sealed class App
             var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
             // A game with one event gets that event on its menu; a game with several gets an Events menu.
             var tickets = TicketsFor(entry);
-            // Gen 1's one event-only Pokémon gets its own entry; Gen 1/2's other distributions are in the Gallery.
-            if (sav is SAV1)
-                actions.Add(("Mew", LegalTag(true), () => GiveMew(entry)));
+            // Gen 1/2's event-only Pokémon get their own entries (Gen 1/2's other distributions are in the Gallery):
+            // Mew in Gen 1 (and Korean Gen 2, which can't link with Gen 1), Celebi in Gen 2 outside Japan, where the
+            // GS Ball never ran on cartridges.
+            if (sav is SAV1 || sav is SAV2 { Korean: true })
+                actions.Add(("Mew", LegalTag(true), () => GiveGameBoyEvent(entry, "Mew", GiftService.Mew)));
+            if (sav is SAV2 { Japanese: false })
+                actions.Add(("Celebi", LegalTag(true), () => GiveGameBoyEvent(entry, "Celebi", GiftService.Celebi)));
             if (sav is SAV2 { Version: GameVersion.C } crystal)
                 actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
             else if (tickets.Count == 1)
@@ -836,6 +840,8 @@ public sealed class App
             EventPokemon.Source.GalleryCopy => $"PKHeX can't regenerate this event, so this is one of the original copies at random: {Names.Rolled(pk)}.",
             _ => "",
         };
+        if (entry.Sav.Generation >= 3 && pk.Language != entry.Sav.Language && GalleryLanguage.FromLanguageId(pk.Language) is { } from)
+            origin += $"\nThis distribution wasn't given out in your game's language, so it's {LanguageArticle(from)} Pokémon, as if traded from {LanguageArticle(from)} game.";
         // No trade rules: the real distributions didn't need the National Pokédex (only the Pokédex, checked above).
         PlaceConverted(entry, pk, $"Put {file.Title}", origin, distribution: true);
     }
@@ -855,6 +861,12 @@ public sealed class App
             return;
         }
         PlaceConverted(entry, prepared.Converted, verb);
+    }
+
+    private static string LanguageArticle(string code)
+    {
+        var name = GalleryLanguage.Name(code);
+        return (name[0] is 'E' or 'I' ? "an " : "a ") + name;
     }
 
     /// <summary>Puts a Pokémon in the first free PC slot, or for a distribution where the games put it (the party).</summary>
@@ -891,23 +903,20 @@ public sealed class App
         }
     }
 
-    /// <summary>
-    /// Gen 1's Mew, generated for this save from PKHeX's Game Boy era Mew events (the international one or the
-    /// Japanese ones, whichever is legal for the save's language).
-    /// </summary>
-    private void GiveMew(SaveEntry entry)
+    /// <summary>A Game Boy era event Pokémon generated for this save (see <see cref="GiftService.Mew"/> and <see cref="GiftService.Celebi"/>).</summary>
+    private void GiveGameBoyEvent(SaveEntry entry, string name, Func<SaveFile, Random?, PKM?> generate)
     {
         if (TradeRules.CheckDistribution(entry.Sav) is { Ok: false } noDex)
         {
             _ui.Message(noDex.Message);
             return;
         }
-        if (GiftService.Mew(entry.Sav) is not { } mew)
+        if (generate(entry.Sav, null) is not { } pk)
         {
-            _ui.Message($"PKHeX couldn't generate a legal Mew for {Names.Game(entry.Sav)}.");
+            _ui.Message($"PKHeX couldn't generate a legal {name} for {Names.Game(entry.Sav)}.");
             return;
         }
-        PlaceConverted(entry, mew, "Put Mew", $"Generated like the original distribution: {Names.Rolled(mew)}.", distribution: true);
+        PlaceConverted(entry, pk, $"Put {name}", $"Generated like the original distribution: {Names.Rolled(pk)}.", distribution: true);
     }
 
     private void GsBallFlow(SaveEntry entry)
