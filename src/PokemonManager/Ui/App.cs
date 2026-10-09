@@ -164,13 +164,17 @@ public sealed class App
             var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
             // A game with one event gets that event on its menu; a game with several gets an Events menu.
             var tickets = TicketsFor(entry);
+            // Gen 1's one event-only Pokémon gets its own entry; Gen 1/2's other distributions are in the Gallery.
+            if (sav is SAV1)
+                actions.Add(("Mew", LegalTag(true), () => GiveMew(entry)));
             if (sav is SAV2 { Version: GameVersion.C } crystal)
                 actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
             else if (tickets.Count == 1)
                 actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
             else if (tickets.Count > 1)
                 actions.Add(("Events", null, () => EventsMenu(entry, tickets)));
-            actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
+            if (sav.Generation >= 3)
+                actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
             actions.Add(("Gallery", null, () => GalleryMenu(entry)));
             actions.Add(("More", null, () => MoreMenu(entry)));
 
@@ -872,6 +876,25 @@ public sealed class App
         }
     }
 
+    /// <summary>
+    /// Gen 1's Mew, generated for this save from PKHeX's Game Boy era Mew events (the international one or the
+    /// Japanese ones, whichever is legal for the save's language).
+    /// </summary>
+    private void GiveMew(SaveEntry entry)
+    {
+        if (TradeRules.CheckDistribution(entry.Sav) is { Ok: false } noDex)
+        {
+            _ui.Message(noDex.Message);
+            return;
+        }
+        if (GiftService.Mew(entry.Sav) is not { } mew)
+        {
+            _ui.Message($"PKHeX couldn't generate a legal Mew for {Names.Game(entry.Sav)}.");
+            return;
+        }
+        PlaceConverted(entry, mew, "Put Mew", $"Generated like the original distribution: {Names.Rolled(mew)}.");
+    }
+
     private void GsBallFlow(SaveEntry entry)
     {
         if (entry.Sav is not SAV2 sav)
@@ -1060,7 +1083,7 @@ public sealed class App
         "A backup is written to PokemonManager/Backups before every change.\n" +
         "\n" +
         "Each game's menu has Events (every ticket the game has, like the Aurora Ticket), Distributions (Pokémon " +
-        "you can only get from an event) and the Gallery (every event file for that game and language, from Project " +
+        "you can only get from an event; Red/Blue/Yellow have Mew instead) and the Gallery (every event file for that game and language, from Project " +
         "Pokémon's EventsGallery). Items are marked Legal or Illegal.\n" +
         "\n" +
         "Your own gift files go in PokemonManager/Gifts (More > Gift files):\n" +

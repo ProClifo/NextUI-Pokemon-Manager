@@ -193,6 +193,21 @@ public static class GiftService
     }
 
     /// <summary>
+    /// A legal event Mew for a Gen 1 save, generated as the distribution did, or null. PKHeX has one Game Boy
+    /// era Mew event per region; only the save's region's generates a legal Mew, so they're tried in random order.
+    /// </summary>
+    public static PKM? Mew(SaveFile sav, Random? random = null)
+    {
+        random ??= Random.Shared;
+        foreach (var ev in BuiltInEvents(sav).Where(e => e.Encounter.Species == (ushort)Species.Mew).OrderBy(_ => random.Next()))
+        {
+            if (EventPokemon.Generate(ev.Encounter, sav) is { } pk && Legality.IsLegal(pk, sav))
+                return pk;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Every event PKHeX knows about for the save's game, newest generation formats first.
     /// </summary>
     public static List<EventEntry> BuiltInEvents(SaveFile sav)
