@@ -148,6 +148,9 @@ public sealed class App
         {
             Console.Error.WriteLine($"Couldn't pick the game font: {ex.Message}");
         }
+        // ...over the game's title art, which stays behind its sub-menus and messages (not Pokémon storage).
+        var previousBackground = _ui.Background;
+        _ui.Background = BackgroundFor(entry);
         try
         {
             SaveMenuLoop(entry);
@@ -155,6 +158,7 @@ public sealed class App
         finally
         {
             _ui.Font = previousFont;
+            _ui.Background = previousBackground;
         }
     }
 
@@ -286,7 +290,22 @@ public sealed class App
         return n;
     }
 
+    /// <summary>Pokémon storage: the PC box screen or the lists, without the game's background.</summary>
     private void BrowseMenu(SaveEntry entry)
+    {
+        var background = _ui.Background;
+        _ui.Background = null;
+        try
+        {
+            BrowseStorage(entry);
+        }
+        finally
+        {
+            _ui.Background = background;
+        }
+    }
+
+    private void BrowseStorage(SaveEntry entry)
     {
         if (_settings.PcBoxView && !_boxViewFailed && _boxViewer.IsAvailable)
         {

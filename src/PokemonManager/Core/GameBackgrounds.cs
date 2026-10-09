@@ -10,7 +10,7 @@ namespace PokemonManager.Core;
 /// </summary>
 public sealed class GameBackgrounds(string assetDir)
 {
-    /// <summary>First three letters of the GBA game code; the fourth is the region/language.</summary>
+    /// <summary>First three letters of the GBA/NDS game code; the fourth is the region/language.</summary>
     private static readonly Dictionary<string, string> GbaCodes = new()
     {
         ["AXV"] = "ruby",
@@ -18,9 +18,24 @@ public sealed class GameBackgrounds(string assetDir)
         ["BPE"] = "emerald",
         ["BPR"] = "firered",
         ["BPG"] = "leafgreen",
+        ["ADA"] = "diamond",
+        ["APA"] = "pearl",
+        ["CPU"] = "platinum",
+        ["IPK"] = "heartgold",
+        ["IPG"] = "soulsilver",
+        ["IRB"] = "black",
+        ["IRA"] = "white",
+        ["IRE"] = "black2",
+        ["IRD"] = "white2",
     };
 
-    private static readonly string[] Games = ["emerald", "firered", "leafgreen", "ruby", "sapphire"];
+    /// <summary>Every game a background can be made for (assets/backgrounds/&lt;game&gt;.png), longest names first so
+    /// a file name with "LeafGreen" isn't read as Green, "FireRed" as Red, "HeartGold" as Gold or "Black 2" as Black.</summary>
+    private static readonly string[] Games =
+    [
+        "soulsilver", "heartgold", "leafgreen", "platinum", "sapphire", "emerald", "firered", "diamond", "crystal",
+        "yellow", "silver", "black2", "white2", "black", "white", "pearl", "green", "ruby", "blue", "gold", "red",
+    ];
 
     public string AssetDir { get; } = assetDir;
 
@@ -50,14 +65,31 @@ public sealed class GameBackgrounds(string assetDir)
     public static string? GameFromRom(string romPath)
         => RomHeader.ReadGameCode(romPath) is { } code ? GameFromGbaCode(code) : null;
 
-    /// <summary>Emerald saves are told apart by PKHeX; Ruby/Sapphire and FireRed/LeafGreen share a format.</summary>
+    /// <summary>The game PKHeX reads from the save, when it can tell (Ruby/Sapphire, FireRed/LeafGreen and
+    /// Red/Blue share save formats; the ROM or the file name tells those apart).</summary>
     public static string? GameFromSave(SaveFile sav) => sav.Version switch
     {
+        GameVersion.RD => "red",
+        GameVersion.GN => "green",
+        GameVersion.BU => "blue",
+        GameVersion.YW => "yellow",
+        GameVersion.GD => "gold",
+        GameVersion.SI => "silver",
+        GameVersion.C => "crystal",
         GameVersion.E => "emerald",
         GameVersion.R => "ruby",
         GameVersion.S => "sapphire",
         GameVersion.FR => "firered",
         GameVersion.LG => "leafgreen",
+        GameVersion.D => "diamond",
+        GameVersion.P => "pearl",
+        GameVersion.Pt => "platinum",
+        GameVersion.HG => "heartgold",
+        GameVersion.SS => "soulsilver",
+        GameVersion.B => "black",
+        GameVersion.W => "white",
+        GameVersion.B2 => "black2",
+        GameVersion.W2 => "white2",
         _ => null,
     };
 

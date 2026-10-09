@@ -47,6 +47,11 @@ public sealed class MinUi : IUi
 
     public GameFont? Font { get; set; }
 
+    public string? Background { get; set; }
+
+    /// <summary>minui-presenter's background option, when a background is set.</summary>
+    private string[] MessageBackground() => Background is { } b && File.Exists(b) ? ["--background-image", b] : [];
+
     /// <summary>minui-list's font options, when the game font has every character the list shows.</summary>
     private string[] ListFont(params IEnumerable<string?>[] texts)
         => Font is { } f && f.Covers(texts.SelectMany(t => t)) ? ["--font-large", f.List, "--font-medium", f.Title] : [];
@@ -114,6 +119,7 @@ public sealed class MinUi : IUi
             "--confirm-text", "SELECT",
             "--cancel-text", "BACK",
         ];
+        background ??= Background;
         if (background is not null && File.Exists(background))
             args = [.. args, "--background-image", background];
         if (images is null && tags is not null && tags.Any(t => t is { Length: > 0 }))
@@ -151,6 +157,7 @@ public sealed class MinUi : IUi
                 "--confirm-show", "--confirm-text", "OK",
                 "--timeout", "0",
                 .. MessageFont(pages[0], "OK"),
+                .. MessageBackground(),
             ]);
             return;
         }
@@ -166,6 +173,7 @@ public sealed class MinUi : IUi
             "--confirm-show", "--confirm-text", "OK",
             "--timeout", "0",
             .. MessageFont([.. pages, "OK", "LEFT/RIGHT to scroll", "(0123456789)"]),
+            .. MessageBackground(),
         ]);
     }
 
@@ -179,6 +187,7 @@ public sealed class MinUi : IUi
             "--cancel-show", "--cancel-text", no,
             "--timeout", "0",
             .. MessageFont(text, yes, no),
+            .. MessageBackground(),
         ]);
         return code == 0;
     }
@@ -186,7 +195,7 @@ public sealed class MinUi : IUi
     public void Busy(string text)
     {
         StopBusy();
-        var psi = Start("minui-presenter", ["--message", Escape(text), "--timeout", "-1", .. MessageFont(text)]);
+        var psi = Start("minui-presenter", ["--message", Escape(text), "--timeout", "-1", .. MessageFont(text), .. MessageBackground()]);
         try
         {
             _busy = Process.Start(psi);
@@ -266,6 +275,7 @@ public sealed class MinUi : IUi
 public sealed class ConsoleUi : IUi
 {
     public GameFont? Font { get; set; }
+    public string? Background { get; set; }
 
     public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null)
     {
