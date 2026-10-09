@@ -182,6 +182,10 @@ public static partial class GalleryNames
     [GeneratedRegex(@"\([^()]*\)")]
     private static partial Regex Parenthesized();
 
+    // A copy's ID after a dash instead of in parentheses, e.g. "フシギダネ - 81EC", and a dash left dangling.
+    [GeneratedRegex(@"\s+-\s+[0-9A-Fa-f]{4,12}$|\s+-$")]
+    private static partial Regex DashedId();
+
     // Trainer IDs written into a title, e.g. "PCNYb 0510 Shiny Raikou".
     [GeneratedRegex(@"(?<!\S)\d{3,5}(?!\S)")]
     private static partial Regex StandaloneNumber();
@@ -261,6 +265,7 @@ public static partial class GalleryNames
     public static string DisplayTitle(string title)
     {
         var shown = Spaces().Replace(Parenthesized().Replace(GroupKey(title), " "), " ").Trim();
+        shown = DashedId().Replace(shown, "").Trim();
         return shown.Length > 0 ? shown : title;
     }
 
@@ -635,6 +640,11 @@ public static class GalleryTree
                     folders.Remove(child);
                 }
             }
+            // Items folded up from their folders can share a name (Tanabata Jirachi 2004, 2005, 2006): list it once.
+            items = items
+                .GroupBy(i => (i.Title.ToUpperInvariant(), i.Language))
+                .Select(g => g.Count() == 1 ? g.First() : g.First() with { Copies = g.SelectMany(i => i.Copies).ToList() })
+                .ToList();
             if (folders.Count == 1 && items.Count == 0)
             {
                 folder = folders[0];

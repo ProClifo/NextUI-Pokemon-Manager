@@ -48,6 +48,7 @@ public sealed class GalleryTests : IDisposable
         Assert.Equal("WSHMKR Jirachi (Salac Berry)", GalleryNames.GroupKey("WSHMKR Jirachi (Salac Berry)"));
         Assert.Equal("WSHMKR Jirachi", GalleryNames.DisplayTitle("WSHMKR Jirachi (Salac Berry)"));
         Assert.Equal("MYSTRY Mew", GalleryNames.DisplayTitle("MYSTRY (118 of 430) Mew (BA7609E8)"));
+        Assert.Equal("フシギダネ", GalleryNames.DisplayTitle("フシギダネ - 81EC"));
     }
 
     private static GalleryEntry Entry(string path, int gen, string[] games, string? lang, GalleryKind kind = GalleryKind.Card, bool released = true)
