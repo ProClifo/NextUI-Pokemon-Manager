@@ -233,25 +233,20 @@ public sealed class App
         }
     }
 
-    /// <summary>Info: the save's details, and the Clock for the games with one.</summary>
+    /// <summary>Info, headed with the save's file name: its details, and the Clock for the games with one.</summary>
     private void InfoMenu(SaveEntry entry)
     {
-        if (!GameClock.Supported(entry.Sav))
-        {
-            _ui.Message(SaveInfo(entry));
-            return;
-        }
         int selected = 0;
         while (true)
         {
-            var choice = _ui.Choose("Info", ["Details", "Clock"], selected);
+            var actions = new List<(string Label, Action Run)> { ("Details", () => _ui.Message(SaveInfo(entry))) };
+            if (GameClock.Supported(entry.Sav))
+                actions.Add(("Clock", () => ClockMenu(entry)));
+            var choice = _ui.Choose(Path.GetFileName(entry.Path), actions.Select(a => a.Label).ToList(), selected);
             if (choice is null)
                 return;
             selected = choice.Value;
-            if (choice == 0)
-                _ui.Message(SaveInfo(entry));
-            else
-                ClockMenu(entry);
+            actions[choice.Value].Run();
         }
     }
 
@@ -665,6 +660,14 @@ public sealed class App
             : null;
         var now = GameClock.Read(sav, rtcPath, DateTime.Now);
         bool weekdays = GameClock.HasWeekdays(sav);
+        // "Sunday 08:41 PM": Left/Right pick a part, Up/Down change it (the viewer's Clock editor)
+        var edited = _boxViewer.EditClock(weekdays ? now.Weekday : -1, now.Hour, now.Minute, _ogFont?.Path, BackgroundFor(entry), out bool unavailable);
+        if (!unavailable)
+        {
+            if (edited is not null)
+                SetClock(entry, rtcPath, edited.Weekday < 0 ? 0 : edited.Weekday, edited.Hour, edited.Minute);
+            return;
+        }
         var names = new List<string>();
         var options = new List<string[]>();
         var values = new List<int>();
@@ -684,7 +687,12 @@ public sealed class App
         if (_ui.Options("Clock", names, options, values) is not { } result)
             return;
         int i = weekdays ? 1 : 0;
-        var rtc = GameClock.Set(sav, DateTime.Now, weekdays ? result.Values[0] : 0, result.Values[i], result.Values[i + 1]);
+        SetClock(entry, rtcPath, weekdays ? result.Values[0] : 0, result.Values[i], result.Values[i + 1]);
+    }
+
+    private void SetClock(SaveEntry entry, string? rtcPath, int weekday, int hour, int minute)
+    {
+        var rtc = GameClock.Set(entry.Sav, DateTime.Now, weekday, hour, minute);
         if (!TryWrite(entry, out _))
             return;
         if (rtc is not null && rtcPath is not null)

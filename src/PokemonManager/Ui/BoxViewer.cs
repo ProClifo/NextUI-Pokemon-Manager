@@ -82,6 +82,70 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         }
     }
 
+    public sealed record ClockResult(int Weekday, int Hour, int Minute);
+
+    /// <summary>
+    /// The Clock editor ("Sunday 08:41 PM"; weekday -1 for games without days): the chosen time, null for Back,
+    /// or Unavailable = true when the viewer couldn't run.
+    /// </summary>
+    public ClockResult? EditClock(int weekday, int hour, int minute, string? fontPath, string? background, out bool unavailable)
+    {
+        unavailable = false;
+        if (FindOnPath(Tool) is null)
+        {
+            unavailable = true;
+            return null;
+        }
+        Directory.CreateDirectory(tempDir);
+        var outPath = Path.Combine(tempDir, "clock-result.json");
+        try
+        {
+            File.Delete(outPath);
+            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            psi.ArgumentList.Add("--clock");
+            psi.ArgumentList.Add($"{weekday},{hour},{minute}");
+            psi.ArgumentList.Add("--write-location");
+            psi.ArgumentList.Add(outPath);
+            if (fontPath is not null)
+            {
+                psi.ArgumentList.Add("--font");
+                psi.ArgumentList.Add(fontPath);
+            }
+            if (background is not null)
+            {
+                psi.ArgumentList.Add("--background");
+                psi.ArgumentList.Add(background);
+            }
+            using var p = Process.Start(psi);
+            if (p is null)
+            {
+                unavailable = true;
+                return null;
+            }
+            p.OutputDataReceived += static (_, _) => { };
+            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
+            p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
+            p.WaitForExit();
+            if (p.ExitCode is 2 or 3)
+                return null;
+            if (p.ExitCode != 0 || !File.Exists(outPath))
+            {
+                unavailable = true;
+                return null;
+            }
+            using var doc = JsonDocument.Parse(File.ReadAllText(outPath));
+            var root = doc.RootElement;
+            return new ClockResult(root.GetProperty("weekday").GetInt32(), root.GetProperty("hour").GetInt32(), root.GetProperty("minute").GetInt32());
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Clock editor failed: {ex.Message}");
+            unavailable = true;
+            return null;
+        }
+    }
+
     private static string? FindOnPath(string name)
     {
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries))

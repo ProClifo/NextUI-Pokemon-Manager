@@ -1251,6 +1251,7 @@ static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, 
 }
 
 #include "pkmgr-box-gb.c"
+#include "pkmgr-box-clock.c"
 
 int main(int argc, char *argv[])
 {
@@ -1258,9 +1259,16 @@ int main(int argc, char *argv[])
     const char *write_location = NULL;
     const char *screenshot = NULL;
     const char *state_name = "box";
+    const char *clock = NULL, *font_path = NULL, *background = NULL;
     for (int i = 1; i < argc; i++)
     {
-        if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc)
+        if (strcmp(argv[i], "--clock") == 0 && i + 1 < argc)
+            clock = argv[++i];
+        else if (strcmp(argv[i], "--font") == 0 && i + 1 < argc)
+            font_path = argv[++i];
+        else if (strcmp(argv[i], "--background") == 0 && i + 1 < argc)
+            background = argv[++i];
+        else if (strcmp(argv[i], "--scene") == 0 && i + 1 < argc)
             scene_path = argv[++i];
         else if (strcmp(argv[i], "--write-location") == 0 && i + 1 < argc)
             write_location = argv[++i];
@@ -1269,6 +1277,8 @@ int main(int argc, char *argv[])
         else if (strcmp(argv[i], "--state") == 0 && i + 1 < argc)
             state_name = argv[++i];
     }
+    if (clock)
+        return clock_run(clock, font_path, background, write_location, screenshot);
     if (scene_path == NULL)
     {
         fprintf(stderr, "usage: pkmgr-box --scene scene.json --write-location out.json\n");
