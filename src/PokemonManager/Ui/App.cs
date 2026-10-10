@@ -183,8 +183,6 @@ public sealed class App
             var sav = entry.Sav;
             Legality.For(sav); // legality reports in this save's menus are for this game and trainer
             var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
-            if (GameClock.Supported(sav))
-                actions.Add(("Clock", null, () => ClockMenu(entry)));
             // A game with one event gets that event on its menu; a game with several gets an Events menu.
             var tickets = TicketsFor(entry);
             if (sav is SAV2 { Version: GameVersion.C } crystal)
@@ -203,7 +201,9 @@ public sealed class App
             if (sav.Generation >= 3)
                 actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
             actions.Add(("Gallery", null, () => GalleryMenu(entry)));
-            actions.Add(("Info", null, () => _ui.Message(SaveInfo(entry))));
+            if (Decorations.Supported(sav))
+                actions.Add(("Decorations", null, () => DecorationsMenu(entry)));
+            actions.Add(("Info", null, () => InfoMenu(entry)));
 
             // Headed like the save on the main menu: "[ENG] Emerald   NAME <player sprite> ID".
             var choice = _ui.Choose($"{SaveName(entry)}\t{sav.OT}\t{sav.DisplayTID:D5}", actions.Select(a => a.Label).ToList(), selected,
@@ -231,6 +231,110 @@ public sealed class App
             entry.Reload();
             _ui.Message($"Something went wrong: {ex.Message}\nNothing was saved. Details are in the log.");
         }
+    }
+
+    /// <summary>Info: the save's details, and the Clock for the games with one.</summary>
+    private void InfoMenu(SaveEntry entry)
+    {
+        if (!GameClock.Supported(entry.Sav))
+        {
+            _ui.Message(SaveInfo(entry));
+            return;
+        }
+        int selected = 0;
+        while (true)
+        {
+            var choice = _ui.Choose("Info", ["Details", "Clock"], selected);
+            if (choice is null)
+                return;
+            selected = choice.Value;
+            if (choice == 0)
+                _ui.Message(SaveInfo(entry));
+            else
+                ClockMenu(entry);
+        }
+    }
+
+    /// <summary>
+    /// Ruby/Sapphire/Emerald's decorations, by category as the PC lists them; one can be sent to another of
+    /// these games (not while it's placed in the player's room or Secret Base).
+    /// </summary>
+    private void DecorationsMenu(SaveEntry entry)
+    {
+        var sav = (SAV3)entry.Sav;
+        int category = 0;
+        while (true)
+        {
+            var labels = Decorations.Categories.Select((c, i) => $"{c} ({Decorations.Count(sav, i)}/{Decorations.Capacity(i)})").ToList();
+            var pick = _ui.Choose("Decorations", labels, category);
+            if (pick is null)
+                return;
+            category = pick.Value;
+            DecorationList(entry, category);
+        }
+    }
+
+    private void DecorationList(SaveEntry entry, int category)
+    {
+        int selected = 0;
+        while (true)
+        {
+            var sav = (SAV3)entry.Sav;
+            var owned = Decorations.List(sav, category);
+            if (owned.Count == 0)
+            {
+                _ui.Message($"There are no {Decorations.Categories[category].ToLowerInvariant()}s in the PC.");
+                return;
+            }
+            // Placed decorations are greyed out: they'd have to be put away in-game first.
+            var labels = owned.Select(d => d.InUse ? $"{d.Name} (in use)" : d.Name).ToList();
+            var pick = _ui.Choose($"{Decorations.Categories[category]}: send which?", labels, Math.Min(selected, owned.Count - 1),
+                disabled: owned.Select(d => d.InUse).ToList());
+            if (pick is null)
+                return;
+            selected = pick.Value;
+            if (!owned[pick.Value].InUse)
+                SendDecoration(entry, owned[pick.Value]);
+        }
+    }
+
+    private void SendDecoration(SaveEntry entry, Decorations.Owned decoration)
+    {
+        var targets = GetSaves().Where(s => s.Path != entry.Path && s.Sav is SAV3 to && Decorations.Supported(to)
+                                            && Decorations.HasRoom(to, decoration.Category)).ToList();
+        if (targets.Count == 0)
+        {
+            _ui.Message("No Ruby, Sapphire or Emerald save has room for it.");
+            return;
+        }
+        var sprites = targets.Select(s => TrainerSprite(s.Sav)).ToList();
+        var tags = targets.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
+        var choice = _ui.Choose($"Send the {decoration.Name} to which game?", targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites);
+        if (choice is not { } c)
+            return;
+        var dest = targets[c];
+        if (!_ui.Confirm($"Send the {decoration.Name} from {Names.Game(entry.Sav)} ({entry.Sav.OT})\nto {Names.Game(dest.Sav)} ({dest.Sav.OT})?", "SEND", "CANCEL"))
+            return;
+        var result = Decorations.Send((SAV3)entry.Sav, decoration, (SAV3)dest.Sav);
+        if (!result.Ok)
+        {
+            entry.Reload();
+            dest.Reload();
+            _ui.Message(result.Message);
+            return;
+        }
+        // The receiving game first: if the sender then fails, the decoration is duplicated, not lost.
+        if (!TryWrite(dest, out _))
+        {
+            entry.Reload();
+            return;
+        }
+        if (!TryWrite(entry, out _))
+        {
+            _ui.Message("The decoration arrived, but this save couldn't be updated, so both games have it.");
+            return;
+        }
+        _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
     }
 
     private static string SaveInfo(SaveEntry entry)
