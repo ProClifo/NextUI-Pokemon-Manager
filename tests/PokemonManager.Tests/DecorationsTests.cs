@@ -29,6 +29,9 @@ public sealed class DecorationsTests : IDisposable
         // Emerald's desks at 0x2734, Ruby/Sapphire's at 0x26A0.
         emerald.Large[0x2734] = SmallDesk;
         emerald.Large[0x2735] = 3;
+        Assert.False(Decorations.Send(emerald, Decorations.List(emerald, Desk)[0], ruby).Ok); // Record Mixing isn't open yet
+        emerald.SetEventFlag(0x878, true);
+        ruby.SetEventFlag(0x818, true);
 
         var desk = Decorations.List(emerald, Desk)[0];
         var result = Decorations.Send(emerald, desk, ruby);
@@ -46,6 +49,8 @@ public sealed class DecorationsTests : IDisposable
         emerald.Large[0x2798] = PikaDoll;
         emerald.Large[0x2799] = PikaDoll;
         emerald.Large[0x271C] = PikaDoll;
+        emerald.SetEventFlag(0x878, true);
+        ruby.SetEventFlag(0x818, true);
         var dolls = Decorations.List(emerald, Doll);
         Assert.Equal([true, false], dolls.Select(d => d.InUse));
         Assert.False(Decorations.Send(emerald, dolls[0], ruby).Ok);

@@ -146,6 +146,12 @@ public static class Decorations
 
     public static bool Supported(SaveFile sav) => sav is SAV3RS or SAV3E;
 
+    /// <summary>
+    /// Whether Record Mixing is open, which sending and receiving decorations need: the Cable Club's Record Corner
+    /// opens once the player has visited Mauville City (FLAG_VISITED_MAUVILLE_CITY: R/S 0x818, E 0x878).
+    /// </summary>
+    public static bool RecordMixingUnlocked(SAV3 sav) => sav.GetEventFlag(sav is SAV3E ? 0x878 : 0x818);
+
     private static int InventoryOffset(SAV3 sav) => sav is SAV3E ? 0x2734 : 0x26A0;
     private static int RoomOffset(SAV3 sav) => sav is SAV3E ? 0x271C : 0x2688;            // 12 decorations
     private static int SecretBaseOffset(SAV3 sav) => sav is SAV3E ? 0x1AAE : 0x1A1A;      // the player's base, 16
@@ -193,6 +199,8 @@ public static class Decorations
     {
         if (!Supported(to))
             return OpResult.Fail($"{Names.Game(to)} has no decorations.");
+        if (!RecordMixingUnlocked(from) || !RecordMixingUnlocked(to))
+            return OpResult.Fail("Both games need Record Mixing: visit Mauville City first.");
         if (decoration.InUse)
             return OpResult.Fail($"The {decoration.Name} is in use. Put it away in-game first.");
         var source = Inventory(from, decoration.Category);

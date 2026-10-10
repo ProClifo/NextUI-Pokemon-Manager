@@ -262,6 +262,11 @@ public sealed class App
     private void DecorationsMenu(SaveEntry entry)
     {
         var sav = (SAV3)entry.Sav;
+        if (!Decorations.RecordMixingUnlocked(sav))
+        {
+            _ui.Message("Decorations can be sent once Record Mixing is open: visit Mauville City first.");
+            return;
+        }
         int category = 0;
         while (true)
         {
@@ -301,10 +306,10 @@ public sealed class App
     private void SendDecoration(SaveEntry entry, Decorations.Owned decoration)
     {
         var targets = GetSaves().Where(s => s.Path != entry.Path && s.Sav is SAV3 to && Decorations.Supported(to)
-                                            && Decorations.HasRoom(to, decoration.Category)).ToList();
+                                            && Decorations.RecordMixingUnlocked(to) && Decorations.HasRoom(to, decoration.Category)).ToList();
         if (targets.Count == 0)
         {
-            _ui.Message("No Ruby, Sapphire or Emerald save has room for it.");
+            _ui.Message("No other Ruby, Sapphire or Emerald save with Record Mixing (Mauville City visited) has room for it.");
             return;
         }
         var sprites = targets.Select(s => TrainerSprite(s.Sav)).ToList();
