@@ -416,6 +416,14 @@ public static class Gen3Events
         return OpResult.Success(message);
     }
 
+    /// <summary>Whether the save holds an event script (a Wonder Card's or Mystery Event's), which an injection replaces.</summary>
+    public static bool HasEventScript(SAV3 sav)
+    {
+        int scriptOffset = sav switch { SAV3E => 0x3728, SAV3FRLG => 0x361C, _ => 0x3690 };
+        var script = sav.Large.Slice(scriptOffset, ScriptSize);
+        return script[4] == RamScriptMagic && BinaryPrimitives.ReadUInt32LittleEndian(script) != 0;
+    }
+
     /// <summary>Describes what event data the save currently holds.</summary>
     public static string Status(SAV3 sav)
     {
@@ -443,9 +451,7 @@ public static class Gen3Events
         lines.Add($"e-Reader Berry: {(sav.IsEBerryEngima ? "none (Enigma)" : sav.EBerryName)}");
         lines.Add($"e-Card Trainer: {(sav.SmallBlock.EReaderTrainer.ContainsAnyExcept((byte)0, (byte)0xFF) ? Text(sav.SmallBlock.EReaderTrainer.Slice(4, sav.Japanese ? 5 : 7), sav.Japanese) : "none")}");
 
-        int scriptOffset = sav switch { SAV3E => 0x3728, SAV3FRLG => 0x361C, _ => 0x3690 };
-        var script = large.Slice(scriptOffset, ScriptSize);
-        bool hasScript = script[4] == RamScriptMagic && BinaryPrimitives.ReadUInt32LittleEndian(script) != 0;
+        bool hasScript = HasEventScript(sav);
         lines.Add($"Event script: {(hasScript ? "present" : "none")}");
         return string.Join('\n', lines);
     }

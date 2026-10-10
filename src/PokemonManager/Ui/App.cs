@@ -522,8 +522,8 @@ public sealed class App
         if (entry.Sav is not SAV3 sav3)
             return;
         var question = $"Inject {file.DisplayName} into {Names.Game(sav3)}?";
-        if (file.Kind is Gen3EventKind.WonderCard or Gen3EventKind.MysteryEvent)
-            question += "\n\nThe game holds one event script at a time; this replaces any current one.";
+        if (file.Kind is Gen3EventKind.WonderCard or Gen3EventKind.MysteryEvent && Gen3Events.HasEventScript(sav3))
+            question += "\n\nThis replaces the event already waiting in the game.";
         if (!_ui.Confirm(question, "INJECT", "CANCEL"))
             return;
 
@@ -535,7 +535,13 @@ public sealed class App
             return;
         }
         if (TryWrite(entry, out _))
-            _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
+            _ui.Message(file.Kind switch
+            {
+                Gen3EventKind.WonderCard => "The WONDER CARD has arrived!",
+                Gen3EventKind.WonderNews => "The WONDER NEWS has arrived!",
+                Gen3EventKind.MysteryEvent => "The MYSTERY EVENT has arrived!",
+                _ => "The e-CARD has arrived!",
+            });
     }
 
     private void GiftActions(SaveEntry entry, MysteryGift gift)
@@ -563,7 +569,7 @@ public sealed class App
             return;
         }
         if (TryWrite(entry, out _))
-            _ui.Message(actions[choice.Value].Pokemon ? result.Message : $"{result.Message}\n\n{SaveStateWarning}");
+            _ui.Message(actions[choice.Value].Pokemon ? result.Message : "The WONDER CARD has arrived!");
     }
 
     // ---------------------------------------------------------------- events, distributions, gallery
@@ -673,7 +679,7 @@ public sealed class App
         }
         if (entry.Sav is not SAV3E emerald)
             return;
-        if (!_ui.Confirm($"Give {Names.Game(emerald)} the Eon Ticket, as if received by Record Mixing with Ruby/Sapphire?", "GIVE", "CANCEL"))
+        if (!_ui.Confirm($"Inject the Eon Ticket into {Names.Game(emerald)}?", "INJECT", "CANCEL"))
             return;
         var result = Gen3Events.GiveEonTicketByRecordMixing(emerald);
         if (!result.Ok)
@@ -683,7 +689,7 @@ public sealed class App
             return;
         }
         if (TryWrite(entry, out _))
-            _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
+            _ui.Message("The EON TICKET has arrived!");
     }
 
     private void DistributionsMenu(SaveEntry entry)
@@ -723,7 +729,7 @@ public sealed class App
             return;
         }
         var name = Gen3Events.RegiDolls.First(d => d.Id == doll).Name;
-        if (!_ui.Confirm($"Send the {name} to {Names.Game(sav)}'s PC?", "SEND", "CANCEL"))
+        if (!_ui.Confirm($"Inject the {name} into {Names.Game(sav)}?", "INJECT", "CANCEL"))
             return;
         var result = Gen3Events.GiveDoll(sav, doll);
         if (!result.Ok)
@@ -733,7 +739,7 @@ public sealed class App
             return;
         }
         if (TryWrite(entry, out _))
-            _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
+            _ui.Message($"The {name.ToUpperInvariant()} has arrived in your PC!");
     }
 
     private void GalleryMenu(SaveEntry entry)
@@ -899,22 +905,19 @@ public sealed class App
     {
         if (entry.Sav is not SAV2 sav)
             return;
-        const string HowTo =
-            "After entering the Hall of Fame, walk into the Goldenrod City Pokémon Center: a woman will give you the GS Ball. " +
-            "Take it to Kurt in Azalea Town, then put it in the Ilex Forest shrine to meet Celebi.";
         if (sav.IsEnabledGSBallMobileEvent)
         {
-            _ui.Message($"The GS Ball event is already enabled.\n\n{HowTo}");
+            _ui.Message("The GS Ball event is already enabled.");
             return;
         }
         var question = sav.Japanese
-            ? "Enable the GS Ball event? Japanese Crystal handed it out through the Mobile System."
-            : "Enable the GS Ball event? Outside Japan it only ran in the 3DS Virtual Console release, so PKHeX flags a Celebi from it in a cartridge copy as illegal.";
+            ? $"Enable the GS Ball event in {Names.Game(sav)}?"
+            : $"Enable the GS Ball event in {Names.Game(sav)}?\n\nOutside Japan it only ran in the 3DS Virtual Console release, so PKHeX flags a Celebi from it in a cartridge copy as illegal.";
         if (!_ui.Confirm(question, "ENABLE", "CANCEL"))
             return;
         sav.EnableGSBallMobileEvent();
         if (TryWrite(entry, out _))
-            _ui.Message($"GS Ball event enabled.\n\n{HowTo}\n\n{SaveStateWarning}");
+            _ui.Message("The GS BALL event has been enabled!");
     }
 
     // ---------------------------------------------------------------- files
