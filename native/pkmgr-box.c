@@ -1182,7 +1182,7 @@ static void box_move(Scene *scene, State *st, int dx, int dy)
             else if (st->target == TARGET_CLOSE_BUTTON)
                 col = box->columns - 2;
             else if (st->target == TARGET_TITLE)
-                col = scene->slot % box->columns;
+                col = 0;
             st->target = TARGET_SLOT;
             scene->slot = (row - 2) * box->columns + col;
         }
@@ -1428,7 +1428,14 @@ int main(int argc, char *argv[])
         }
         else if (st.mode == VIEW_PARTY)
         {
-            if (dx || dy)
+            if (dx > 0 && st.party_slot > 0)
+            {
+                // Right from the party's right column goes back to the box, on its first Pokémon
+                st.mode = st.menu_from = VIEW_BOX;
+                st.target = TARGET_SLOT;
+                scene.slot = 0;
+            }
+            else if (dx || dy)
                 party_move(&st, dx, dy);
             else if (a && st.party_slot < 6 && scene.boxes[0].slots[st.party_slot].filled)
             {
