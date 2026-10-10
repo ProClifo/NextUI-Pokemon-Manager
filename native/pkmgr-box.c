@@ -1177,12 +1177,14 @@ static void box_move(Scene *scene, State *st, int dx, int dy)
             st->target = TARGET_TITLE;
         else
         {
+            // up from PARTY POKéMON wraps to the bottom row's first column; down from the box name goes to the
+            // top row's third column
             if (st->target == TARGET_PARTY_BUTTON)
-                col = 1;
+                col = 0;
             else if (st->target == TARGET_CLOSE_BUTTON)
                 col = box->columns - 2;
             else if (st->target == TARGET_TITLE)
-                col = 0;
+                col = box->columns > 2 ? 2 : 0;
             st->target = TARGET_SLOT;
             scene->slot = (row - 2) * box->columns + col;
         }
