@@ -335,9 +335,20 @@ static void gb_select_outline(SDL_Surface *dst, Scene *scene, const Layout *l, i
     SDL_Surface *tiles = skin_image(scene, "select.png");
     if (tiles == NULL)
         return;
-    for (size_t i = 0; i < sizeof(GB_SELECT_OAM) / sizeof(GB_SELECT_OAM[0]); i++)
+    // the skin's own table (Gold/Silver's differs from Crystal's), else Crystal's
+    JSON_Array *table = json_object_get_array(scene->layout, "select_oam");
+    size_t count = table ? json_array_get_count(table) : sizeof(GB_SELECT_OAM) / sizeof(GB_SELECT_OAM[0]);
+    for (size_t i = 0; i < count; i++)
     {
-        const int *o = GB_SELECT_OAM[i];
+        int entry[6];
+        const int *o = GB_SELECT_OAM[i < sizeof(GB_SELECT_OAM) / sizeof(GB_SELECT_OAM[0]) ? i : 0];
+        if (table)
+        {
+            JSON_Array *e = json_array_get_array(table, i);
+            for (int k = 0; k < 6; k++)
+                entry[k] = e ? (int)json_array_get_number(e, k) : 0;
+            o = entry;
+        }
         // OAM positions are 8 px right of and 16 px below the screen's
         int x = o[0] * 8 + o[2] - 8, y = o[1] * 8 + o[3] - 16 + row_index * 16;
         SDL_Surface *tile = SDL_CreateRGBSurfaceWithFormat(0, 8, 8, 32, SDL_PIXELFORMAT_RGBA8888);

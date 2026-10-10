@@ -82,14 +82,14 @@ public static class BoxSummary
         }
 
         var personal = pk.PersonalInfo;
-        var types = new JsonArray((JsonNode)TypeName(personal.Type1));
+        var types = new JsonArray((JsonNode)TypeName(ModernType(pk, personal.Type1)));
         if (personal.Type2 != personal.Type1)
-            types.Add((JsonNode)TypeName(personal.Type2));
+            types.Add((JsonNode)TypeName(ModernType(pk, personal.Type2)));
         summary["types"] = types;
         // The Game Boy stats screens spell the types out ("PSYCHIC"); Gen 1 calls Psychic's partner "PSYCHIC" too.
-        var typeNames = new JsonArray((JsonNode)Up(TypeText(personal.Type1)));
+        var typeNames = new JsonArray((JsonNode)Up(TypeText(ModernType(pk, personal.Type1))));
         if (personal.Type2 != personal.Type1)
-            typeNames.Add((JsonNode)Up(TypeText(personal.Type2)));
+            typeNames.Add((JsonNode)Up(TypeText(ModernType(pk, personal.Type2))));
         summary["type_names"] = typeNames;
         summary["species_id"] = pk.Species;
         // Crystal shows the OT's gender only for Pokémon with catch data
@@ -279,6 +279,23 @@ public static class BoxSummary
     private static string Name(PKM pk) => pk.IsEgg ? "EGG" : pk.IsNicknamed ? pk.Nickname : Up(Names.Species(pk.Species));
 
     private static string Up(string text) => text.ToUpperInvariant();
+
+    /// <summary>
+    /// Gen 1/2 number their types as the Game Boy games do (pokecrystal constants/type_constants.asm: Fire is 20);
+    /// the strings are in the later order (Normal, Fighting, ... Bug 6, Ghost 7, Steel 8, Fire 9 ... Dark 16).
+    /// </summary>
+    private static int ModernType(PKM pk, int type)
+    {
+        if (pk.Format > 2)
+            return type;
+        return type switch
+        {
+            <= 5 => type,          // Normal, Fighting, Flying, Poison, Ground, Rock
+            7 => 6, 8 => 7, 9 => 8, // Bug, Ghost, Steel
+            >= 20 and <= 27 => type - 11, // Fire, Water, Grass, Electric, Psychic, Ice, Dragon, Dark
+            _ => 99,               // ??? (Curse): no name in the later list
+        };
+    }
 
     private static string TypeText(int type) => type < GameInfo.Strings.types.Length ? GameInfo.Strings.types[type] : "???";
 

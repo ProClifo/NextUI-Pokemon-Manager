@@ -66,7 +66,14 @@ done
 echo "==> PC box viewer and minui-list"
 missing=()
 for platform in "${PLATFORMS[@]}"; do
-    [ -x "$ROOT/native/pkmgr-box-$platform-nextui" ] && [ -x "$ROOT/native/minui-list-$platform-nextui" ] || missing+=("$platform")
+    box="$ROOT/native/pkmgr-box-$platform-nextui" list="$ROOT/native/minui-list-$platform-nextui"
+    stale=
+    # rebuilt when a source is newer than the binary, so a pak never ships an old viewer
+    for src in "$ROOT"/native/pkmgr-box*.c "$ROOT/native/desktop.h" "$ROOT/native/Makefile"; do
+        [ "$src" -nt "$box" ] && stale=1
+    done
+    [ "$ROOT/native/minui-list.patch" -nt "$list" ] && stale=1
+    { [ -x "$box" ] && [ -x "$list" ] && [ -z "$stale" ]; } || missing+=("$platform")
 done
 if [ ${#missing[@]} -ne 0 ]; then
     command -v docker >/dev/null 2>&1 || { echo "docker is required to build minui-list and the PC box viewer for ${missing[*]}" >&2; exit 1; }

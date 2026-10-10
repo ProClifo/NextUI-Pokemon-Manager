@@ -153,7 +153,18 @@ def gen2(repo, out, crystal):
     save(tile(battle, 4, 1, TEXT), out, "no.png")  # $74
     save(tile(battle, 1, 1, TEXT), out, "arrow_page_left.png")  # $71 ◀
     pc = os.path.join(gfx, "pc")
-    save(tiles(os.path.join(pc, "pc.png"), [(0, 0), (1, 0)], TEXT), out, "select.png")
+    # The PC's selection outline: BillsPC_UpdateSelectionCursor's OAM (x tile, y tile, x px, y px, tile, flags:
+    # 1 x flip, 2 y flip). Crystal builds it from two flipped tiles, Gold/Silver from six.
+    if crystal:
+        oam = ([[x, 4, 0, 6, 0, 0] for x in range(10, 19)] + [[18, 4, 7, 6, 0, 0]]
+               + [[x, 7, 0, 1, 0, 2] for x in range(10, 19)] + [[18, 7, 7, 1, 0, 2]]
+               + [[9, 5, 6, 6, 1, 0], [9, 6, 6, 1, 1, 2], [19, 5, 1, 6, 1, 1], [19, 6, 1, 1, 1, 3]])
+        picks = [(0, 0), (1, 0)]
+    else:
+        oam = ([[9, 5, 7, 1, 0, 0]] + [[x, 5, 7, 1, 1, 0] for x in range(10, 18)] + [[18, 5, 7, 1, 2, 0]]
+               + [[9, 6, 7, 1, 3, 0]] + [[x, 6, 7, 1, 4, 0] for x in range(10, 18)] + [[18, 6, 7, 1, 5, 0]])
+        picks = [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)]
+    save(tiles(os.path.join(pc, "pc.png"), picks, TEXT), out, "select.png")
     mail = os.path.join(pc, "pc_mail.png")  # $5C mail, $5D item, $5E/$5F the box arrows
     save(tile(mail, 0, 0, TEXT), out, "mail.png")
     save(tile(mail, 1, 0, TEXT), out, "item.png")
@@ -188,7 +199,7 @@ def gen2(repo, out, crystal):
             for i in range(4):
                 square.alpha_composite(tile(stats, first + i, 0, colors), ((i % 2) * 8, (i // 2) * 8))
             save(square, out, f"page_{size}_{page}.png")
-    return {"style": "gb", "gen": 2, "crystal": crystal,
+    return {"style": "gb", "gen": 2, "crystal": crystal, "select_oam": oam,
             "colors": {"pages": {name: list(p["bg"]) for name, p in PAGES.items()}}}
 
 

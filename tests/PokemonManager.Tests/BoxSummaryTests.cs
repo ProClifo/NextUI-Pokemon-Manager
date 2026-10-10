@@ -50,4 +50,17 @@ public sealed class BoxSummaryTests : IDisposable
         Assert.NotEqual("0", (string?)s["attack"]); // worked out for a box Pokémon
         Assert.Equal("-", (string?)s["moves"]![1]!["name"]);
     }
+
+    [Theory]
+    [InlineData(GameVersion.RD)]
+    [InlineData(GameVersion.C)]
+    public void GameBoyTypesAreNamedRight(GameVersion version)
+    {
+        using var saves = new TestSaves();
+        var sav = saves.Create(version, "GB.sav").Sav;
+        string Types(Species species) => string.Join("/", BoxSummary.For(TestSaves.Make(sav, species, 20), sav, false)["type_names"]!.AsArray().Select(t => (string?)t));
+        Assert.Equal("FIRE", Types(Species.Charmander));
+        Assert.Equal("GHOST/POISON", Types(Species.Gengar));
+        Assert.Equal("WATER/PSYCHIC", Types(Species.Slowpoke));
+    }
 }
