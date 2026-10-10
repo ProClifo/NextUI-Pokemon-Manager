@@ -149,4 +149,20 @@ public sealed class BoxSceneTests : IDisposable
         Assert.EndsWith("wallpapers/00.png", (string?)boxes[1]!["wallpaper"]);
         Assert.EndsWith("wallpapers/01.png", (string?)boxes[2]!["wallpaper"]);
     }
+
+    [Theory]
+    [InlineData(GameVersion.RD)]
+    [InlineData(GameVersion.C)]
+    [InlineData(GameVersion.GD)]
+    [InlineData(GameVersion.Pt)]
+    [InlineData(GameVersion.B)]
+    public void EveryGenerationBuildsAScene(GameVersion version)
+    {
+        var sav = _saves.Create(version, $"{version}.sav").Sav;
+        var mon = TestSaves.Make(sav, Species.Pikachu, 10);
+        sav.SetPartySlotAtIndex(mon, 0);
+        sav.SetBoxSlotAtIndex(mon, 0, 0);
+        var json = _scene.Build(sav, "Game", new SlotRef(0, 0), actions: _ => (true, true));
+        Assert.NotNull(json["boxes"]![1]!["slots"]![0]!["summary"]);
+    }
 }

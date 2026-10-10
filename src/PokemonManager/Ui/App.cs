@@ -20,7 +20,6 @@ public sealed class App
     private readonly SaveLibrary _library;
     private readonly AppSettings _settings;
     private readonly BoxViewer _boxViewer;
-    private bool _boxViewFailed;
     private readonly Dictionary<string, SlotRef> _boxPositions = new();
     private List<SaveEntry>? _saves;
     /// <summary>Saves left off the main menu, and why.</summary>
@@ -324,7 +323,7 @@ public sealed class App
 
     private void BrowseStorage(SaveEntry entry)
     {
-        if (_settings.PcBoxView && !_boxViewFailed && _boxViewer.IsAvailable)
+        if (_settings.PcBoxView && _boxViewer.IsAvailable)
         {
             var position = _boxPositions.GetValueOrDefault(entry.Path, new SlotRef(0, 0));
             while (true)
@@ -335,7 +334,7 @@ public sealed class App
                     return;
                 if (outcome == BoxViewer.Outcome.Unavailable)
                 {
-                    _boxViewFailed = true; // fall back to the lists for the rest of this session
+                    // Lists for this save this time; the PC is tried again next time (the reason is in the log).
                     break;
                 }
                 // The viewer has its own Transfer/Summary/Evolve/Cancel menu, like the game's PC.
@@ -1037,8 +1036,9 @@ public sealed class App
         var names = new List<string>
         {
             "Illegal Transfers", "Official ROMs Only", "PC Box View", "Save State Deletion",
-            "Gallery: All Languages", "Gallery: Unreleased Files", "Show Welcome Screen Again",
+            "Gallery: All Languages", "Gallery: Unreleased Files", "Show Welcome Screen Again", "Reset to Default",
         };
+        int welcome = names.Count - 2, reset = names.Count - 1;
         int selected = 0;
         while (true)
         {
@@ -1053,6 +1053,19 @@ public sealed class App
                 return;
             selected = Math.Max(result.Selected, 0);
             bool On(int i) => result.Values[i] == 1;
+
+            if (result.Selected == reset)
+            {
+                if (_ui.Confirm("Put every setting back to how it was when the pak was installed?", "RESET", "CANCEL"))
+                {
+                    bool official = _settings.OnlyOfficialRoms;
+                    _settings.ResetToDefaults();
+                    if (_settings.OnlyOfficialRoms != official)
+                        _saves = null; // rescan with the default rule
+                    _settings.Save(_paths.SettingsFile);
+                }
+                continue;
+            }
 
             if (On(0) && !_settings.AllowIllegalTransfers && !_ui.Confirm(
                     "Illegal transfers let you move Pokémon in ways the real games never allowed: between any " +
@@ -1072,16 +1085,14 @@ public sealed class App
             if (_settings.OnlyOfficialRoms != On(1))
                 _saves = null; // rescan with the new rule
             _settings.OnlyOfficialRoms = On(1);
-            if (_settings.PcBoxView != On(2))
-                _boxViewFailed = false;
             _settings.PcBoxView = On(2);
             _settings.SaveStateDeletion = On(3);
             _settings.GalleryAllLanguages = On(4);
             _settings.GalleryUnreleased = On(5);
-            if (result.Selected == names.Count - 1)
+            if (result.Selected == welcome)
                 _settings.SeenWelcome = false;
             _settings.Save(_paths.SettingsFile);
-            if (result.Selected != names.Count - 1)
+            if (result.Selected != welcome)
                 return; // saved
         }
     }

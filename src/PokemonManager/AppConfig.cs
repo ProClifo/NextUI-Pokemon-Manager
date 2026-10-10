@@ -84,6 +84,18 @@ public sealed class AppSettings
     /// </summary>
     public bool SaveStateDeletion { get; set; }
 
+    /// <summary>Puts every setting back to its default ("Reset to Default"); the welcome screen stays seen.</summary>
+    public void ResetToDefaults()
+    {
+        var defaults = new AppSettings();
+        AllowIllegalTransfers = defaults.AllowIllegalTransfers;
+        OnlyOfficialRoms = defaults.OnlyOfficialRoms;
+        PcBoxView = defaults.PcBoxView;
+        GalleryAllLanguages = defaults.GalleryAllLanguages;
+        GalleryUnreleased = defaults.GalleryUnreleased;
+        SaveStateDeletion = defaults.SaveStateDeletion;
+    }
+
     public static AppSettings Load(string path)
     {
         var s = new AppSettings();

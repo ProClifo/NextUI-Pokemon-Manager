@@ -86,9 +86,11 @@ public static class BoxSummary
         if (personal.Type2 != personal.Type1)
             types.Add((JsonNode)TypeName(personal.Type2));
         summary["types"] = types;
-        summary["ability"] = Up(strings.abilitylist[pk.Ability]);
-        summary["ability_desc"] = AbilityDescriptions.GetValueOrDefault(pk.Ability, "");
-        summary["memo"] = Memo(pk, sav);
+        // Game Boy Pokémon have no ability or nature.
+        bool gameBoy = pk.Format <= 2;
+        summary["ability"] = gameBoy ? "" : Up(strings.abilitylist[pk.Ability]);
+        summary["ability_desc"] = gameBoy ? "" : AbilityDescriptions.GetValueOrDefault(pk.Ability, "");
+        summary["memo"] = gameBoy ? MemoGameBoy(pk) : Memo(pk, sav);
         summary["item"] = pk.HeldItem > 0 ? Up(Names.Item(pk.HeldItem, pk.Context)) : "NONE";
         int ribbons = RibbonCount(pk);
         summary["ribbon"] = ribbons == 0 ? "NONE" : ribbons.ToString();
@@ -250,6 +252,16 @@ public static class BoxSummary
             count += (ev.RibbonChampionBattle ? 1 : 0) + (ev.RibbonChampionRegional ? 1 : 0) + (ev.RibbonChampionNational ? 1 : 0)
                 + (ev.RibbonCountry ? 1 : 0) + (ev.RibbonNational ? 1 : 0) + (ev.RibbonEarth ? 1 : 0);
         return count;
+    }
+
+    /// <summary>Game Boy Pokémon: only Crystal records where and at what level they were met.</summary>
+    private static string MemoGameBoy(PKM pk)
+    {
+        if (pk is not PK2 { MetLevel: > 0 } crystal)
+            return "";
+        var place = crystal.MetLocation > 0
+            && GameInfo.GetLocationName(false, crystal.MetLocation, 2, 2, GameVersion.C) is { Length: > 0 } name ? Up(name) : null;
+        return place is null ? $"Met at Lv{{{crystal.MetLevel}}}." : $"Met at Lv{{{crystal.MetLevel}}},\n{{{place}}}.";
     }
 
     private static string Name(PKM pk) => pk.IsEgg ? "EGG" : pk.IsNicknamed ? pk.Nickname : Up(Names.Species(pk.Species));

@@ -136,7 +136,16 @@ public sealed class BoxScene(string assetDir)
                 continue;
             }
             var slot = Slot(pk, sets, leafGreen);
-            slot["summary"] = BoxSummary.For(pk, sav, at.IsParty);
+            try
+            {
+                slot["summary"] = BoxSummary.For(pk, sav, at.IsParty);
+            }
+            catch (Exception ex)
+            {
+                // One odd Pokémon mustn't keep the PC from opening: it just gets a bare summary.
+                Console.Error.WriteLine($"No summary for {Names.Species(pk)} in box {box} slot {at.Slot}: {ex}");
+                slot["summary"] = new JsonObject { ["nickname"] = Names.Species(pk).ToUpperInvariant(), ["egg"] = pk.IsEgg };
+            }
             // The viewer's menu greys out what can't be done.
             if (actions?.Invoke(at) is { } can)
             {
