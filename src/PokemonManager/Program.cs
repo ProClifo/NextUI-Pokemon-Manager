@@ -32,6 +32,7 @@ try
         "redeem-event" => RedeemEvent(rest),
         "gen3-status" => Gen3Status(rest),
         "box-scene" => BoxSceneCommand(rest),
+        "trainer-card" => TrainerCardCommand(rest),
         "gallery-build" => GalleryBuild(rest),
         "gallery" => GalleryList(rest),
         "help" or "--help" or "-h" => Usage(0),
@@ -208,6 +209,16 @@ int BoxSceneCommand(List<string> a)
     return 0;
 }
 
+int TrainerCardCommand(List<string> a)
+{
+    var entry = LoadSave(a, 0);
+    var output = Arg(a, 1, "output file");
+    var assets = a.Count > 2 ? a[2] : AppPaths.FromEnvironment(sd, data).BoxAssetsDir;
+    var font = a.Count > 3 ? a[3] : null;
+    File.WriteAllText(output, TrainerCard.For(entry.Sav, new BoxScene(assets).Skin(entry.Sav), font).ToJsonString());
+    return 0;
+}
+
 SaveLibrary Library() => new(AppPaths.FromEnvironment(sd, data).BackupDir);
 
 static SaveEntry LoadSave(List<string> a, int index)
@@ -308,6 +319,7 @@ static int Usage(int code)
           redeem-event <save> <index>          send a built-in event Pokémon to the PC
           gen3-status <save>                   Gen 3 Mystery Gift / Event status
           box-scene <save> <out.json> [assets] [slot] [font.ttf] scene file for the PC box viewer (testing)
+          trainer-card <save> <out.json> [assets] [font.ttf]  card file for pkmgr-box --card (testing)
           gallery-build <EventsGallery dir> <out.zip>   bundle the Gen 1-5 EventsGallery files (build time)
           gallery <save> [events|distributions|all] [--all-languages] [--unreleased]
                                                gallery files the game menus would list

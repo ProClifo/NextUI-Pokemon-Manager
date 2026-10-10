@@ -113,6 +113,96 @@ def font_glyphs(font, out):
     save(tile(font, 2, 7, TEXT), out, "dot.png")
 
 
+def blocks(path, size, count, colors, horizontal=False):
+    """count square blocks of size px stacked vertically in path (or side by side), as one horizontal strip."""
+    img = Image.open(path).convert("L")
+    out = Image.new("RGBA", (size * count, size), (0, 0, 0, 0))
+    for k in range(count):
+        sx, sy = (k * size, 0) if horizontal else (0, k * size)
+        for y in range(size):
+            for x in range(size):
+                level = img.getpixel((sx + x, sy + y))
+                c = {255: 0, 170: 1, 85: 2, 0: 3}.get(level, 3 - round(level / 85))
+                if colors[c] is not None:
+                    out.putpixel((k * size + x, y), colors[c] + (255,))
+    return out
+
+
+def card_gen1(repo, out):
+    """Red/Blue/Yellow's trainer info screen (engine/menus/start_sub_menus.asm DrawTrainerInfo, draw_badges.asm):
+    card_tiles.png = trainer_info.png's tiles $77-$7E and the background $D7 (bottom edge, right edge, top-left,
+    top, top-right, left edge, bottom-left, bottom-right, background); the circle, badge numbers 1-8, the colon,
+    the gym leaders' faces and badges (16x16 each, Boulder first) and the player's picture."""
+    gfx = os.path.join(repo, "gfx")
+    tc = os.path.join(gfx, "trainer_card")
+    save(tiles(os.path.join(tc, "trainer_info.png"), [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1), (0, 2), (1, 2), (2, 2)], TEXT),
+         out, "card_tiles.png")
+    save(tile(os.path.join(tc, "circle_tile.png"), 0, 0, TEXT), out, "card_circle.png")
+    save(tiles(os.path.join(tc, "badge_numbers.png"), [(c, r) for r in range(4) for c in range(2)], TEXT), out, "card_numbers.png")
+    save(tile(os.path.join(gfx, "font", "font_extra.png"), 13, 0, TEXT), out, "card_colon.png")
+    faces = Image.new("RGBA", (128, 16), (0, 0, 0, 0))
+    badges = Image.new("RGBA", (128, 16), (0, 0, 0, 0))
+    sheet = blocks(os.path.join(tc, "badges.png"), 16, 16, TEXT)  # face k at 2k, badge k at 2k + 1
+    for k in range(8):
+        faces.alpha_composite(sheet.crop((32 * k, 0, 32 * k + 16, 16)), (16 * k, 0))
+        badges.alpha_composite(sheet.crop((32 * k + 16, 0, 32 * k + 32, 16)), (16 * k, 0))
+    save(faces, out, "card_faces.png")
+    save(badges, out, "card_badges.png")
+    # the picture's columns 1-4, rows 0-5 show in the box (the screen code shifts it a column left)
+    pic = blocks(os.path.join(gfx, "player", "red.png"), 56, 1, TEXT).crop((8, 0, 40, 48))
+    save(pic, out, "card_pic.png")
+
+
+# _CGB_TrainerCard: each palette is white, the trainer's two middle colours, black (gfx/trainers/*.png)
+CARD_PALETTES = {
+    "chris": (rgb5(25, 18, 12), rgb5(22, 9, 5)), "falkner": (rgb5(27, 17, 14), rgb5(7, 5, 31)),
+    "bugsy": (rgb5(26, 18, 15), rgb5(13, 21, 6)), "whitney": (rgb5(28, 18, 9), rgb5(21, 7, 2)),
+    "morty": (rgb5(29, 17, 12), rgb5(12, 7, 22)), "chuck": (rgb5(25, 16, 12), rgb5(12, 8, 8)),
+    "jasmine": (rgb5(26, 18, 10), rgb5(16, 9, 11)), "pryce": (rgb5(31, 18, 16), rgb5(12, 9, 8)),
+}
+LEADER_PALETTES = ["falkner", "bugsy", "whitney", "morty", "chuck", "jasmine", "pryce", "falkner"]  # Clair uses Kris's
+
+
+def card_gen2(repo, out, crystal):
+    """Gold/Silver/Crystal's trainer card (engine/menus/trainer_card.asm), in the CGB palettes: card_tiles_<m|f>.png
+    = trainer_card.png's $23-$28 (border, inner corner, divider, divider end, ID, No) in the border's palette (the
+    other gender's), the right corner (Crystal), the STATUS tab and colon, the leaders' numbers and 24x16 faces in
+    their palettes, the BADGES tab, the badges (16x16, OBJ palette CGB_BADGE) and the player's picture."""
+    tc = os.path.join(repo, "gfx", "trainer_card")
+    def pal(name):
+        c1, c2 = CARD_PALETTES[name]
+        return [None, c1, c2, BLACK]
+    for gender, border in (("m", "falkner"), ("f", "chris")):
+        save(tiles(os.path.join(tc, "trainer_card.png"), [(0, 0), (1, 0), (0, 1), (1, 1), (0, 2), (1, 2)], pal(border)),
+             out, f"card_tiles_{gender}.png")
+        if crystal:
+            save(tile(os.path.join(tc, "card_right_corner.png"), 0, 0, pal(border)), out, f"card_corner_{gender}.png")
+        save(tiles(os.path.join(tc, "card_status.png"), [(i, 0) for i in range(6)], pal(border)), out, f"card_status_{gender}.png")
+    leaders = os.path.join(tc, "leaders.png")
+    numbers = Image.new("RGBA", (64, 8), (0, 0, 0, 0))
+    faces = Image.new("RGBA", (24 * 8, 16), (0, 0, 0, 0))
+    for k in range(8):
+        colors = pal(LEADER_PALETTES[k])
+        numbers.alpha_composite(tile(leaders, 0, k, colors), (8 * k, 0))
+        faces.alpha_composite(tiles(leaders, [(4, k), (5, k), (6, k)], colors), (24 * k, 0))
+        faces.alpha_composite(tiles(leaders, [(7, k), (8, k), (9, k)], colors), (24 * k, 8))
+    save(numbers, out, "card_numbers.png")
+    save(faces, out, "card_faces.png")
+    save(tiles(leaders, [(i, 8) for i in range(5)], TEXT), out, "card_badges_tab.png")
+    save(blocks(os.path.join(tc, "badges.png"), 16, 8, [None, rgb5(26, 21, 22), rgb5(15, 15, 18), BLACK]), out, "card_badges.png")
+    pics = [("m", "chris_card.png", "chris")] + ([("f", "kris_card.png", "falkner")] if crystal else [])
+    for gender, file, palette in pics:
+        img = Image.open(os.path.join(tc, file)).convert("L")
+        pic = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        colors = pal(palette)
+        for y in range(img.height):
+            for x in range(img.width):
+                c = {255: 0, 170: 1, 85: 2, 0: 3}.get(img.getpixel((x, y)), 3)
+                if colors[c] is not None:
+                    pic.putpixel((x, y), colors[c] + (255,))
+        save(pic, out, f"card_pic_{gender}.png")
+
+
 def gen1(repo, out):
     gfx = os.path.join(repo, "gfx")
     os.makedirs(out, exist_ok=True)
@@ -137,6 +227,7 @@ def gen1(repo, out):
     save(tile(hud1, 0, 0, TEXT), out, "hp_end.png")
     for name, color in HP_BARS.items():
         save(tiles(battle, [(1 + n, 0) for n in range(9)], [None, HP_LIGHT, color, BLACK]), out, f"hp_{name}.png")
+    card_gen1(repo, out)
     return {"style": "gb", "gen": 1}
 
 
@@ -199,6 +290,7 @@ def gen2(repo, out, crystal):
             for i in range(4):
                 square.alpha_composite(tile(stats, first + i, 0, colors), ((i % 2) * 8, (i // 2) * 8))
             save(square, out, f"page_{size}_{page}.png")
+    card_gen2(repo, out, crystal)
     return {"style": "gb", "gen": 2, "crystal": crystal, "select_oam": oam,
             "colors": {"pages": {name: list(p["bg"]) for name, p in PAGES.items()}}}
 
@@ -216,6 +308,7 @@ def main():
         layout = build(path, target)
         layout.setdefault("colors", {}).update({"bg": list(WHITE), "fg": list(BLACK), "disabled": [165, 165, 165]})
         layout["font"] = {"height": 7, "cap_top": 0, "color": list(BLACK)}
+        layout["card"] = any(os.path.exists(os.path.join(target, f)) for f in ("card_pic.png", "card_pic_m.png"))
         with open(os.path.join(target, "layout.json"), "w", encoding="utf-8") as f:
             json.dump(layout, f, indent=1)
         print(f"gb_ui: {name}")

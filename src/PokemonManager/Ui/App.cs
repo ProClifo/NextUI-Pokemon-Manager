@@ -246,7 +246,7 @@ public sealed class App
         }
     }
 
-    /// <summary>Info, headed with the save's file name: its details, and the Clock for the games with one.</summary>
+    /// <summary>Info, headed with the save's file name: its details, the Clock and the Trainer Card for the games with them.</summary>
     private void InfoMenu(SaveEntry entry)
     {
         int selected = 0;
@@ -255,6 +255,12 @@ public sealed class App
             var actions = new List<(string Label, Action Run)> { ("Details", () => _ui.Message(SaveInfo(entry))) };
             if (GameClock.Supported(entry.Sav))
                 actions.Add(("Clock", () => ClockMenu(entry)));
+            if (_boxViewer.HasCard(entry.Sav))
+                actions.Add(("Trainer Card", () =>
+                {
+                    if (!_boxViewer.ShowCard(entry.Sav, _ogFont?.Path))
+                        _ui.Message("The Trainer Card couldn't be shown.");
+                }));
             var choice = _ui.Choose(Path.GetFileName(entry.Path), actions.Select(a => a.Label).ToList(), selected);
             if (choice is null)
                 return;

@@ -1266,6 +1266,7 @@ static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, 
 
 #include "pkmgr-box-gb.c"
 #include "pkmgr-box-clock.c"
+#include "pkmgr-box-card.c"
 
 int main(int argc, char *argv[])
 {
@@ -1273,11 +1274,13 @@ int main(int argc, char *argv[])
     const char *write_location = NULL;
     const char *screenshot = NULL;
     const char *state_name = "box";
-    const char *clock = NULL, *font_path = NULL, *background = NULL;
+    const char *clock = NULL, *font_path = NULL, *background = NULL, *card = NULL;
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "--clock") == 0 && i + 1 < argc)
             clock = argv[++i];
+        else if (strcmp(argv[i], "--card") == 0 && i + 1 < argc)
+            card = argv[++i];
         else if (strcmp(argv[i], "--font") == 0 && i + 1 < argc)
             font_path = argv[++i];
         else if (strcmp(argv[i], "--background") == 0 && i + 1 < argc)
@@ -1293,6 +1296,8 @@ int main(int argc, char *argv[])
     }
     if (clock)
         return clock_run(clock, font_path, background, write_location, screenshot);
+    if (card)
+        return card_run(card, screenshot, state_name);
     if (scene_path == NULL)
     {
         fprintf(stderr, "usage: pkmgr-box --scene scene.json --write-location out.json\n");

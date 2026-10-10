@@ -44,6 +44,13 @@ public static class BoxSummary
     /// The number the summary shows (SpeciesToPokedexNum): national once the National Dex is on, otherwise the
     /// regional number, or none for a species outside the regional Pokédex. (Emerald's summary shows none.)
     /// </summary>
+    /// <summary>The species' Hoenn Pokédex number, or null outside it.</summary>
+    public static int? HoennDexNumber(ushort species)
+    {
+        int hoenn = Array.IndexOf(HoennDex, species);
+        return hoenn >= 0 ? hoenn + 1 : null;
+    }
+
     private static int? DexNumber(ushort species, SaveFile sav)
     {
         if (sav is not SAV3 || TradeRules.NationalDex3((SAV3)sav))

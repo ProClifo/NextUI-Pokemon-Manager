@@ -146,6 +146,43 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         }
     }
 
+    /// <summary>Whether <see cref="ShowCard"/> can show this game's Trainer Card.</summary>
+    public bool HasCard(SaveFile sav) => FindOnPath(Tool) is not null && TrainerCard.Available(sav, scene.Skin(sav));
+
+    /// <summary>
+    /// Shows the game's Trainer Card (Gen 1-3, with the skin's card art). False when there's no card art for the
+    /// game or the viewer couldn't run.
+    /// </summary>
+    public bool ShowCard(SaveFile sav, string? fontPath)
+    {
+        var skin = scene.Skin(sav);
+        if (!TrainerCard.Available(sav, skin) || FindOnPath(Tool) is null)
+            return false;
+        Directory.CreateDirectory(tempDir);
+        var cardPath = Path.Combine(tempDir, "card.json");
+        try
+        {
+            File.WriteAllText(cardPath, TrainerCard.For(sav, skin, fontPath).ToJsonString());
+            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            psi.ArgumentList.Add("--card");
+            psi.ArgumentList.Add(cardPath);
+            using var p = Process.Start(psi);
+            if (p is null)
+                return false;
+            p.OutputDataReceived += static (_, _) => { };
+            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
+            p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
+            p.WaitForExit();
+            return p.ExitCode is 0 or 2 or 3;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Trainer card failed: {ex.Message}");
+            return false;
+        }
+    }
+
     private static string? FindOnPath(string name)
     {
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries))
