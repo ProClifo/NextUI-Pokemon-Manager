@@ -88,6 +88,16 @@ public static class GiftService
     public static bool SupportsAlbum(SaveFile sav) => sav is IMysteryGiftStorageProvider;
 
     /// <summary>
+    /// Why the save can't receive Mystery Gifts yet: Diamond/Pearl/Platinum unlock Mystery Gift with the Jubilife TV
+    /// questionnaire (scripts_jubilife_tv_3f.s: CheckIsMysteryGiftPhrase, UnlockMysteryGift). HeartGold/SoulSilver
+    /// unlock it with the Pokédex, and Gen 5 has it from the start.
+    /// </summary>
+    public static string? MysteryGiftLocked(SaveFile sav)
+        => sav is SAV4Sinnoh s4 && !s4.IsMysteryGiftUnlocked
+            ? $"Unlock Mystery Gift in {Names.Game(sav)} first: fill in the questionnaire at Jubilife TV with \"EVERYONE HAPPY\" \"WI-FI CONNECTION\"."
+            : null;
+
+    /// <summary>
     /// Places a Wonder Card into the save's album so it can be picked up in-game from the delivery person,
     /// exactly as if it had been received over Wi-Fi/local wireless.
     /// </summary>
@@ -99,6 +109,8 @@ public static class GiftService
             return OpResult.Fail($"This gift isn't compatible with {Names.Game(sav)}. {why}".Trim());
         if (gift is PCD { IsLockCapsule: true })
             return OpResult.Fail("The Lock Capsule can't be injected as a card.");
+        if (MysteryGiftLocked(sav) is { } locked)
+            return OpResult.Fail(locked);
 
         var storage = provider.MysteryGiftStorage;
         int count = storage.GiftCountMax;

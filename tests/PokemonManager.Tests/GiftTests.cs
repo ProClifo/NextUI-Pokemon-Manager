@@ -19,6 +19,12 @@ public sealed class GiftTests : IDisposable
         var entry = _saves.Create(GameVersion.Pt, "Platinum.sav");
         var pcd = FirstPokemonGift(EncounterEvent.MGDB_G4);
 
+        // Mystery Gift must be unlocked in-game first (the Jubilife TV questionnaire).
+        var locked = GiftService.InjectCard(entry.Sav, pcd);
+        Assert.False(locked.Ok);
+        Assert.Contains("Jubilife TV", locked.Message);
+        ((SAV4)entry.Sav).IsMysteryGiftUnlocked = true;
+
         var result = GiftService.InjectCard(entry.Sav, pcd);
         Assert.True(result.Ok, result.Message);
 
