@@ -29,7 +29,6 @@ typedef struct
     int scroll;
     int menu_item;
     int page;
-    int last_box; // Gen 1's BOX No. while the party is shown
     const char *message; // why Transfer/Evolve can't be used, until a button is pressed
 } GbState;
 
@@ -463,8 +462,10 @@ static void gb_draw_gen1(SDL_Surface *dst, Scene *scene, const Layout *l, GbStat
     gb_print(dst, scene, l, "What?", 1, 14);
     gb_box(dst, scene, l, 9, 14, 11, 4);
     char number[32];
-    int b = scene->box == 0 ? st->last_box : scene->box;
-    snprintf(number, sizeof(number), "BOX No.%d", b);
+    if (scene->box == 0)
+        snprintf(number, sizeof(number), "Party"); // the party is shown (DEPOSIT's list in the game)
+    else
+        snprintf(number, sizeof(number), "BOX No.%d", scene->box);
     gb_print(dst, scene, l, number, 10, 16);
 
     // DisplayListMenuID: LIST_MENU_BOX, four names with their levels, CANCEL last
@@ -524,8 +525,6 @@ static void gb_fix_scroll(Scene *scene, GbState *st)
 
 static void gb_change_box(Scene *scene, GbState *st, int delta)
 {
-    if (scene->box != 0)
-        st->last_box = scene->box;
     scene->box = (scene->box + delta + scene->box_count) % scene->box_count;
     st->cursor = 0;
     st->scroll = 0;
@@ -550,7 +549,6 @@ static void gb_init(Scene *scene, GbState *st)
     gb_grey = get_color(scene->layout, "colors.disabled", gb_grey);
     memset(st, 0, sizeof(*st));
     st->mode = GB_LIST;
-    st->last_box = scene->box > 0 ? scene->box : 1;
     st->cursor = scene->slot;
     gb_fix_scroll(scene, st);
 }
