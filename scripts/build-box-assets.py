@@ -8,11 +8,13 @@ Writes:
   unknown.png               the "?" box icon (32x64), for species no art set has
   background.png            the PC's scrolling background pattern (256x256 tile)
   cursor.png                the hand cursor (32x32, first frame)
+  abilities.json            the summary screen's ability descriptions by ability number
 
 The Pokémon icons and sprites of each game are made by scripts/build-box-art.py.
 No Nintendo artwork is stored in this repository; it is generated at build time from pret/pokeemerald.
 Requires Pillow.
 """
+import json
 import os
 import re
 import struct
@@ -147,6 +149,22 @@ def main():
     storage = os.path.join(root, "graphics", "pokemon_storage")
     build_tilemap(os.path.join(storage, "scrolling_bg.png"), os.path.join(storage, "scrolling_bg.bin"),
                   read_jasc(os.path.join(storage, "scrolling_bg.pal")), 32).save(os.path.join(out, "background.png"))
+
+    abilities = ability_descriptions(root)
+    with open(os.path.join(out, "abilities.json"), "w", encoding="utf-8") as f:
+        json.dump(abilities, f, ensure_ascii=False, indent=0)
+    print(f"{len(abilities)} ability descriptions")
+
+
+def ability_descriptions(root):
+    """The summary screen's ability descriptions by ability number (src/data/text/abilities.h)."""
+    numbers = {m.group(1): int(m.group(2)) for m in re.finditer(
+        r"#define (ABILITY_\w+)\s+(\d+)", open(os.path.join(root, "include", "constants", "abilities.h"), encoding="utf-8").read())}
+    text = open(os.path.join(root, "src", "data", "text", "abilities.h"), encoding="utf-8").read()
+    strings = {m.group(1): m.group(2) for m in re.finditer(r'static const u8 (\w+)\[\] = _\("(.*?)"\);', text)}
+    table = text[text.index("gAbilityDescriptionPointers"):]
+    return {numbers[m.group(1)]: strings[m.group(2)] for m in re.finditer(r"\[(ABILITY_\w+)\]\s*=\s*(\w+)", table)
+            if m.group(1) in numbers and m.group(2) in strings}
 
 
 

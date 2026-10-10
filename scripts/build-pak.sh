@@ -105,7 +105,7 @@ sparse_clone pokegold "$POKEGOLD_COMMIT" "${GB_ART[@]}"
 sparse_clone pokecrystal "$POKECRYSTAL_COMMIT" "${GB_ART[@]}"
 sparse_clone pokeruby "$POKERUBY_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c'
 sparse_clone pokeemerald "$POKEEMERALD_COMMIT" '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk' \
-    '/src/pokemon_icon.c' '/graphics/object_events/pics/people/'
+    '/src/pokemon_icon.c' '/graphics/object_events/pics/people/' '/src/data/text/abilities.h' '/include/constants/abilities.h'
 sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' \
     '/graphics/object_events/pics/people/'
 sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \

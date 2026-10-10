@@ -44,6 +44,7 @@ public sealed class App
         _paths.EnsureCreated();
         _library = new SaveLibrary(paths.BackupDir);
         _boxViewer = new BoxViewer(new BoxScene(paths.BoxAssetsDir), paths.TempDir);
+        BoxSummary.LoadAbilityDescriptions(Path.Combine(paths.BoxAssetsDir, "abilities.json"));
         _backgrounds = new GameBackgrounds(paths.BackgroundsDir);
         _gallery = new GalleryArchive(paths.GalleryFile);
         _uiScale = UiFont.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE"));
@@ -328,7 +329,7 @@ public sealed class App
             var position = _boxPositions.GetValueOrDefault(entry.Path, new SlotRef(0, 0));
             while (true)
             {
-                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ogFont, _nextFont);
+                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ogFont, _nextFont, ActionsFor(entry));
                 _boxPositions[entry.Path] = position;
                 if (outcome == BoxViewer.Outcome.Back)
                     return;
@@ -337,7 +338,11 @@ public sealed class App
                     _boxViewFailed = true; // fall back to the lists for the rest of this session
                     break;
                 }
-                PokemonMenu(entry, position);
+                // The viewer has its own Transfer/Summary/Evolve/Cancel menu, like the game's PC.
+                if (outcome == BoxViewer.Outcome.Evolve)
+                    EvolveFlow(entry, position);
+                else
+                    TransferFlow(entry, position, TransferMode.Move);
             }
         }
 
@@ -406,6 +411,26 @@ public sealed class App
                 return others[choice.Value];
             selected = choice.Value;
         }
+    }
+
+    /// <summary>
+    /// Transfer/Evolve availability for every slot of a save, for the PC viewer's menu. Whether another save
+    /// can take a Pokémon is worked out once per kind of Pokémon, so a full PC stays quick.
+    /// </summary>
+    private Func<SlotRef, (bool Transfer, bool Evolve)> ActionsFor(SaveEntry entry)
+    {
+        var others = GetSaves().Where(s => s.Path != entry.Path).ToList();
+        var accepted = new Dictionary<(ushort, byte, bool, bool, int, GameVersion), bool>();
+        return slot =>
+        {
+            var pk = slot.Get(entry.Sav);
+            bool blocked = slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null;
+            var key = (pk.Species, pk.Form, pk.IsEgg, pk.FatefulEncounter, pk.HeldItem, pk.Version);
+            if (!accepted.TryGetValue(key, out bool anywhere))
+                accepted[key] = anywhere = others.Any(s => CanTransferTo(entry, slot, s));
+            bool transfer = !blocked && anywhere && TransferService.CanMove(entry.Sav, slot).Ok;
+            return (transfer, !blocked && CanEvolveNow(pk));
+        };
     }
 
     /// <summary>Whether the Pokémon can be moved to <paramref name="dest"/>, following the games' trade rules.</summary>

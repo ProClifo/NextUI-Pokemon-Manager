@@ -13,18 +13,21 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
 {
     private const string Tool = "pkmgr-box";
 
-    public enum Outcome { Picked, Back, Unavailable }
+    /// <summary>What the player chose on the PC screen: Transfer or Evolve on a Pokémon (Summary is shown by
+    /// the viewer itself), leaving it, or the viewer couldn't run.</summary>
+    public enum Outcome { Transfer, Evolve, Back, Unavailable }
 
     public bool IsAvailable => scene.AssetsPresent && FindOnPath(Tool) is not null;
 
-    public Outcome Pick(SaveFile sav, string title, ref SlotRef position, UiFont? font = null, UiFont? fallbackFont = null)
+    public Outcome Pick(SaveFile sav, string title, ref SlotRef position, UiFont? font = null, UiFont? fallbackFont = null,
+        Func<SlotRef, (bool Transfer, bool Evolve)>? actions = null)
     {
         Directory.CreateDirectory(tempDir);
         var scenePath = Path.Combine(tempDir, "box-scene.json");
         var outPath = Path.Combine(tempDir, "box-result.json");
         try
         {
-            File.WriteAllText(scenePath, scene.Build(sav, title, position, font, fallbackFont).ToJsonString());
+            File.WriteAllText(scenePath, scene.Build(sav, title, position, font, fallbackFont, actions).ToJsonString());
             File.Delete(outPath);
         }
         catch (Exception ex)
@@ -64,7 +67,8 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
                 {
                     using var doc = JsonDocument.Parse(File.ReadAllText(outPath));
                     position = BoxScene.FromViewer(doc.RootElement.GetProperty("box").GetInt32(), doc.RootElement.GetProperty("slot").GetInt32());
-                    return Outcome.Picked;
+                    return doc.RootElement.TryGetProperty("action", out var action) && action.GetString() == "evolve"
+                        ? Outcome.Evolve : Outcome.Transfer;
                 }
                 catch (Exception)
                 {

@@ -22,15 +22,16 @@ public sealed class BoxScene(string assetDir)
 
     public string AssetDir { get; } = assetDir;
 
-    public bool AssetsPresent => File.Exists(Path.Combine(AssetDir, "cursor.png"));
+    /// <summary>The box art and at least Emerald's PC/summary skin (res/box/ui/e) are in the pak.</summary>
+    public bool AssetsPresent => File.Exists(Path.Combine(AssetDir, "cursor.png")) && File.Exists(Path.Combine(AssetDir, "ui", "e", "layout.json"));
 
-    public JsonObject Build(SaveFile sav, string title, SlotRef start, UiFont? font = null, UiFont? fallbackFont = null)
+    public JsonObject Build(SaveFile sav, string title, SlotRef start, UiFont? font = null, UiFont? fallbackFont = null, Func<SlotRef, (bool Transfer, bool Evolve)>? actions = null)
     {
         var sets = ArtSets(sav);
         // Gen 3 Deoxys looks the way the game showing it draws it; LeafGreen's differs from FireRed's.
         bool leafGreen = sav is SAV3FRLG { Version: GameVersion.LG };
         // The party is a 3x2 grid centred on the plain wallpaper.
-        var party = Box("PARTY", Wallpaper(PlainWallpaper), 3, 2, Enumerable.Range(0, 6).Select(i => i < sav.PartyCount ? sav.GetPartySlotAtIndex(i) : null), sets, leafGreen);
+        var party = Box("PARTY", Wallpaper(PlainWallpaper), 3, 2, Enumerable.Range(0, 6).Select(i => i < sav.PartyCount ? sav.GetPartySlotAtIndex(i) : null), sets, leafGreen, sav, SlotRef.PartyBox, actions);
         party["offset_x"] = 40;
         party["offset_y"] = 48;
         var boxes = new JsonArray { (JsonNode)party };
@@ -39,7 +40,7 @@ public sealed class BoxScene(string assetDir)
             var mons = Enumerable.Range(0, sav.BoxSlotCount).Select(s => (PKM?)sav.GetBoxSlotAtIndex(b, s));
             int columns = 6;
             int rows = (sav.BoxSlotCount + columns - 1) / columns;
-            boxes.Add((JsonNode)Box(SlotRef.BoxName(sav, b), Wallpaper(WallpaperFor(sav, b)), columns, rows, mons, sets, leafGreen));
+            boxes.Add((JsonNode)Box(SlotRef.BoxName(sav, b), Wallpaper(WallpaperFor(sav, b)), columns, rows, mons, sets, leafGreen, sav, b, actions));
         }
 
         var (box, slot) = ToViewer(start);
@@ -51,6 +52,7 @@ public sealed class BoxScene(string assetDir)
             ["box"] = box,
             ["slot"] = slot,
             ["boxes"] = boxes,
+            ["skin"] = Skin(sav),
         };
         // The font to draw in, unless it lacks some of the text (OG has no Japanese): then the fallback.
         var chosen = font is not null && font.Covers(Strings(scene)) ? font : fallbackFont;
@@ -109,11 +111,40 @@ public sealed class BoxScene(string assetDir)
 
     private string Wallpaper(int id) => Path.Combine(AssetDir, "wallpapers", $"{id:00}.png");
 
-    private JsonObject Box(string name, string wallpaper, int columns, int rows, IEnumerable<PKM?> mons, string[] sets, bool leafGreen)
+    /// <summary>
+    /// The folder of the PC and summary screens' art and layout (res/box/ui/&lt;game&gt;, from scripts/pc_ui):
+    /// Ruby/Sapphire's, FireRed/LeafGreen's, or Emerald's for Emerald and every other game.
+    /// </summary>
+    public string Skin(SaveFile sav)
+    {
+        var game = sav switch { SAV3RS => "rs", SAV3FRLG => "frlg", _ => "e" };
+        var dir = Path.Combine(AssetDir, "ui", game);
+        return Directory.Exists(dir) ? dir : Path.Combine(AssetDir, "ui", "e");
+    }
+
+    private JsonObject Box(string name, string wallpaper, int columns, int rows, IEnumerable<PKM?> mons, string[] sets, bool leafGreen, SaveFile sav, int box,
+        Func<SlotRef, (bool Transfer, bool Evolve)>? actions)
     {
         var slots = new JsonArray();
+        int index = 0;
         foreach (var pk in mons)
-            slots.Add((JsonNode)(pk is { Species: > 0 } ? Slot(pk, sets, leafGreen) : new JsonObject()));
+        {
+            var at = new SlotRef(box, index++);
+            if (pk is not { Species: > 0 })
+            {
+                slots.Add((JsonNode)new JsonObject());
+                continue;
+            }
+            var slot = Slot(pk, sets, leafGreen);
+            slot["summary"] = BoxSummary.For(pk, sav, at.IsParty);
+            // The viewer's menu greys out what can't be done.
+            if (actions?.Invoke(at) is { } can)
+            {
+                slot["can_transfer"] = can.Transfer;
+                slot["can_evolve"] = can.Evolve;
+            }
+            slots.Add((JsonNode)slot);
+        }
         return new JsonObject
         {
             ["name"] = name,
