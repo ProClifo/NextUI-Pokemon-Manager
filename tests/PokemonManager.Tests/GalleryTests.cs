@@ -273,6 +273,23 @@ public sealed class GalleryTests : IDisposable
     }
 
     [Fact]
+    public void ShinyCopiesOfUnlockedGameBoyEventsStayShiny()
+    {
+        // PCNY's Celebi had random DVs; this gallery copy came out shiny (all DVs 10).
+        var file = Convert.FromBase64String("Afv/+wBJXWnXAUEAAIcAAAAAAAAAAAAAqqoKGRQFRgAFfwUAAAAAAAAAAAAAAAAAAAAAj4KNmKFQUFBQUFCChIuEgYhQUFBQUA==");
+        var root = WriteGallery(write => write("Released/Gen 2/Classic/ENG/Pokémon Center New York/GSC - PCNYb 0321 Shiny Celebi.pk2", file));
+        var zip = Path.Combine(_saves.Dir, "gallery.zip");
+        GalleryBuilder.Build(root, zip);
+        using var gallery = new GalleryArchive(zip);
+        var sav = _saves.Create(GameVersion.C, "Crystal.sav").Sav;
+
+        var result = EventPokemon.FromGallery(gallery, Assert.Single(gallery.Entries), sav);
+        Assert.True(result.Legal, result.Message);
+        Assert.Equal(EventPokemon.Source.Generated, result.Source);
+        Assert.True(result.Pokemon!.IsShiny);
+    }
+
+    [Fact]
     public void DistributionsAreGeneratedFreshAndLegal()
     {
         var sav = _saves.Create(GameVersion.E, "Emerald.sav").Sav;

@@ -387,30 +387,21 @@ public sealed class App
     // ---------------------------------------------------------------- transfers
 
     /// <summary>
-    /// The other saves, shown like the main menu ("[ENG] Emerald" with NAME, sprite and ID); the ones the
-    /// Pokémon can't go to are greyed out and do nothing when picked.
+    /// The saves the Pokémon can go to, shown like the main menu ("[ENG] Emerald" with NAME, sprite and ID).
+    /// Transfer is greyed out when there are none, so the list is never empty in practice.
     /// </summary>
-    private SaveEntry? PickOtherSave(SaveEntry exclude, string title, SlotRef? from = null)
+    private SaveEntry? PickOtherSave(SaveEntry source, string title, SlotRef from)
     {
-        var others = GetSaves().Where(s => s.Path != exclude.Path).ToList();
-        if (others.Count == 0)
+        var targets = GetSaves().Where(s => s.Path != source.Path && CanTransferTo(source, from, s)).ToList();
+        if (targets.Count == 0)
         {
-            _ui.Message("No other Pokémon saves were found. Put the other game's save in the SD card's Saves folder.");
+            _ui.Message("No other game can take this Pokémon.");
             return null;
         }
-        var sprites = others.Select(s => TrainerSprite(s.Sav)).ToList();
-        var tags = others.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-        var blocked = others.Select(s => from is { } f && !CanTransferTo(exclude, f, s)).ToList();
-        int selected = Math.Max(blocked.IndexOf(false), 0);
-        while (true)
-        {
-            var choice = _ui.Choose(title, others.Select(SaveName).ToList(), selected, tags: tags, images: sprites, disabled: blocked);
-            if (choice is null)
-                return null;
-            if (!blocked[choice.Value])
-                return others[choice.Value];
-            selected = choice.Value;
-        }
+        var sprites = targets.Select(s => TrainerSprite(s.Sav)).ToList();
+        var tags = targets.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
+        var choice = _ui.Choose(title, targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites);
+        return choice is { } c ? targets[c] : null;
     }
 
     /// <summary>

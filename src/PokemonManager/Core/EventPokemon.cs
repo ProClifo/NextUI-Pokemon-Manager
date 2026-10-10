@@ -131,7 +131,19 @@ public static class EventPokemon
         // A distribution from another language's games (see GalleryLists.Distributions) is generated in that language.
         var language = sav.Generation >= 3 ? GalleryLanguage.ToLanguageId(entry.Language) : null;
         if (perRecipient && Generate(analysis.EncounterMatch, sav, language) is { } generated)
-            return new Result(generated, true, Source.Generated, "");
+        {
+            // A shiny entry of an event that wasn't shiny-locked (e.g. "PCNYb 0321 Shiny Celebi", a random-DV
+            // Celebi that came out shiny) stays shiny: Game Boy shininess is only the DVs, so the new copy gets
+            // shiny DVs. Later generations tie it to the PID's RNG, so they hand out a real copy below instead.
+            if (!file.IsShiny || generated.IsShiny)
+                return new Result(generated, true, Source.Generated, "");
+            if (generated.Format <= 2)
+            {
+                generated.SetShiny();
+                if (Legality.IsLegal(generated, sav))
+                    return new Result(generated, true, Source.Generated, "");
+            }
+        }
 
         if (perRecipient)
         {
