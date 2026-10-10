@@ -98,7 +98,8 @@ sparse_clone() {
     git -C "$DECOMP/$repo" sparse-checkout set --no-cone "$@"
 }
 GB_ART=('/gfx/pokemon/' '/gfx/icons/' '/gfx/stats/' '/gfx/sprites/' '/gfx/overworld/' '/gfx/sprites.asm' '/data/pokemon/' '/data/sgb/'
-    '/data/icon_pointers.asm' '/engine/gfx/mon_icons.asm')
+    '/data/icon_pointers.asm' '/engine/gfx/mon_icons.asm'
+    '/gfx/font/' '/gfx/frames/' '/gfx/pc/' '/gfx/battle/')  # the PC and stats screens' tiles (scripts/gb_ui)
 sparse_clone pokered "$POKERED_COMMIT" "${GB_ART[@]}"
 sparse_clone pokeyellow "$POKEYELLOW_COMMIT" "${GB_ART[@]}"
 sparse_clone pokegold "$POKEGOLD_COMMIT" "${GB_ART[@]}"
@@ -122,6 +123,7 @@ echo "==> PC box art"
 python3 "$ROOT/scripts/build-box-assets.py" "$DECOMP/pokeemerald" "$PAK/res/box"
 python3 "$ROOT/scripts/build-box-art.py" "$DECOMP" "$PAK/res/box/art"
 python3 "$ROOT/scripts/pc_ui/build.py" "$DECOMP" "$PAK/res/box/ui"
+python3 "$ROOT/scripts/gb_ui/build.py" "$DECOMP" "$PAK/res/box/ui"
 
 echo "==> Players' overworld sprites (main menu)"
 python3 "$ROOT/scripts/build-trainers.py" "$DECOMP" "$PAK/res/trainers"

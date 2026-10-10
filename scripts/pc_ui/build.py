@@ -215,6 +215,57 @@ def normalize(full):
     return out
 
 
+WALLPAPERS = ["forest", "city", "desert", "savanna", "crag", "volcano", "snow", "cave",
+              "beach", "seafloor", "river", "sky", "polkadot", "pokecenter", "machine", "plain"]
+
+
+def frlg_wallpaper(folder):
+    """A FireRed/LeafGreen wallpaper: tiles.png (two 16-colour palettes: the frame's, then the background's) and
+    a 20x18 tilemap.bin whose palettes 1 and 2 are those; colour 0 and palette 0 stay see-through."""
+    import struct
+    from PIL import Image
+    img = Image.open(os.path.join(folder, "tiles.png"))
+    w, h = img.size
+    px = img.load()
+    tiles = [[[px[tx * 8 + x, ty * 8 + y] & 0xF for x in range(8)] for y in range(8)]
+             for ty in range(h // 8) for tx in range(w // 8)]
+    pal = img.getpalette()
+    palettes = {1: [tuple(pal[i * 3:i * 3 + 3]) for i in range(16)], 2: [tuple(pal[i * 3:i * 3 + 3]) for i in range(16, 32)]}
+    data = open(os.path.join(folder, "tilemap.bin"), "rb").read()
+    out = Image.new("RGBA", (160, 144), (0, 0, 0, 0))
+    o = out.load()
+    for i, e in enumerate(struct.unpack("<%dH" % (len(data) // 2), data)):
+        tile, hflip, vflip, p = e & 0x3FF, (e >> 10) & 1, (e >> 11) & 1, e >> 12
+        if p not in palettes or tile >= len(tiles):
+            continue
+        cx, cy = (i % 20) * 8, (i // 20) * 8
+        for y in range(8):
+            for x in range(8):
+                c = tiles[tile][7 - y if vflip else y][7 - x if hflip else x]
+                if c:
+                    o[cx + x, cy + y] = palettes[p][c] + (255,)
+    return out
+
+
+def game_wallpapers(decomp, out):
+    """Each game's own 16 box wallpapers as ui/<game>/wallpapers/<00-15>.png, in the games' order (Emerald's are
+    res/box/wallpapers, from scripts/build-box-assets.py)."""
+    rs = os.path.join(out, "rs", "wallpapers")
+    if os.path.isdir(rs):  # pc_ui/rs.py names them
+        for i, name in enumerate(WALLPAPERS):
+            if os.path.exists(os.path.join(rs, f"{name}.png")):
+                os.replace(os.path.join(rs, f"{name}.png"), os.path.join(rs, f"{i:02d}.png"))
+    src = os.path.join(decomp, "pokefirered", "graphics", "pokemon_storage", "wallpapers")
+    if os.path.isdir(src) and os.path.isdir(os.path.join(out, "frlg")):
+        dst = os.path.join(out, "frlg", "wallpapers")
+        os.makedirs(dst, exist_ok=True)
+        # sWallpapers: FireRed/LeafGreen have STARS, TILES and SIMPLE where Ruby/Sapphire/Emerald have
+        # POLKA-DOT, MACHINE and PLAIN
+        names = WALLPAPERS[:12] + ["stars", "pokecenter", "tiles", "simple"]
+        for i, name in enumerate(names):
+            frlg_wallpaper(os.path.join(src, name)).save(os.path.join(dst, f"{i:02d}.png"))
+
+
 def main():
     decomp, out = sys.argv[1], sys.argv[2]
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -236,6 +287,7 @@ def main():
         for preview in [p for p in os.listdir(target) if p.startswith("preview_")]:
             os.remove(os.path.join(target, preview))
         print(f"pc_ui: {game}")
+    game_wallpapers(decomp, out)
     # Ruby/Sapphire's ball icons are Emerald's.
     rs_balls, e_balls = os.path.join(out, "rs", "balls"), os.path.join(out, "e", "balls")
     if os.path.isdir(e_balls) and os.path.isdir(os.path.join(out, "rs")) and not os.path.isdir(rs_balls):

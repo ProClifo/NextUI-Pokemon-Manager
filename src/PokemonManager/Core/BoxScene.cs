@@ -25,13 +25,13 @@ public sealed class BoxScene(string assetDir)
     /// <summary>The box art and at least Emerald's PC/summary skin (res/box/ui/e) are in the pak.</summary>
     public bool AssetsPresent => File.Exists(Path.Combine(AssetDir, "cursor.png")) && File.Exists(Path.Combine(AssetDir, "ui", "e", "layout.json"));
 
-    public JsonObject Build(SaveFile sav, string title, SlotRef start, UiFont? font = null, UiFont? fallbackFont = null, Func<SlotRef, (bool Transfer, bool Evolve)>? actions = null)
+    public JsonObject Build(SaveFile sav, string title, SlotRef start, UiFont? font = null, UiFont? fallbackFont = null, Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null)
     {
         var sets = ArtSets(sav);
         // Gen 3 Deoxys looks the way the game showing it draws it; LeafGreen's differs from FireRed's.
         bool leafGreen = sav is SAV3FRLG { Version: GameVersion.LG };
         // The party is a 3x2 grid centred on the plain wallpaper.
-        var party = Box("PARTY", Wallpaper(PlainWallpaper), 3, 2, Enumerable.Range(0, 6).Select(i => i < sav.PartyCount ? sav.GetPartySlotAtIndex(i) : null), sets, leafGreen, sav, SlotRef.PartyBox, actions);
+        var party = Box("PARTY", Wallpaper(sav, PlainWallpaper), 3, 2, Enumerable.Range(0, 6).Select(i => i < sav.PartyCount ? sav.GetPartySlotAtIndex(i) : null), sets, leafGreen, sav, SlotRef.PartyBox, actions);
         party["offset_x"] = 40;
         party["offset_y"] = 48;
         var boxes = new JsonArray { (JsonNode)party };
@@ -40,7 +40,7 @@ public sealed class BoxScene(string assetDir)
             var mons = Enumerable.Range(0, sav.BoxSlotCount).Select(s => (PKM?)sav.GetBoxSlotAtIndex(b, s));
             int columns = 6;
             int rows = (sav.BoxSlotCount + columns - 1) / columns;
-            boxes.Add((JsonNode)Box(SlotRef.BoxName(sav, b), Wallpaper(WallpaperFor(sav, b)), columns, rows, mons, sets, leafGreen, sav, b, actions));
+            boxes.Add((JsonNode)Box(SlotRef.BoxName(sav, b), Wallpaper(sav, WallpaperFor(sav, b)), columns, rows, mons, sets, leafGreen, sav, b, actions));
         }
 
         var (box, slot) = ToViewer(start);
@@ -109,21 +109,39 @@ public sealed class BoxScene(string assetDir)
         return box % WallpaperCount;
     }
 
-    private string Wallpaper(int id) => Path.Combine(AssetDir, "wallpapers", $"{id:00}.png");
+    /// <summary>
+    /// A box wallpaper from the save's own game: Ruby/Sapphire's and FireRed/LeafGreen's are in their skins
+    /// (scripts/pc_ui), Emerald's (used by every other game) in res/box/wallpapers.
+    /// </summary>
+    private string Wallpaper(SaveFile sav, int id)
+    {
+        var own = Path.Combine(Skin(sav), "wallpapers", $"{id:00}.png");
+        return File.Exists(own) ? own : Path.Combine(AssetDir, "wallpapers", $"{id:00}.png");
+    }
 
     /// <summary>
-    /// The folder of the PC and summary screens' art and layout (res/box/ui/&lt;game&gt;, from scripts/pc_ui):
-    /// Ruby/Sapphire's, FireRed/LeafGreen's, or Emerald's for Emerald and every other game.
+    /// The folder of the PC and summary screens' art and layout (res/box/ui/&lt;game&gt;): Red/Blue's, Yellow's,
+    /// Gold/Silver's and Crystal's Game Boy PCs (scripts/gb_ui), Ruby/Sapphire's, FireRed/LeafGreen's, or Emerald's
+    /// for Emerald and every later game (scripts/pc_ui).
     /// </summary>
     public string Skin(SaveFile sav)
     {
-        var game = sav switch { SAV3RS => "rs", SAV3FRLG => "frlg", _ => "e" };
+        var game = sav switch
+        {
+            SAV1 { Version: GameVersion.YW } => "y",
+            SAV1 => "rb",
+            SAV2 { Version: GameVersion.C } => "c",
+            SAV2 => "gs",
+            SAV3RS => "rs",
+            SAV3FRLG => "frlg",
+            _ => "e",
+        };
         var dir = Path.Combine(AssetDir, "ui", game);
         return Directory.Exists(dir) ? dir : Path.Combine(AssetDir, "ui", "e");
     }
 
     private JsonObject Box(string name, string wallpaper, int columns, int rows, IEnumerable<PKM?> mons, string[] sets, bool leafGreen, SaveFile sav, int box,
-        Func<SlotRef, (bool Transfer, bool Evolve)>? actions)
+        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions)
     {
         var slots = new JsonArray();
         int index = 0;
@@ -149,8 +167,13 @@ public sealed class BoxScene(string assetDir)
             // The viewer's menu greys out what can't be done.
             if (actions?.Invoke(at) is { } can)
             {
-                slot["can_transfer"] = can.Transfer;
-                slot["can_evolve"] = can.Evolve;
+                slot["can_transfer"] = can.TransferBlocked is null;
+                slot["can_evolve"] = can.EvolveBlocked is null;
+                // Shown in the message box when the greyed-out choice is picked.
+                if (can.TransferBlocked is { } whyNotTransfer)
+                    slot["transfer_why"] = whyNotTransfer;
+                if (can.EvolveBlocked is { } whyNotEvolve)
+                    slot["evolve_why"] = whyNotEvolve;
             }
             slots.Add((JsonNode)slot);
         }

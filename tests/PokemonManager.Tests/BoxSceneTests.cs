@@ -162,7 +162,25 @@ public sealed class BoxSceneTests : IDisposable
         var mon = TestSaves.Make(sav, Species.Pikachu, 10);
         sav.SetPartySlotAtIndex(mon, 0);
         sav.SetBoxSlotAtIndex(mon, 0, 0);
-        var json = _scene.Build(sav, "Game", new SlotRef(0, 0), actions: _ => (true, true));
+        var json = _scene.Build(sav, "Game", new SlotRef(0, 0), actions: _ => (null, "It doesn't evolve by trading!"));
         Assert.NotNull(json["boxes"]![1]!["slots"]![0]!["summary"]);
+    }
+
+    [Fact]
+    public void BoxesUseTheirOwnGamesWallpapers()
+    {
+        var rsWallpapers = Path.Combine(_assets, "ui", "rs", "wallpapers");
+        Directory.CreateDirectory(rsWallpapers);
+        for (int i = 0; i < 16; i++)
+            File.WriteAllBytes(Path.Combine(rsWallpapers, $"{i:00}.png"), []);
+
+        var ruby = _saves.Create(GameVersion.R, "Ruby.sav").Sav;
+        var wallpaper = (string?)_scene.Build(ruby, "Ruby", new SlotRef(0, 0))["boxes"]![1]!["wallpaper"];
+        Assert.StartsWith(rsWallpapers, wallpaper);
+
+        // Emerald's are the shared ones.
+        var emerald = _saves.Create(GameVersion.E, "Emerald.sav").Sav;
+        wallpaper = (string?)_scene.Build(emerald, "Emerald", new SlotRef(0, 0))["boxes"]![1]!["wallpaper"];
+        Assert.StartsWith(Path.Combine(_assets, "wallpapers"), wallpaper);
     }
 }

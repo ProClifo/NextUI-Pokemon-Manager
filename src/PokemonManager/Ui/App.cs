@@ -407,19 +407,23 @@ public sealed class App
     /// Transfer/Evolve availability for every slot of a save, for the PC viewer's menu. Whether another save
     /// can take a Pokémon is worked out once per kind of Pokémon, so a full PC stays quick.
     /// </summary>
-    private Func<SlotRef, (bool Transfer, bool Evolve)> ActionsFor(SaveEntry entry)
+    private Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)> ActionsFor(SaveEntry entry)
     {
         var others = GetSaves().Where(s => s.Path != entry.Path).ToList();
         var accepted = new Dictionary<(ushort, byte, bool, bool, int, GameVersion), bool>();
         return slot =>
         {
             var pk = slot.Get(entry.Sav);
-            bool blocked = slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null;
             var key = (pk.Species, pk.Form, pk.IsEgg, pk.FatefulEncounter, pk.HeldItem, pk.Version);
             if (!accepted.TryGetValue(key, out bool anywhere))
                 accepted[key] = anywhere = others.Any(s => CanTransferTo(entry, slot, s));
-            bool transfer = !blocked && anywhere && TransferService.CanMove(entry.Sav, slot).Ok;
-            return (transfer, !blocked && CanEvolveNow(pk));
+            var move = TransferService.CanMove(entry.Sav, slot);
+            string? transfer = (slot.IsParty ? ActionReasons.PartyTrade(entry.Sav, pk, evolve: false) : null)
+                ?? (move.Ok ? null : slot.IsParty && entry.Sav.PartyCount <= 1 ? ActionReasons.LastPartyPokemon
+                    : move.Message.Contains("last party", StringComparison.Ordinal) ? ActionReasons.LastPartyPokemon : ActionReasons.CantBeMoved)
+                ?? (others.Count == 0 ? ActionReasons.NoOtherGames : anywhere ? null : ActionReasons.NoGamesToSendTo);
+            string? evolve = ActionReasons.Evolve(pk) ?? (slot.IsParty ? ActionReasons.PartyTrade(entry.Sav, pk, evolve: true) : null);
+            return (transfer, evolve);
         };
     }
 

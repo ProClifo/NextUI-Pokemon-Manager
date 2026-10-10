@@ -1,4 +1,5 @@
-// pkmgr-box: a Gen 3 style PC for Pokémon Manager, drawn like the game's own PC and summary screens.
+// pkmgr-box: the PC for Pokémon Manager, drawn like the games' own PC and summary screens (Gen 3 here; Gen 1/2 in
+// pkmgr-box-gb.c).
 //
 // Reads a scene description (JSON) written by pkmgr: the boxes (viewer box 0 is the party), each Pokémon's
 // icon, sprite and summary text, and a skin folder with the game's PC/summary art and layout.json
@@ -57,6 +58,8 @@ typedef struct
     JSON_Object *summary; // owned by the scene's JSON
     bool can_transfer;    // greyed out in the menu when false
     bool can_evolve;
+    char *transfer_why; // why Transfer/Evolve can't be used, shown when the greyed-out item is picked
+    char *evolve_why;
 } Slot;
 
 typedef struct
@@ -225,6 +228,8 @@ static bool load_scene(const char *path, Scene *scene)
             slot->summary = json_object_get_object(so, "summary");
             slot->can_transfer = json_object_get_boolean(so, "can_transfer") != 0; // missing (-1) = allowed
             slot->can_evolve = json_object_get_boolean(so, "can_evolve") != 0;
+            slot->transfer_why = dup_string(so, "transfer_why");
+            slot->evolve_why = dup_string(so, "evolve_why");
         }
     }
     if (scene->box < 0 || scene->box >= scene->box_count)
@@ -467,6 +472,31 @@ static void draw_window(SDL_Surface *dst, Scene *scene, const Layout *l, const c
 
 // ------------------------------------------------------------------ PC screen
 
+static int wrap_two_lines(const char *text, int max_w, int (*width)(const char *, const void *), const void *ctx, char lines[2][160]);
+
+static int measure_text(const char *text, const void *ctx)
+{
+    return text_width(text, (const Layout *)ctx);
+}
+
+// The message box at the bottom; a second line makes it one line taller, upwards.
+static void draw_message(SDL_Surface *screen, Scene *scene, const Layout *l, const char *text)
+{
+    JSON_Object *lo = scene->layout;
+    SDL_Rect m = get_rect(lo, "pc.message"), mt = get_rect(lo, "pc.message_text");
+    SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
+    char lines[2][160];
+    int n = wrap_two_lines(text, m.w - 2 * mt.x - 2, measure_text, l, lines);
+    if (n == 2)
+    {
+        m.y -= 16;
+        m.h += 16;
+    }
+    draw_window(screen, scene, l, json_object_dotget_string(lo, "pc.message_frame"), m.x, m.y, m.w, m.h);
+    for (int i = 0; i < n; i++)
+        draw_text_c(screen, l, lines[i], m.x + mt.x, m.y + mt.y + i * 16, 0, color, shadow);
+}
+
 typedef enum
 {
     TARGET_SLOT,
@@ -491,15 +521,50 @@ typedef struct
     int party_slot; // 0-5, 6 = CANCEL
     int menu_item;
     int page;
+    const char *message; // an explanation in the message box, until a button is pressed
 } State;
 
 static const char *MENU_ITEMS[] = {"TRANSFER", "SUMMARY", "EVOLVE", "CANCEL"};
 #define MENU_COUNT 4
 
-// Transfer and Evolve are greyed out (and do nothing) when the Pokémon can't be transferred or evolved.
+// Transfer and Evolve are greyed out when the Pokémon can't be transferred or evolved; picking them explains why.
 static bool menu_enabled(Slot *slot, int item)
 {
     return item == 0 ? slot->can_transfer : item == 2 ? slot->can_evolve : true;
+}
+
+static const char *menu_why(Slot *slot, int item)
+{
+    if (item == 0)
+        return slot->transfer_why ? slot->transfer_why : "It can't be transferred!";
+    return slot->evolve_why ? slot->evolve_why : "It can't evolve by trading!";
+}
+
+// Splits text into at most two lines of at most max_w pixels (measured by width()), at spaces.
+static int wrap_two_lines(const char *text, int max_w, int (*width)(const char *, const void *), const void *ctx, char lines[2][160])
+{
+    lines[0][0] = lines[1][0] = '\0';
+    snprintf(lines[0], 160, "%s", text);
+    if (width(lines[0], ctx) <= max_w)
+        return 1;
+    // the last space that keeps the first line inside the box
+    int split = -1;
+    for (int i = 0; text[i]; i++)
+    {
+        if (text[i] != ' ')
+            continue;
+        char head[160];
+        snprintf(head, sizeof(head), "%.*s", i, text);
+        if (width(head, ctx) <= max_w)
+            split = i;
+        else
+            break;
+    }
+    if (split < 0)
+        return 1;
+    snprintf(lines[0], 160, "%.*s", split, text);
+    snprintf(lines[1], 160, "%s", text + split + 1);
+    return 2;
 }
 
 static void draw_icon(SDL_Surface *screen, const Layout *l, Slot *slot, int x, int y, bool animate, Uint32 ticks)
@@ -719,13 +784,13 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
                     fill_logical(screen, l, x + 1, ty + cap_top + (font_height - 7) / 2 + r, r < 4 ? r + 1 : 7 - r, 1, color);
             }
         }
-        SDL_Rect m = get_rect(lo, "pc.message"), mt = get_rect(lo, "pc.message_text");
-        draw_window(screen, scene, l, json_object_dotget_string(lo, "pc.message_frame"), m.x, m.y, m.w, m.h);
         char msg[160];
         const char *nick = json_object_get_string(cur->summary, "nickname");
         snprintf(msg, sizeof(msg), "%s is selected.", nick ? nick : cur->name);
-        draw_text_c(screen, l, msg, m.x + mt.x, m.y + mt.y, 0, color, shadow);
+        draw_message(screen, scene, l, msg);
     }
+    else if (st->message)
+        draw_message(screen, scene, l, st->message);
 }
 
 // ------------------------------------------------------------------ summary screen
@@ -922,7 +987,7 @@ static void party_move(State *st, int dx, int dy)
 // The next filled slot in the same box or party, for flicking through summaries.
 static void summary_step(Scene *scene, State *st, int delta)
 {
-    bool party = st->menu_from == VIEW_PARTY;
+    bool party = st && st->menu_from == VIEW_PARTY; // no state: the Game Boy PC, where scene->box/slot are current
     Box *box = party ? &scene->boxes[0] : &scene->boxes[scene->box];
     int count = party ? 6 : box->columns * box->rows;
     int at = party ? st->party_slot : scene->slot;
@@ -961,6 +1026,8 @@ static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, 
         draw_pc(screen, scene, st, l, ticks);
 }
 
+#include "pkmgr-box-gb.c"
+
 int main(int argc, char *argv[])
 {
     const char *scene_path = NULL;
@@ -997,10 +1064,30 @@ int main(int argc, char *argv[])
     PWR_init();
     InitSettings();
 
+    // Gen 1/2 saves: the Game Boy PC (pkmgr-box-gb.c).
+    const char *style = json_object_get_string(scene.layout, "style");
+    if (style && strcmp(style, "gb") == 0)
+    {
+        int gb_exit = EXIT_BACK;
+#ifdef DESKTOP
+        if (screenshot)
+        {
+            gb_screenshot(screen, &scene, state_name, screenshot);
+            return EXIT_PICKED;
+        }
+#endif
+        gb_exit = gb_run(screen, &scene, write_location);
+        QuitSettings();
+        PWR_quit();
+        PAD_quit();
+        GFX_quit();
+        return gb_exit;
+    }
+
     Layout layout = make_layout(screen);
     open_text_font(&scene, &layout);
 
-    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0};
+    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0, NULL};
     if (scene.box == 0)
     {
         // Back from a party Pokémon: the party is open again.
@@ -1024,6 +1111,8 @@ int main(int argc, char *argv[])
         }
         else if (strcmp(state_name, "party_button") == 0)
             st.target = TARGET_PARTY_BUTTON;
+        else if (strcmp(state_name, "why") == 0 && hovered(&scene, &st))
+            st.message = menu_why(hovered(&scene, &st), hovered(&scene, &st)->can_transfer ? 2 : 0);
         draw(screen, &scene, &st, &layout, 0);
         IMG_SavePNG(screen, screenshot);
         return EXIT_PICKED;
@@ -1057,6 +1146,8 @@ int main(int argc, char *argv[])
             exit_code = EXIT_MENU;
             quitting = true;
         }
+        else if (st.message && (dx || dy || a || b || l1 || r1))
+            st.message = NULL; // a button closes the explanation
         else if (st.mode == VIEW_BOX)
         {
             if (l1 || (st.target == TARGET_TITLE && dx < 0))
@@ -1107,6 +1198,12 @@ int main(int argc, char *argv[])
                 action = st.menu_item == 0 ? "transfer" : "evolve";
                 exit_code = EXIT_PICKED;
                 quitting = true;
+            }
+            else if (a && (st.menu_item == 0 || st.menu_item == 2))
+            {
+                // greyed out: the menu closes and the message box says why
+                st.message = menu_why(hovered(&scene, &st), st.menu_item);
+                st.mode = st.menu_from;
             }
             else if (a && st.menu_item == 1)
             {

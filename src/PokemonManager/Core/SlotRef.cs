@@ -44,7 +44,7 @@ public readonly record struct SlotRef(int Box, int Slot)
             if (!string.IsNullOrWhiteSpace(name))
                 return name;
         }
-        return $"Box {box + 1}";
+        return sav.Generation <= 2 ? $"BOX{box + 1}" : $"Box {box + 1}"; // the Game Boy games' "BOX1"
     }
 
     /// <summary>Where the slot is, for messages: "your party" or "BOX 1, slot 3".</summary>

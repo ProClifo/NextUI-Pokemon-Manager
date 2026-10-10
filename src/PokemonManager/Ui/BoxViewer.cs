@@ -20,7 +20,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
     public bool IsAvailable => scene.AssetsPresent && FindOnPath(Tool) is not null;
 
     public Outcome Pick(SaveFile sav, string title, ref SlotRef position, UiFont? font = null, UiFont? fallbackFont = null,
-        Func<SlotRef, (bool Transfer, bool Evolve)>? actions = null)
+        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null)
     {
         Directory.CreateDirectory(tempDir);
         var scenePath = Path.Combine(tempDir, "box-scene.json");

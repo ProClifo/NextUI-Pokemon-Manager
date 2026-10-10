@@ -46,8 +46,8 @@ public static class BoxSummary
     /// </summary>
     private static int? DexNumber(ushort species, SaveFile sav)
     {
-        if (sav is SAV3 s3 && TradeRules.NationalDex3(s3))
-            return species;
+        if (sav is not SAV3 || TradeRules.NationalDex3((SAV3)sav))
+            return species; // Game Boy stats screens show the national number
         if (sav is SAV3FRLG) // FireRed/LeafGreen: the Kanto Pokédex is the first 151
             return species <= 151 ? species : null;
         int hoenn = Array.IndexOf(HoennDex, species);
@@ -86,6 +86,18 @@ public static class BoxSummary
         if (personal.Type2 != personal.Type1)
             types.Add((JsonNode)TypeName(personal.Type2));
         summary["types"] = types;
+        // The Game Boy stats screens spell the types out ("PSYCHIC"); Gen 1 calls Psychic's partner "PSYCHIC" too.
+        var typeNames = new JsonArray((JsonNode)Up(TypeText(personal.Type1)));
+        if (personal.Type2 != personal.Type1)
+            typeNames.Add((JsonNode)Up(TypeText(personal.Type2)));
+        summary["type_names"] = typeNames;
+        summary["species_id"] = pk.Species;
+        // Crystal shows the OT's gender only for Pokémon with catch data
+        summary["ot_gender_known"] = pk is not PK2 || ((PK2)pk).MetLevel > 0;
+        summary["shiny"] = pk.IsShiny;
+        summary["status"] = StatusText(pk, inParty);
+        if (pk.HeldItem > 0)
+            summary["item_icon"] = IsMail(pk) ? "mail" : "item";
         // Game Boy Pokémon have no ability or nature.
         bool gameBoy = pk.Format <= 2;
         summary["ability"] = gameBoy ? "" : Up(strings.abilitylist[pk.Ability]);
@@ -267,6 +279,23 @@ public static class BoxSummary
     private static string Name(PKM pk) => pk.IsEgg ? "EGG" : pk.IsNicknamed ? pk.Nickname : Up(Names.Species(pk.Species));
 
     private static string Up(string text) => text.ToUpperInvariant();
+
+    private static string TypeText(int type) => type < GameInfo.Strings.types.Length ? GameInfo.Strings.types[type] : "???";
+
+    /// <summary>A party Pokémon's status as the stats screens print it (box Pokémon are healed): FNT, SLP, PSN...</summary>
+    private static string StatusText(PKM pk, bool inParty)
+    {
+        if (!inParty || pk.Stat_HPMax == 0)
+            return "OK";
+        if (pk.Stat_HPCurrent == 0)
+            return "FNT";
+        int status = pk.Status_Condition;
+        return (status & 7) != 0 ? "SLP" : (status & 0x08) != 0 ? "PSN" : (status & 0x10) != 0 ? "BRN"
+            : (status & 0x20) != 0 ? "FRZ" : (status & 0x40) != 0 ? "PAR" : "OK";
+    }
+
+    /// <summary>Whether the held item is a piece of mail (Gen 2's PC shows a letter instead of the item icon).</summary>
+    private static bool IsMail(PKM pk) => Names.Item(pk.HeldItem, pk.Context).EndsWith("Mail", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>The ball icon's file name (balls/&lt;name&gt;.png); balls Gen 3 doesn't have show as a Poké Ball.</summary>
     private static string BallName(byte ball) => (Ball)ball switch
