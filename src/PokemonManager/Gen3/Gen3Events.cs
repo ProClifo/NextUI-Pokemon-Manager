@@ -366,7 +366,7 @@ public static class Gen3Events
         if (sav is SAV3FRLG)
             return OpResult.Fail("FireRed and LeafGreen have no decorations.");
         var name = RegiDolls.First(d => d.Id == doll).Name.ToUpperInvariant();
-        if (!sav.GetEventFlag(sav is SAV3E ? 0x878 : 0x818))
+        if (!sav.GetEventFlag(sav is SAV3E ? FlagVisitedMauvilleE : FlagVisitedMauvilleRS))
             return OpResult.Fail($"Visit Mauville City first: the {name} was traded by the old man there.");
         var dolls = sav.Large.Slice(sav is SAV3E ? 0x2798 : 0x2704, DollSlots);
         if (dolls.Contains(doll))
@@ -379,6 +379,9 @@ public static class Gen3Events
     }
 
     // pokeemerald include/constants/flags.h and items.h
+    // FLAG_VISITED_MAUVILLE_CITY: the Cable Club only opens its Record Corner after it (cable_club.inc).
+    private const int FlagVisitedMauvilleRS = 0x818;
+    private const int FlagVisitedMauvilleE = 0x878;
     private const int FlagSysGameClearE = 0x864;             // FLAG_SYS_GAME_CLEAR
     private const int FlagEnableShipSouthernIslandE = 0x8B3; // FLAG_ENABLE_SHIP_SOUTHERN_ISLAND
     public const ushort ItemEonTicket = 275;
@@ -390,6 +393,8 @@ public static class Gen3Events
     /// </summary>
     public static OpResult GiveEonTicketByRecordMixing(SAV3E sav)
     {
+        if (!sav.GetEventFlag(FlagVisitedMauvilleE))
+            return OpResult.Fail("Visit Mauville City first: the Cable Club's Record Corner only opens after that.");
         var bag = sav.Inventory;
         var keyItems = bag.GetPouch(InventoryType.KeyItems);
         var pc = bag.Pouches.FirstOrDefault(p => p.Type == InventoryType.PCItems);
