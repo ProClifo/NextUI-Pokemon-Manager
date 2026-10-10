@@ -1215,12 +1215,7 @@ static void party_move(State *st, int dx, int dy)
     else if (dx > 0 && s == 0)
         s = 1;
     else if (dy != 0)
-    {
-        if (s == 0)
-            s = 6;
-        else
-            s = s + dy < 1 ? 6 : s + dy > 6 ? 1 : s + dy;
-    }
+        s = (s + dy + 7) % 7; // up and down go through 1st, 2nd ... 6th, CANCEL and wrap
     st->party_slot = s;
 }
 
