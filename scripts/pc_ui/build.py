@@ -341,6 +341,7 @@ def game_fonts(game, repo, target):
 def main():
     decomp, out = sys.argv[1], sys.argv[2]
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from pc_ui import card
     for game, repo in GAMES.items():
         try:
             module = importlib.import_module(f"pc_ui.{game}")
@@ -356,6 +357,7 @@ def main():
             json.dump(full, f, indent=1)
         layout = normalize(copy.deepcopy(full))
         layout["fonts"] = game_fonts(game, os.path.join(decomp, repo), target)
+        layout["card"] = card.build(game, os.path.join(decomp, repo), target)
         with open(layout_path, "w", encoding="utf-8") as f:
             json.dump(layout, f, indent=1)
         for preview in [p for p in os.listdir(target) if p.startswith("preview_")]:

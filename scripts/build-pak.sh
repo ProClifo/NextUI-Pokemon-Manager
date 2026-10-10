@@ -116,12 +116,17 @@ sparse_clone pokecrystal "$POKECRYSTAL_COMMIT" "${GB_ART[@]}"
 GBA_UI=('/charmap.txt' '/graphics/fonts/' '/graphics/interface/' '/graphics/pokemon_storage/' '/graphics/summary_screen/'
     '/graphics/text_window/')
 sparse_clone pokeruby "$POKERUBY_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' "${GBA_UI[@]}" '/graphics/misc/' \
-    '/graphics/types/' '/misc.mk' '/src/data/text/font3_widths.h' '/src/data/text/font4_widths.h' '/src/data/text/type1_map.h'
+    '/graphics/types/' '/misc.mk' '/src/data/text/font3_widths.h' '/src/data/text/font4_widths.h' '/src/data/text/type1_map.h' \
+    '/graphics/trainer_card/' '/graphics/trainers/brendan.png' '/graphics/trainers/may.png'
 sparse_clone pokeemerald "$POKEEMERALD_COMMIT" '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk' \
     '/src/pokemon_icon.c' '/graphics/object_events/pics/people/' '/src/data/text/abilities.h' '/include/constants/abilities.h' \
-    "${GBA_UI[@]}" '/graphics/balls/' '/graphics/battle_interface/' '/graphics/types/' '/src/fonts.c'
+    "${GBA_UI[@]}" '/graphics/balls/' '/graphics/battle_interface/' '/graphics/types/' '/src/fonts.c' \
+    '/graphics/trainer_card/' '/graphics/trainers/front_pics/brendan.png' '/graphics/trainers/front_pics/may.png' \
+    '/graphics/trainers/palettes/brendan.pal' '/graphics/trainers/palettes/may.pal'
 sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' \
-    '/graphics/object_events/pics/people/' "${GBA_UI[@]}" '/graphics/misc/' '/src/text.c'
+    '/graphics/object_events/pics/people/' "${GBA_UI[@]}" '/graphics/misc/' '/src/text.c' \
+    '/graphics/trainer_card/' '/graphics/trainers/front_pics/red_front_pic.png' '/graphics/trainers/front_pics/leaf_front_pic.png' \
+    '/graphics/trainers/palettes/red.pal' '/graphics/trainers/palettes/leaf.pal'
 sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \
     '/res/graphics/field_sprites/player/'
 # HeartGold's player sprites (MMODEL_HERO, MMODEL_HEROINE)

@@ -5,6 +5,7 @@
 // draw_badges.asm): one page, A or B closes it. Gen 2 (Gold/Silver/Crystal's TRAINER CARD,
 // engine/menus/trainer_card.asm): the status page and the badges page; Right/A turns to the badges, Left back,
 // A on the badges or B closes it. Positions are the games' (tile columns and rows of the 160x144 screen).
+// Gen 3 (Ruby/Sapphire, Emerald, FireRed/LeafGreen) adds "stars" and the back's records: see card3_front/back.
 
 typedef struct
 {
@@ -188,9 +189,312 @@ static void card_draw_gen2(SDL_Surface *dst, Scene *scene, const Layout *l, Card
             card_block(dst, scene, l, "card_badges.png", b, 16, 16, BADGE_XY[b][0], BADGE_XY[b][1]);
 }
 
+
+// ------------------------------------------------------------------ Gen 3
+
+// Ruby/Sapphire, Emerald and FireRed/LeafGreen (src/trainer_card.c): the card's front and back, drawn on the GBA's
+// 240x160 screen with the game's font. Positions are the games' (screen pixels, the top of each glyph cell).
+enum { CARD3_RS, CARD3_E, CARD3_FRLG };
+static int card3_game = -1; // -1: a Game Boy card
+
+typedef struct
+{
+    SDL_Color fg, shadow;
+} CardInk;
+
+static CardInk card3_grey(void)
+{
+    if (card3_game == CARD3_RS)
+        return (CardInk){{74, 74, 74, 255}, {213, 213, 205, 255}};
+    return (CardInk){{98, 98, 98, 255}, {213, 213, 205, 255}};
+}
+
+static CardInk card3_red(void)
+{
+    if (card3_game == CARD3_RS)
+        return (CardInk){{255, 0, 0, 255}, {255, 0, 255, 255}};
+    return (CardInk){{230, 8, 8, 255}, {255, 189, 115, 255}};
+}
+
+static int card3_text(SDL_Surface *dst, const Layout *l, const char *text, int x, int y, int align, CardInk ink)
+{
+    return draw_game_text(dst, l, text, x, y, align, ink.fg, ink.shadow);
+}
+
+// Text in several colours, one after another, starting at x (or ending at x when right-aligned).
+static void card3_runs(SDL_Surface *dst, const Layout *l, const char *const *texts, const CardInk *inks, int n, int x, int y, bool right)
+{
+    if (right)
+        for (int i = 0; i < n; i++)
+            x -= game_text_width(texts[i]);
+    for (int i = 0; i < n; i++)
+    {
+        int w = game_text_width(texts[i]);
+        card3_text(dst, l, texts[i], x, y, 0, inks[i]);
+        x += w;
+    }
+}
+
+static void card3_image(SDL_Surface *dst, Scene *scene, const Layout *l, const char *name, int x, int y)
+{
+    SDL_Surface *img = skin_image(scene, name);
+    if (img)
+        blit_scaled(img, NULL, dst, l, x, y);
+}
+
+static int card3_stars(JSON_Object *c)
+{
+    int stars = gb_int(c, "stars");
+    return stars < 0 ? 0 : stars > 4 ? 4 : stars;
+}
+
+static void card3_front(SDL_Surface *dst, Scene *scene, const Layout *l, JSON_Object *c, bool colon)
+{
+    char buf[96], name[64];
+    bool female = json_object_get_boolean(c, "female") == 1;
+    int stars = card3_stars(c);
+    snprintf(buf, sizeof(buf), "card_front_%d_%c.png", stars, female ? 'f' : 'm');
+    card3_image(dst, scene, l, buf, 0, 0);
+    snprintf(name, sizeof(name), "%s", gb_str(c, "name"));
+    int id = gb_int(c, "id"), money = gb_int(c, "money"), dex = gb_int(c, "dex");
+    int hours = gb_int(c, "hours"), minutes = gb_int(c, "minutes");
+    hours = hours > 999 ? 999 : hours;
+    minutes = minutes > 59 ? 59 : minutes < 0 ? 0 : minutes;
+    bool has_dex = json_object_get_boolean(c, "has_dex") == 1;
+    CardInk grey = card3_grey();
+    char money_text[24], dex_text[16], hours_text[16], minutes_text[16];
+    snprintf(money_text, sizeof(money_text), "¥%d", money);
+    snprintf(dex_text, sizeof(dex_text), "%d", dex);
+    snprintf(minutes_text, sizeof(minutes_text), "%02d", minutes);
+    int pic_x = 153, pic_y = 40, badge_y = 120, star_y = 56;
+    if (card3_game == CARD3_E)
+    {
+        snprintf(buf, sizeof(buf), "NAME: %s", name);
+        card3_text(dst, l, buf, 24, 41, 0, grey);
+        snprintf(buf, sizeof(buf), "IDNo.%05d", id);
+        card3_text(dst, l, buf, 128 + (96 - game_text_width(buf)) / 2, 17, 0, grey);
+        card3_text(dst, l, "MONEY", 24, 65, 0, grey);
+        card3_text(dst, l, money_text, 136, 65, 2, grey);
+        if (has_dex)
+        {
+            card3_text(dst, l, "POKéDEX", 24, 81, 0, grey);
+            card3_text(dst, l, dex_text, 136, 81, 2, grey);
+        }
+        card3_text(dst, l, "TIME", 24, 97, 0, grey);
+        // PrintTimeOnCard: hours in 3 figures, the colon, 2-figure minutes, ending at 136
+        int cw = game_text_width(":"), x = 136 - (cw + 30);
+        snprintf(hours_text, sizeof(hours_text), "%d", hours);
+        card3_text(dst, l, hours_text, x + 18, 97, 2, grey);
+        if (colon)
+            card3_text(dst, l, ":", x + 18, 97, 0, grey);
+        card3_text(dst, l, minutes_text, x + 18 + cw, 97, 0, grey);
+    }
+    else if (card3_game == CARD3_FRLG)
+    {
+        pic_x = 165, pic_y = 44, badge_y = 128;
+        snprintf(buf, sizeof(buf), "NAME: %s", name);
+        card3_text(dst, l, buf, 28, 37, 0, grey);
+        snprintf(buf, sizeof(buf), "IDNo.%05d", id);
+        card3_text(dst, l, buf, 150, 18, 0, grey);
+        card3_text(dst, l, "MONEY", 28, 64, 0, grey);
+        // the game places these assuming 6 pixels a character
+        card3_text(dst, l, money_text, 142 - 6 * (int)(strlen(money_text) - 1), 64, 0, grey); // ¥ is 2 bytes
+        if (has_dex)
+        {
+            card3_text(dst, l, "POKéDEX", 28, 80, 0, grey);
+            card3_text(dst, l, dex_text, 144 - 6 * (int)strlen(dex_text), 80, 0, grey);
+        }
+        card3_text(dst, l, "TIME", 28, 96, 0, grey);
+        snprintf(hours_text, sizeof(hours_text), "%3d", hours);
+        card3_text(dst, l, hours_text, 109, 96, 0, grey);
+        if (colon)
+            card3_text(dst, l, ":", 127, 96, 0, grey);
+        card3_text(dst, l, minutes_text, 132, 96, 0, grey);
+    }
+    else
+    {
+        // the labels are printed on the card; text is 4 pixels lower than its tile row
+        pic_x = 152, pic_y = 44, badge_y = 124, star_y = 52;
+        card3_text(dst, l, name, 56, 44, 0, grey);
+        snprintf(buf, sizeof(buf), "%05d", id);
+        card3_text(dst, l, buf, 160, 20, 0, grey);
+        card3_text(dst, l, money_text, 128, 68, 2, grey);
+        if (has_dex)
+            card3_text(dst, l, dex_text, 128, 84, 2, grey);
+        else
+        {
+            snprintf(buf, sizeof(buf), "card_nodex_%d.png", stars);
+            card3_image(dst, scene, l, buf, 24, 84);
+        }
+        snprintf(buf, sizeof(buf), "%d %s %02d", hours, colon ? ":" : " ", minutes);
+        card3_text(dst, l, buf, 128, 100, 2, grey);
+    }
+    snprintf(buf, sizeof(buf), "card_pic_%c.png", female ? 'f' : 'm');
+    card3_image(dst, scene, l, buf, pic_x, pic_y);
+    int badges = gb_int(c, "badges");
+    for (int i = 0; i < 8; i++)
+        if ((badges >> i) & 1)
+            card_block(dst, scene, l, "card_badges.png", i, 16, 16, 32 + 24 * i, badge_y);
+    for (int k = 0; k < stars; k++)
+        card3_image(dst, scene, l, "card_star.png", 120 + 8 * k, star_y);
+}
+
+static int card3_value(JSON_Object *c, const char *key)
+{
+    return (int)json_object_get_number(c, key);
+}
+
+static void card3_back(SDL_Surface *dst, Scene *scene, const Layout *l, JSON_Object *c)
+{
+    char buf[96], a[16], b[16];
+    bool female = json_object_get_boolean(c, "female") == 1;
+    snprintf(buf, sizeof(buf), "card_back_%d_%c.png", card3_stars(c), female ? 'f' : 'm');
+    card3_image(dst, scene, l, buf, 0, 0);
+    CardInk grey = card3_grey(), red = card3_red();
+    const char *name = gb_str(c, "name");
+    JSON_Array *hof = json_object_get_array(c, "hof");
+    int hh = hof ? (int)json_array_get_number(hof, 0) : 0, hm = hof ? (int)json_array_get_number(hof, 1) : 0;
+    int hs = hof ? (int)json_array_get_number(hof, 2) : 0;
+    int wins = card3_value(c, "link_wins"), losses = card3_value(c, "link_losses"), trades = card3_value(c, "trades");
+    if (card3_game == CARD3_FRLG)
+    {
+        card3_text(dst, l, name, 146, 19, 0, grey);
+        if (hof)
+        {
+            card3_text(dst, l, "HALL OF FAME DEBUT  ", 18, 43, 0, grey);
+            snprintf(buf, sizeof(buf), "%3d:%02d:%02d", hh, hm, hs);
+            card3_text(dst, l, buf, 172, 43, 0, red);
+        }
+        if (wins || losses)
+        {
+            card3_text(dst, l, "LINK BATTLES", 18, 59, 0, grey);
+            card3_text(dst, l, "W:", 138, 59, 0, grey);
+            card3_text(dst, l, "L:", 186, 59, 0, grey);
+            snprintf(a, sizeof(a), "%4d", wins);
+            snprintf(b, sizeof(b), "%4d", losses);
+            card3_text(dst, l, a, 152, 59, 0, red);
+            card3_text(dst, l, b, 200, 59, 0, red);
+        }
+        static const char *ROWS[][2] = {{"trades", "POKéMON TRADES"}, {"union", "UNION TRADES & BATTLES"}, {"berry_crush", "BERRY CRUSH"}};
+        for (int r = 0; r < 3; r++)
+        {
+            int v = card3_value(c, ROWS[r][0]);
+            if (v == 0)
+                continue;
+            card3_text(dst, l, ROWS[r][1], 18, 75 + 16 * r, 0, grey);
+            snprintf(buf, sizeof(buf), "%5d", v);
+            card3_text(dst, l, buf, 194, 75 + 16 * r, 0, red);
+        }
+        return;
+    }
+    snprintf(buf, sizeof(buf), "%s's TRAINER CARD", name);
+    card3_text(dst, l, buf, 224, card3_game == CARD3_RS ? 20 : 17, 2, grey);
+    int pokeblocks = card3_value(c, "pokeblocks"), contests = card3_value(c, "contests");
+    if (card3_game == CARD3_E)
+    {
+        // PrintStatOnBackOfCard: row r's label at (24, r * 16 + 41), its value ending at 224
+        if (hof)
+        {
+            card3_text(dst, l, "HALL OF FAME DEBUT  ", 24, 41, 0, grey);
+            snprintf(buf, sizeof(buf), "%d:%02d:%02d", hh, hm, hs);
+            card3_text(dst, l, buf, 224, 41, 2, red);
+        }
+        if (wins || losses)
+        {
+            card3_text(dst, l, "LINK BATTLES", 24, 57, 0, grey);
+            snprintf(a, sizeof(a), "%d", wins);
+            snprintf(b, sizeof(b), "%d", losses);
+            const char *texts[] = {"W:", a, "  L:", b};
+            const CardInk inks[] = {grey, red, grey, red};
+            card3_runs(dst, l, texts, inks, 4, 224, 57, true);
+        }
+        if (trades)
+        {
+            card3_text(dst, l, "POKéMON TRADES", 24, 73, 0, grey);
+            snprintf(buf, sizeof(buf), "%d", trades);
+            card3_text(dst, l, buf, 224, 73, 2, red);
+        }
+        if (pokeblocks)
+        {
+            card3_text(dst, l, "{POKEBLOCK}S W/FRIENDS", 24, 89, 0, grey);
+            snprintf(buf, sizeof(buf), "%d", pokeblocks);
+            card3_text(dst, l, buf, 224, 89, 2, red);
+        }
+        if (contests)
+        {
+            card3_text(dst, l, "WON CONTESTS W/FRIENDS", 24, 105, 0, grey);
+            snprintf(buf, sizeof(buf), "%d", contests);
+            card3_text(dst, l, buf, 224, 105, 2, red);
+        }
+        int bp = card3_value(c, "bp");
+        if (bp)
+        {
+            card3_text(dst, l, "BATTLE POINTS WON", 24, 121, 0, grey);
+            snprintf(a, sizeof(a), "%d", bp);
+            const char *texts[] = {a, "BP"};
+            const CardInk inks[] = {red, grey};
+            card3_runs(dst, l, texts, inks, 2, 224, 121, true);
+        }
+        return;
+    }
+    // Ruby/Sapphire
+    if (hof)
+    {
+        card3_text(dst, l, "FIRST HALL OF FAME", 24, 44, 0, grey);
+        snprintf(buf, sizeof(buf), "%d : %02d : %02d", hh, hm, hs);
+        card3_text(dst, l, buf, 224, 44, 2, red);
+    }
+    if (wins || losses)
+    {
+        card3_text(dst, l, "LINK CABLE BATTLES  W/            L/", 24, 60, 0, grey);
+        snprintf(a, sizeof(a), "%d", wins);
+        snprintf(b, sizeof(b), "%d", losses);
+        card3_text(dst, l, a, 176, 60, 2, red);
+        card3_text(dst, l, b, 224, 60, 2, red);
+    }
+    if (trades)
+    {
+        card3_text(dst, l, "POKéMON TRADES", 24, 76, 0, grey);
+        snprintf(buf, sizeof(buf), "%d", trades);
+        card3_text(dst, l, buf, 224, 76, 2, red);
+    }
+    if (pokeblocks)
+    {
+        card3_text(dst, l, "{POKEBLOCK}S W/FRIENDS", 24, 92, 0, grey);
+        snprintf(buf, sizeof(buf), "%d", pokeblocks);
+        card3_text(dst, l, buf, 224, 92, 2, red);
+    }
+    if (contests)
+    {
+        card3_text(dst, l, "CONTESTS W/FRIENDS W/", 24, 108, 0, grey);
+        snprintf(buf, sizeof(buf), "%d", contests);
+        card3_text(dst, l, buf, 224, 108, 2, red);
+    }
+    int tower_wins = card3_value(c, "tower_wins"), streak = card3_value(c, "tower_streak");
+    if (tower_wins || streak)
+    {
+        card3_text(dst, l, "BATTLE TOWER W/", 24, 124, 0, grey);
+        card3_text(dst, l, "&", 138, 124, 0, grey);
+        card3_text(dst, l, "STRAIGHT", 176, 124, 0, grey);
+        snprintf(a, sizeof(a), "%d", tower_wins);
+        snprintf(b, sizeof(b), "%d", streak);
+        card3_text(dst, l, a, 136, 124, 2, red);
+        card3_text(dst, l, b, 173, 124, 2, red);
+    }
+}
+
 static void card_draw(SDL_Surface *dst, Scene *scene, const Layout *l, CardState *st, Uint32 ticks)
 {
     SDL_FillRect(dst, NULL, SDL_MapRGB(dst->format, 0, 0, 0));
+    if (card3_game >= 0)
+    {
+        // the time's colon blinks once a second
+        if (st->page == 0)
+            card3_front(dst, scene, l, st->card, (ticks / 1000) % 2 == 0);
+        else
+            card3_back(dst, scene, l, st->card);
+        return;
+    }
     fill_logical(dst, l, 0, 0, GB_W, GB_H, gb_bg);
     if (gb_gen == 1)
         card_draw_gen1(dst, scene, l, st);
@@ -220,18 +524,30 @@ static int card_run(const char *card_path, const char *screenshot, const char *s
         fprintf(stderr, "could not read %s\n", layout_path);
         return EXIT_ERROR;
     }
-    gb_gen = get_int(scene.layout, "gen", 2);
-    gb_bg = get_color(scene.layout, "colors.bg", gb_bg);
-    gb_fg = get_color(scene.layout, "colors.fg", gb_fg);
-    gb_load_font(&scene);
+    const char *game = strrchr(scene.skin ? scene.skin : "", '/');
+    game = game ? game + 1 : scene.skin ? scene.skin : "";
+    card3_game = strcmp(game, "rs") == 0 ? CARD3_RS : strcmp(game, "e") == 0 ? CARD3_E : strcmp(game, "frlg") == 0 ? CARD3_FRLG : -1;
+    if (card3_game >= 0)
+    {
+        load_game_fonts(scene.skin, scene.layout);
+        use_font("normal");
+    }
+    else
+    {
+        gb_gen = get_int(scene.layout, "gen", 2);
+        gb_bg = get_color(scene.layout, "colors.bg", gb_bg);
+        gb_fg = get_color(scene.layout, "colors.fg", gb_fg);
+        gb_load_font(&scene);
+    }
 
     PWR_setCPUSpeed(CPU_SPEED_MENU);
     SDL_Surface *screen = GFX_init(MODE_MAIN);
     PAD_init();
     PWR_init();
     InitSettings();
-    Layout l = gb_layout(screen);
-    open_text_font(&scene, &l);
+    Layout l = card3_game >= 0 ? make_layout(screen) : gb_layout(screen);
+    if (card3_game < 0)
+        open_text_font(&scene, &l);
     CardState st = {card, 0};
 
 #ifdef DESKTOP
@@ -263,6 +579,17 @@ static int card_run(const char *card_path, const char *screenshot, const char *s
             exit_code = EXIT_MENU;
             quitting = true;
         }
+        else if (card3_game >= 0)
+        {
+            // A turns the card over, then closes it; B closes the front and (but in Ruby/Sapphire) turns the
+            // back over again
+            if (a && st.page == 0)
+                st.page = 1, dirty = 1;
+            else if (a || (b && (st.page == 0 || card3_game == CARD3_RS)))
+                quitting = true;
+            else if (b)
+                st.page = 0, dirty = 1;
+        }
         else if (b || (gb_gen == 1 && a) || (st.page == 1 && a))
             quitting = true;
         else if (gb_gen == 2 && st.page == 0 && (right || a))
@@ -270,7 +597,7 @@ static int card_run(const char *card_path, const char *screenshot, const char *s
         else if (gb_gen == 2 && st.page == 1 && left)
             st.page = 0, dirty = 1;
         Uint32 now = SDL_GetTicks();
-        if (gb_gen == 2 && st.page == 0 && now - last_blink >= 533)
+        if (((card3_game < 0 && gb_gen == 2) || card3_game >= 0) && st.page == 0 && now - last_blink >= (card3_game >= 0 ? 250u : 533u))
         {
             last_blink = now;
             dirty = 1;
