@@ -675,7 +675,7 @@ static int gb_run(SDL_Surface *screen, Scene *scene, const char *write_location)
             }
             else if (gb_gen == 2 && (dx || l1 || r1))
                 st.page = (st.page + (dx ? dx : l1 ? -1 : 1) + pages) % pages;
-            else if (gb_gen == 2 && dy)
+            else if (dy) // the previous/next Pokémon in the list
                 gb_stats_step(scene, &st, dy);
             else if (b)
                 st.mode = GB_MENU;

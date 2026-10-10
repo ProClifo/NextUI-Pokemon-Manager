@@ -72,7 +72,7 @@ public sealed class App
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
-                items.Add($"[{_hidden.Count} hidden saves]");
+                items.Add($"[{_hidden.Count} {(_hidden.Count == 1 ? "other" : "others")}]");
             int rescan = items.Count; items.Add("[Rescan SD card]");
             int settings = items.Count; items.Add("[Settings]");
             int help = items.Count; items.Add("[Help]");
@@ -143,15 +143,28 @@ public sealed class App
         return background;
     }
 
+    /// <summary>
+    /// The saves that aren't listed (no ROM, no Pokédex yet, an unofficial ROM), shown like the main menu's;
+    /// picking one says why it isn't listed.
+    /// </summary>
     private void ShowHidden()
     {
-        var lines = _hidden.Select(h => $"- {h.Save.FileName}: {h.Reason}");
-        _ui.Message(
-            "Only saves that have received the Pokédex and whose game's ROM is on the card (same file name), " +
-            "unmodified and official, are shown. Hidden:\n" +
-            string.Join('\n', lines) +
-            "\n\nTo manage saves from unofficial ROMs anyway, turn off Settings > Official ROMs only. " +
-            "A save without its ROM or the Pokédex is never shown.");
+        int selected = 0;
+        while (true)
+        {
+            var saves = _hidden.Select(h => h.Save).ToList();
+            var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
+            var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
+            var choice = _ui.Choose("Other saves", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites);
+            if (choice is not { } c)
+                return;
+            selected = c;
+            var (save, reason) = _hidden[c];
+            var hint = reason.Contains("official", StringComparison.OrdinalIgnoreCase) || reason.Contains("hack", StringComparison.OrdinalIgnoreCase)
+                ? "\n\nTo manage saves from unofficial ROMs anyway, turn off Settings > Official ROMs Only."
+                : "";
+            _ui.Message($"{save.FileName} isn't listed: {reason}.{hint}");
+        }
     }
 
     // ---------------------------------------------------------------- save menu

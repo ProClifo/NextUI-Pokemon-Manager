@@ -970,7 +970,21 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     if (hand)
     {
         SDL_Rect src = {0, 0, hand->w >= 64 ? 32 : hand->w, hand->h >= 32 ? 32 : hand->h};
-        blit_scaled(hand, &src, screen, l, hx, hy + hand_bob);
+        // Over PARTY POKéMON and CLOSE BOX the hand hangs upside down (the cursor sprite's vFlip)
+        bool on_button = st->mode == VIEW_BOX && (st->target == TARGET_PARTY_BUTTON || st->target == TARGET_CLOSE_BUTTON);
+        SDL_Surface *flipped = on_button ? SDL_CreateRGBSurfaceWithFormat(0, src.w, src.h, 32, SDL_PIXELFORMAT_RGBA8888) : NULL;
+        if (flipped)
+        {
+            SDL_SetSurfaceBlendMode(hand, SDL_BLENDMODE_NONE);
+            for (int row = 0; row < src.h; row++)
+                SDL_BlitSurface(hand, &(SDL_Rect){src.x, src.y + row, src.w, 1}, flipped, &(SDL_Rect){0, src.h - 1 - row, src.w, 1});
+            SDL_SetSurfaceBlendMode(hand, SDL_BLENDMODE_BLEND);
+            SDL_SetSurfaceBlendMode(flipped, SDL_BLENDMODE_BLEND);
+            blit_scaled(flipped, NULL, screen, l, hx, hy - hand_bob);
+            SDL_FreeSurface(flipped);
+        }
+        else
+            blit_scaled(hand, &src, screen, l, hx, hy + hand_bob);
     }
 
     // The action menu, in a window whose bottom-right corner is fixed, and its message.
