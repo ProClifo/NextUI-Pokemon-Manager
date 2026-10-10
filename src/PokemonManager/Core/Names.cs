@@ -14,6 +14,14 @@ public static class Names
 
     public static string Species(PKM pk) => pk.IsEgg ? "Egg" : Species(pk.Species);
 
+    /// <summary>"Inject Mew (Lv. 10) into Emerald?" or "Inject Manaphy Egg into Platinum?"</summary>
+    public static string InjectQuestion(PKM pk, SaveFile sav)
+        => pk.IsEgg ? $"Inject {Species(pk.Species)} Egg into {Game(sav)}?" : $"Inject {Species(pk.Species)} (Lv. {pk.CurrentLevel}) into {Game(sav)}?";
+
+    /// <summary>"MEW has arrived!" (the in-game capitals) or "The EGG has arrived!"</summary>
+    public static string Arrived(PKM pk)
+        => pk.IsEgg ? "The EGG has arrived!" : $"{Species(pk.Species).ToUpperInvariant()} has arrived!";
+
     public static string Move(ushort move)
         => move < Strings.movelist.Length ? Strings.movelist[move] : $"Move {move}";
 
@@ -97,14 +105,6 @@ public static class Names
         lines.Add($"Held item: {Item(pk.HeldItem, pk.Context)}");
         lines.Add($"Legality: {Legality(pk)}");
         return string.Join('\n', lines);
-    }
-
-    /// <summary>The randomly rolled parts of a Pokémon: nature (Gen 3+), IVs/DVs and shininess.</summary>
-    public static string Rolled(PKM pk)
-    {
-        var ivs = $"IVs {pk.IV_HP}/{pk.IV_ATK}/{pk.IV_DEF}/{pk.IV_SPA}/{pk.IV_SPD}/{pk.IV_SPE}";
-        var nature = pk.Format >= 3 ? $"{GameInfo.Strings.natures[(int)pk.Nature]} nature, " : "";
-        return $"{nature}{ivs}{(pk.IsShiny ? ", shiny" : "")}";
     }
 
     public static string Legality(PKM pk)

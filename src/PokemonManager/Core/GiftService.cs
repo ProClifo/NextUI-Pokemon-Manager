@@ -198,10 +198,7 @@ public static class GiftService
         if (target.Value is not { } slot)
             return OpResult.Fail(target.Message);
         slot.Set(sav, pk);
-        var placed = slot.Get(sav);
-        return OpResult.Success(
-            $"{Names.Summary(placed)} was sent to {slot.Describe(sav)}.\n" +
-            $"Legality: {Names.Legality(placed)}");
+        return OpResult.Success(Names.Arrived(pk));
     }
 
     /// <summary>

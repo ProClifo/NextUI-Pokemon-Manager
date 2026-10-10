@@ -541,11 +541,11 @@ public sealed class App
     private void GiftActions(SaveEntry entry, MysteryGift gift)
     {
         var sav = entry.Sav;
-        var actions = new List<(string Label, Func<OpResult> Run)>();
+        var actions = new List<(string Label, Func<OpResult> Run, bool Pokemon)>();
         if (gift is DataMysteryGift data && GiftService.SupportsAlbum(sav))
-            actions.Add(("Add to Mystery Gift album (pick up in-game)", () => GiftService.InjectCard(sav, data)));
+            actions.Add(("Add to Mystery Gift album (pick up in-game)", () => GiftService.InjectCard(sav, data), false));
         if (gift.IsEntity)
-            actions.Add(("Send the Pokémon to your PC", () => GiftService.Redeem(sav, gift)));
+            actions.Add(("Send the Pokémon to your PC", () => GiftService.Redeem(sav, gift), true));
         if (actions.Count == 0)
         {
             _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, and this gift isn't a Pokémon, so it can't be added.");
@@ -563,7 +563,7 @@ public sealed class App
             return;
         }
         if (TryWrite(entry, out _))
-            _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
+            _ui.Message(actions[choice.Value].Pokemon ? result.Message : $"{result.Message}\n\n{SaveStateWarning}");
     }
 
     // ---------------------------------------------------------------- events, distributions, gallery
@@ -858,56 +858,25 @@ public sealed class App
             if (!_ui.Confirm($"This unreleased file is flagged as illegal by PKHeX:\n{result.Message}\n\nAdd it anyway?", "ADD", "CANCEL"))
                 return;
         }
-        var origin = result.Source switch
-        {
-            EventPokemon.Source.Generated => $"Generated like the original distribution: {Names.Rolled(pk)}.",
-            EventPokemon.Source.GalleryCopy => $"PKHeX can't regenerate this event, so this is one of the original copies at random: {Names.Rolled(pk)}.",
-            _ => "",
-        };
-        if (entry.Sav.Generation >= 3 && pk.Language != entry.Sav.Language && GalleryLanguage.FromLanguageId(pk.Language) is { } from)
-            origin += $"\nThis distribution wasn't given out in your game's language, so it's {LanguageArticle(from)} Pokémon, as if traded from {LanguageArticle(from)} game.";
         // No trade rules: the real distributions didn't need the National Pokédex (only the Pokédex, checked above).
-        PlaceConverted(entry, pk, $"Put {file.Title}", origin, distribution: true);
+        PlaceConverted(entry, pk);
     }
 
-    private static string LanguageArticle(string code)
-    {
-        var name = GalleryLanguage.Name(code);
-        return (name[0] is 'E' or 'I' ? "an " : "a ") + name;
-    }
-
-    /// <summary>Puts a Pokémon in the first free PC slot (a distribution needs the Pokédex too, checked by the callers).</summary>
-    private void PlaceConverted(SaveEntry entry, PKM pk, string verb, string details = "", bool distribution = false)
+    /// <summary>Asks, then puts a distributed Pokémon in the first free PC slot (callers check the Pokédex).</summary>
+    private void PlaceConverted(SaveEntry entry, PKM pk)
     {
         var sav = entry.Sav;
-        SlotRef slot;
-        if (distribution)
+        var target = SlotRef.ForDistribution(sav);
+        if (target.Value is not { } slot)
         {
-            var target = SlotRef.ForDistribution(sav);
-            if (target.Value is not { } found)
-            {
-                _ui.Message(target.Message);
-                return;
-            }
-            slot = found;
-        }
-        else if (SlotRef.FirstEmptyBoxSlot(sav) is { } free)
-        {
-            slot = free;
-        }
-        else
-        {
-            _ui.Message("Every PC box is full.");
+            _ui.Message(target.Message);
             return;
         }
-        if (!_ui.Confirm($"{verb} ({Names.Summary(pk)}) into {slot.Describe(sav)}?"))
+        if (!_ui.Confirm(Names.InjectQuestion(pk, sav)))
             return;
         slot.Set(sav, pk);
         if (TryWrite(entry, out _))
-        {
-            var extra = details.Length == 0 ? "" : $"\n{details}";
-            _ui.Message($"Added {Names.Summary(slot.Get(sav))}.{extra}\nLegality: {Names.Legality(slot.Get(sav))}\n\n{SaveStateWarning}");
-        }
+            _ui.Message(Names.Arrived(pk));
     }
 
     /// <summary>A Game Boy era event Pokémon generated for this save (see <see cref="GiftService.Mew"/> and <see cref="GiftService.Celebi"/>).</summary>
@@ -923,7 +892,7 @@ public sealed class App
             _ui.Message($"PKHeX couldn't generate a legal {name} for {Names.Game(entry.Sav)}.");
             return;
         }
-        PlaceConverted(entry, pk, $"Put {name}", $"Generated like the original distribution: {Names.Rolled(pk)}.", distribution: true);
+        PlaceConverted(entry, pk);
     }
 
     private void GsBallFlow(SaveEntry entry)
