@@ -43,3 +43,5 @@ jobs:
         with:
           files: dist/*.zip
           generate_release_notes: true
+          # v0.1.0-alpha.1 and the like are marked as pre-releases
+          prerelease: ${{ contains(github.ref_name, '-') }}
