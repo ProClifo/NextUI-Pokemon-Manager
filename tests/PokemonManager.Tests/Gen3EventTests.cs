@@ -17,6 +17,7 @@ public sealed class Gen3EventTests : IDisposable
     private const int FlagMysteryEventEmerald = 0x8AC;  // FLAG_SYS_MYSTERY_EVENT_ENABLE
     private const int FlagMysteryGiftFRLG = 0x839;      // FLAG_SYS_MYSTERY_GIFT_ENABLED
     private const int FlagMysteryEventRS = 0x84C;       // FLAG_SYS_EXDATA_ENABLE
+    private const int FlagBadge05RS = 0x80B;            // FLAG_BADGE05_GET (Norman)
 
     /// <summary>A save whose player has unlocked the game's Mystery Event/Mystery Gift menus, as events need.</summary>
     private static SaveEntry Unlocked(SaveEntry entry)
@@ -25,7 +26,10 @@ public sealed class Gen3EventTests : IDisposable
             return entry;
         switch (sav)
         {
-            case SAV3RS: sav.SetEventFlag(FlagMysteryEventRS, true); break;
+            case SAV3RS:
+                sav.SetEventFlag(FlagBadge05RS, true);
+                sav.SetEventFlag(FlagMysteryEventRS, true);
+                break;
             case SAV3E:
                 sav.SetEventFlag(FlagMysteryGiftEmerald, true);
                 if (sav.Japanese)
@@ -273,6 +277,8 @@ public sealed class Gen3EventTests : IDisposable
         Assert.False(sav.GetEventFlag(menuFlag)); // never unlocked for the player
 
         sav.SetEventFlag(menuFlag, true);
+        if (version == GameVersion.R)
+            sav.SetEventFlag(FlagBadge05RS, true);
         Assert.True(Gen3Events.Inject(sav, file).Ok);
     }
 
@@ -380,5 +386,16 @@ public sealed class Gen3EventTests : IDisposable
         var again = Gen3Events.GiveEonTicketByRecordMixing(sav);
         Assert.Contains("already have", again.Message);
         Assert.Equal(1, sav.Inventory.GetPouch(InventoryType.KeyItems).Items.Count(i => i.Index == Gen3Events.ItemEonTicket));
+    }
+
+    [Fact]
+    public void RubySapphireMysteryEventNeedsNormanBeaten()
+    {
+        var sav = (SAV3)_saves.Create(GameVersion.S, "Sapphire.sav").Sav;
+        var file = WriteFile("event.me3", MakeScript(rubySapphire: true));
+        sav.SetEventFlag(FlagMysteryEventRS, true); // e.g. an edited save: the game only sets it after Norman
+        Assert.Contains("Norman", Gen3Events.Inject(sav, file).Message);
+        sav.SetEventFlag(FlagBadge05RS, true);
+        Assert.True(Gen3Events.Inject(sav, file).Ok);
     }
 }

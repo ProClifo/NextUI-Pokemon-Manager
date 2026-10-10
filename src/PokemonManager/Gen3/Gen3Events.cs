@@ -321,26 +321,34 @@ public static class Gen3Events
     internal const int FlagMysteryGiftEnableE = 0x8DB;     // FLAG_SYS_MYSTERY_GIFT_ENABLE
     internal const int FlagMysteryGiftEnableFRLG = 0x839;  // FLAG_SYS_MYSTERY_GIFT_ENABLED
 
+    internal const int FlagBadge05RS = 0x80B;              // FLAG_BADGE05_GET: Norman's Balance Badge
+
     /// <summary>
-    /// Why this save can't receive the event yet: the game's own menu for it (Ruby/Sapphire's Mystery Event,
-    /// FireRed/LeafGreen/Emerald's Mystery Gift, Japanese Emerald's Mystery Event) must be unlocked in-game first.
+    /// Why this save can't receive the event yet: the game's own menu for it must be unlocked in-game first.
+    /// Ruby/Sapphire: Mystery Event, from the Mystery Event Club's profile after beating Norman
+    /// (mystery_event_club.inc); FireRed/LeafGreen/Emerald: Mystery Gift, and Japanese Emerald: Mystery Event,
+    /// from the Poké Mart questionnaire (questionnaire.inc).
     /// </summary>
     public static string? MenuLocked(SAV3 sav, Gen3EventKind kind)
     {
         const string eventPhrase = "\"MYSTERY EVENT IS EXCITING\"";
         const string giftPhrase = "\"LINK TOGETHER WITH ALL\"";
-        var (flag, menu, phrase) = (sav, kind) switch
+        var game = Names.Game(sav);
+        switch (sav, kind)
         {
-            (SAV3RS, _) => (FlagExdataEnableRS, "Mystery Event", eventPhrase),
-            (SAV3E, Gen3EventKind.MysteryEvent) => (sav.Japanese ? FlagMysteryEventEnableE : -1, "Mystery Event", eventPhrase),
-            (SAV3E, _) => (FlagMysteryGiftEnableE, "Mystery Gift", giftPhrase),
-            _ => (FlagMysteryGiftEnableFRLG, "Mystery Gift", giftPhrase),
-        };
-        if (flag < 0)
-            return "Non-Japanese Emerald has no Mystery Event, so this event can't be received.";
-        if (sav.GetEventFlag(flag))
-            return null;
-        return $"Unlock {menu} in {Names.Game(sav)} first: fill in the questionnaire with {phrase}.";
+            case (SAV3RS, _):
+                if (sav.GetEventFlag(FlagExdataEnableRS) && sav.GetEventFlag(FlagBadge05RS))
+                    return null;
+                return $"Unlock Mystery Event in {game} first: after beating Norman, give {eventPhrase} as your profile to the man in the Petalburg City Pokémon Center.";
+            case (SAV3E, Gen3EventKind.MysteryEvent) when !sav.Japanese:
+                return "Non-Japanese Emerald has no Mystery Event, so this event can't be received.";
+            case (SAV3E, Gen3EventKind.MysteryEvent):
+                return sav.GetEventFlag(FlagMysteryEventEnableE) ? null
+                    : $"Unlock Mystery Event in {game} first: fill in the questionnaire in a Poké Mart with {eventPhrase}.";
+            default:
+                return sav.GetEventFlag(sav is SAV3E ? FlagMysteryGiftEnableE : FlagMysteryGiftEnableFRLG) ? null
+                    : $"Unlock Mystery Gift in {game} first: fill in the questionnaire in a Poké Mart with {giftPhrase}.";
+        }
     }
 
     // pokeemerald include/constants/flags.h and items.h
