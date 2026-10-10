@@ -37,7 +37,7 @@ public sealed class ActionReasonsTests : IDisposable
             ActionReasons.NoOtherGames, ActionReasons.NoGamesToSendTo, ActionReasons.LastPartyPokemon, ActionReasons.CantBeMoved,
             "Go to a PokéCenter to evolve!", "Go to a PokéCenter to trade!", "Its HM moves need a PokéCenter!",
             "An Egg can't evolve!", "It doesn't evolve by trading!", "It's holding an Everstone!",
-            "It must be traded for Karrablast!", "It needs to hold a Dragon Scale!", "It needs to hold a Deep Sea Scale!",
+            "No Karrablast to trade with!", "It needs to hold a Dragon Scale!", "It needs to hold a Deep Sea Scale!",
         ];
         foreach (var reason in reasons)
             Assert.True(FitsTwoLines(reason, 18), reason);
@@ -49,5 +49,16 @@ public sealed class ActionReasonsTests : IDisposable
             return true;
         int split = text.LastIndexOf(' ', Math.Min(width, text.Length - 1));
         return split > 0 && text.Length - split - 1 <= width;
+    }
+
+    [Fact]
+    public void SummaryShowsNoHiddenValues()
+    {
+        var sav = _saves.Create(GameVersion.E, "Emerald.sav").Sav;
+        var text = Names.Details(TestSaves.Make(sav, Species.Pikachu, 10));
+        Assert.Contains("Nature:", text);
+        Assert.DoesNotContain("IVs", text);
+        Assert.DoesNotContain("EVs", text);
+        Assert.DoesNotContain(sav.SID16.ToString("D5"), text);
     }
 }

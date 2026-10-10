@@ -411,6 +411,7 @@ public sealed class App
     {
         var others = GetSaves().Where(s => s.Path != entry.Path).ToList();
         var accepted = new Dictionary<(ushort, byte, bool, bool, int, GameVersion), bool>();
+        var partners = new Dictionary<ushort, bool>(); // Karrablast/Shelmet: is the other one in some save?
         return slot =>
         {
             var pk = slot.Get(entry.Sav);
@@ -422,7 +423,10 @@ public sealed class App
                 ?? (move.Ok ? null : slot.IsParty && entry.Sav.PartyCount <= 1 ? ActionReasons.LastPartyPokemon
                     : move.Message.Contains("last party", StringComparison.Ordinal) ? ActionReasons.LastPartyPokemon : ActionReasons.CantBeMoved)
                 ?? (others.Count == 0 ? ActionReasons.NoOtherGames : anywhere ? null : ActionReasons.NoGamesToSendTo);
-            string? evolve = ActionReasons.Evolve(pk) ?? (slot.IsParty ? ActionReasons.PartyTrade(entry.Sav, pk, evolve: true) : null);
+            if (PartnerTrade.Applies(pk) && !partners.ContainsKey(pk.Species))
+                partners[pk.Species] = PartnerTrade.Find(pk, others).Count > 0;
+            string? evolve = ActionReasons.Evolve(pk, partners.GetValueOrDefault(pk.Species))
+                ?? (slot.IsParty ? ActionReasons.PartyTrade(entry.Sav, pk, evolve: true) : null);
             return (transfer, evolve);
         };
     }
@@ -455,7 +459,8 @@ public sealed class App
     private bool CanEvolve(SaveEntry entry, SlotRef slot)
     {
         var pk = slot.Get(entry.Sav);
-        return CanEvolveNow(pk) && !(slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null);
+        bool partner = PartnerTrade.Applies(pk) && PartnerTrade.Find(pk, GetSaves().Where(s => s.Path != entry.Path)).Count > 0;
+        return ActionReasons.Evolve(pk, partner) is null && !(slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null);
     }
 
     /// <returns>True if the source slot no longer holds this Pokémon.</returns>
@@ -593,6 +598,8 @@ public sealed class App
         if (PartyTradeBlocked(entry, slot))
             return false;
         var pk = slot.Get(entry.Sav);
+        if (PartnerTrade.Applies(pk))
+            return PartnerTradeFlow(entry, slot, pk);
         // Only evolutions a real trade would trigger: Onix must hold the Metal Coat to become Steelix.
         var options = TradeEvolution.GetOptions(pk).Where(o => o.ConditionsMet).ToList();
         if (options.Count == 0 || TradeEvolution.HoldsEverstone(pk))
@@ -620,6 +627,60 @@ public sealed class App
         if (TryWrite(entry, out _))
             _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
         return false;
+    }
+
+    /// <summary>
+    /// Karrablast/Shelmet: pick the other one from another Gen 5 save, then trade them so both evolve.
+    /// Returns true when the slot now holds a different Pokémon.
+    /// </summary>
+    private bool PartnerTradeFlow(SaveEntry entry, SlotRef slot, PKM pk)
+    {
+        if (TradeEvolution.HoldsEverstone(pk))
+            return false;
+        var partners = PartnerTrade.Find(pk, GetSaves().Where(s => s.Path != entry.Path));
+        var wanted = Names.Species((ushort)PartnerTrade.PartnerSpecies(pk));
+        if (partners.Count == 0)
+        {
+            _ui.Message($"{Names.Species(pk)} evolves only when traded for {wanted}, and no other Black/White save has one to trade.");
+            return false;
+        }
+        var partner = partners[0];
+        if (partners.Count > 1)
+        {
+            var labels = partners.Select(p => $"{SaveName(p.Save)} {p.Save.Sav.OT}: {Names.Summary(p.Pokemon)} ({p.Slot.Describe(p.Save.Sav)})").ToList();
+            var pick = _ui.Choose($"Trade for which {wanted}?", labels);
+            if (pick is null)
+                return false;
+            partner = partners[pick.Value];
+        }
+
+        var mineEvolves = Names.Species(TradeEvolution.GetOptions(pk).First(o => o.Method == EvolutionType.TradeShelmetKarrablast).Species);
+        var theirsEvolves = Names.Species(TradeEvolution.GetOptions(partner.Pokemon).First(o => o.Method == EvolutionType.TradeShelmetKarrablast).Species);
+        if (!_ui.Confirm($"Trade {Names.Summary(pk)} for {Names.Summary(partner.Pokemon)} from {SaveName(partner.Save)} ({partner.Save.Sav.OT})?\n\n" +
+                         $"{Names.Species(pk)} will evolve into {mineEvolves}, and {wanted} into {theirsEvolves}.", "TRADE", "CANCEL"))
+            return false;
+
+        var result = PartnerTrade.Trade(entry, slot, partner, _settings.AllowIllegalTransfers);
+        if (!result.Ok)
+        {
+            entry.Reload();
+            partner.Save.Reload();
+            _ui.Message(result.Message);
+            return false;
+        }
+        // Write the partner's save first: if this one then fails, the two Pokémon are duplicated, not lost.
+        if (!TryWrite(partner.Save, out _))
+        {
+            entry.Reload();
+            return false;
+        }
+        if (!TryWrite(entry, out _))
+        {
+            _ui.Message("The trade was saved in the other game, but this save couldn't be updated.");
+            return true;
+        }
+        _ui.Message($"{result.Message}\n\nBackups were saved to PokemonManager/Backups.\n{SaveStateWarning}");
+        return true;
     }
 
     // ---------------------------------------------------------------- gifts & events

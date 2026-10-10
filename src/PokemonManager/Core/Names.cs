@@ -87,22 +87,26 @@ public static class Names
     }
 
     /// <summary>Multi-line detail view (Showdown-style set plus origin and legality).</summary>
+    /// <summary>
+    /// What the game's own summary shows about a Pokémon, and nothing hidden (no EVs, IVs, PID or secret ID).
+    /// </summary>
     public static string Details(PKM pk)
     {
         if (pk.Species == 0)
             return "Empty slot";
-        var lines = new List<string>();
-        try
+        var lines = new List<string> { Summary(pk) };
+        if (!pk.IsEgg)
         {
-            lines.Add(new ShowdownSet(pk).Text.Trim());
+            if (pk.Format >= 3)
+            {
+                lines.Add($"Nature: {GameInfo.Strings.natures[(int)pk.Nature]}");
+                lines.Add($"Ability: {GameInfo.Strings.abilitylist[pk.Ability]}");
+            }
+            var moves = Enumerable.Range(0, 4).Select(pk.GetMove).Where(m => m != 0).Select(m => GameInfo.Strings.movelist[m]);
+            lines.Add($"Moves: {string.Join(", ", moves)}");
+            lines.Add($"Held item: {(pk.HeldItem == 0 ? "None" : Item(pk.HeldItem, pk.Context))}");
         }
-        catch
-        {
-            lines.Add(Summary(pk));
-        }
-        lines.Add("");
         lines.Add($"OT: {pk.OriginalTrainerName} ({pk.DisplayTID:D5})");
-        lines.Add($"Held item: {Item(pk.HeldItem, pk.Context)}");
         lines.Add($"Legality: {Legality(pk)}");
         return string.Join('\n', lines);
     }

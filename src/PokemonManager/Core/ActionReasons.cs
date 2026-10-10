@@ -25,8 +25,11 @@ public static class ActionReasons
         return evolve ? "Go to a PokéCenter to evolve!" : "Go to a PokéCenter to trade!";
     }
 
-    /// <summary>Why a trade wouldn't evolve this Pokémon as it is now.</summary>
-    public static string? Evolve(PKM pk)
+    /// <summary>
+    /// Why a trade wouldn't evolve this Pokémon as it is now. Karrablast and Shelmet evolve by being traded for
+    /// each other: <paramref name="partnerAvailable"/> says whether another save has the partner to trade with.
+    /// </summary>
+    public static string? Evolve(PKM pk, bool partnerAvailable = false)
     {
         if (pk.IsEgg)
             return "An Egg can't evolve!";
@@ -39,7 +42,7 @@ public static class ActionReasons
             return null;
         var option = options[0];
         if (option.Method == EvolutionType.TradeShelmetKarrablast)
-            return $"It must be traded for {(pk.Species == (ushort)Species.Karrablast ? "Shelmet" : "Karrablast")}!";
+            return partnerAvailable ? null : $"No {(pk.Species == (ushort)Species.Karrablast ? "Shelmet" : "Karrablast")} to trade with!";
         var item = Names.Item(option.RequiredItem, pk.Context);
         return $"It needs to hold {(IsVowel(item[0]) ? "an" : "a")} {item}!";
     }
