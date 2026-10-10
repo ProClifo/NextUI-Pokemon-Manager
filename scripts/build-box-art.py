@@ -370,8 +370,20 @@ def gen3(root, out, dex, icon_pals, icon_index):
             for suffix in ("", "-shiny"):
                 if base + suffix not in store[kind] and first + suffix in store[kind]:
                     save(store[kind][first + suffix], os.path.join(out, kind, f"{base}{suffix}.png"))
+    # Deoxys in the form the game shows (decompress.c's DuplicateDeoxysTiles: the second frame of its front
+    # pic; GetMonIconTiles(species, TRUE) in the PC: the form icon after the normal one). Ruby/Sapphire show
+    # the Normal form, FireRed Attack, LeafGreen Defense (386-leafgreen) and Emerald Speed.
     deoxys = os.path.join(gfx, "deoxys")
-    gba_sprite(deoxys, "front_def.png", deoxys, out, "386-leafgreen")
+    deoxys_icon = lambda file, name: save(indexed(os.path.join(deoxys, file), icon_pals[icon_index.get("deoxys", 0)]),
+                                          os.path.join(out, "icons", f"{name}.png"))
+    if os.path.exists(os.path.join(deoxys, "front_def.png")):  # pokefirered
+        gba_sprite(deoxys, "front.png", deoxys, out, "386", frame=1)
+        gba_sprite(deoxys, "front_def.png", deoxys, out, "386-leafgreen", frame=1)
+        deoxys_icon("icon_attack.png", "386")
+        deoxys_icon("icon_defense.png", "386-leafgreen")
+    elif os.path.exists(os.path.join(deoxys, "icon_speed.png")):  # pokeemerald
+        gba_sprite(deoxys, "anim_front.png", deoxys, out, "386", frame=1)
+        deoxys_icon("icon_speed.png", "386")
     egg = os.path.join(gfx, "egg")
     if not gba_sprite(egg, "front.png", egg, out, "egg", shiny=False) and os.path.exists(os.path.join(egg, "pic.png")):
         # pokeruby: egg/pic.png with egg/palette.pal
@@ -383,7 +395,7 @@ def gen3(root, out, dex, icon_pals, icon_index):
     return sprites
 
 
-def gba_sprite(folder, file, pal_dir, out, name, shiny=True):
+def gba_sprite(folder, file, pal_dir, out, name, shiny=True, frame=0):
     path = os.path.join(folder, file)
     if not os.path.exists(path):
         alt = os.path.join(folder, "anim_front.png")
@@ -395,7 +407,7 @@ def gba_sprite(folder, file, pal_dir, out, name, shiny=True):
     for pal_file, suffix in [("normal.pal", "")] + ([("shiny.pal", "-shiny")] if shiny else []):
         pal_path = os.path.join(pal_dir, pal_file)
         if os.path.exists(pal_path):
-            img = indexed(path, read_jasc(pal_path)).crop((0, 0, 64, 64))
+            img = indexed(path, read_jasc(pal_path)).crop((0, 64 * frame, 64, 64 * (frame + 1)))
             save(trimmed(img), os.path.join(out, "sprites", f"{name}{suffix}.png"))
             wrote = True
     return wrote
