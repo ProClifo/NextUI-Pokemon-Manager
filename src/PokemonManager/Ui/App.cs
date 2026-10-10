@@ -694,8 +694,10 @@ public sealed class App
         if (!GalleryAvailable())
             return;
         var profile = ProfileFor(entry);
-        // Only released distributions are listed, and every Pokémon handed out passes the legality check.
+        // Only released distributions that can be given legally to this save are listed.
+        _ui.Busy("Checking distributions...");
         var list = GalleryLists.Distributions(_gallery, profile)
+            .Where(e => EventPokemon.CanGive(_gallery, e, entry.Sav))
             .Select(e => (e.Title, Tag: (string?)"Legal", Run: (Action)(() => GiveGalleryFile(entry, e)))).ToList();
         // Ruby/Sapphire/Emerald also get the Regi dolls, which no normal play hands out (decorations can't be illegal).
         if (entry.Sav is SAV3RS or SAV3E)

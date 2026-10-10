@@ -185,4 +185,21 @@ public sealed class GiftTests : IDisposable
         Assert.Equal("Inject Mew Egg into Emerald?", Names.InjectQuestion(mew, sav));
         Assert.Equal("The EGG has arrived in your PC!", Names.Arrived(mew));
     }
+
+    /// <summary>EventsGallery: Released/Gen 4/Pokemon Ranger Manaphy Egg/DPPtHGSS - Manaphy Egg.pgt</summary>
+    internal static byte[] ManaphyEggCard => Convert.FromBase64String("BwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
+
+    [Theory]
+    [InlineData(GameVersion.D)]
+    [InlineData(GameVersion.Pt)]
+    [InlineData(GameVersion.HG)]
+    public void ManaphyEggIsGeneratedLegally(GameVersion version)
+    {
+        var sav = _saves.Create(version, $"{version}.sav").Sav;
+        var egg = new PGT(ManaphyEggCard);
+        var pk = EventPokemon.Generate(egg, sav);
+        Assert.NotNull(pk);
+        Assert.True(pk.IsEgg);
+        Assert.Null(pk.MetDate); // not met anywhere until it hatches
+    }
 }

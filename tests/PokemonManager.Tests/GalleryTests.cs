@@ -309,4 +309,18 @@ public sealed class GalleryTests : IDisposable
         Assert.NotNull(pk);
         Assert.True(Legality.IsLegal(pk!));
     }
+
+    [Fact]
+    public void DistributionsAKoreanGen4GameCanNeverGetLegallyAreLeftOut()
+    {
+        var root = WriteGallery(write => write("Released/Gen 4/Pokemon Ranger Manaphy Egg/DPPtHGSS - Manaphy Egg.pgt", GiftTests.ManaphyEggCard));
+        var zip = Path.Combine(_saves.Dir, "gallery.zip");
+        GalleryBuilder.Build(root, zip);
+        using var gallery = new GalleryArchive(zip);
+        var egg = Assert.Single(gallery.Entries);
+
+        Assert.True(EventPokemon.CanGive(gallery, egg, _saves.Create(GameVersion.Pt, "Pt.sav").Sav));
+        // Korean Gen 4 games can't legally get eggs from international games.
+        Assert.False(EventPokemon.CanGive(gallery, egg, _saves.Create(GameVersion.Pt, "PtKOR.sav", "지우", LanguageID.Korean).Sav));
+    }
 }

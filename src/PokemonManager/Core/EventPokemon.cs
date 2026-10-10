@@ -98,6 +98,14 @@ public static class EventPokemon
             {
                 continue;
             }
+            // An unhatched egg hasn't been met anywhere, so the games leave its met date blank; PKHeX fills one in
+            // for Gen 4 gift eggs (the Manaphy Egg) and then flags it.
+            if (pk is { IsEgg: true, Format: >= 4, MetLocation: 0 } and not PB8)
+            {
+                pk.MetYear = 0;
+                pk.MetMonth = 0;
+                pk.MetDay = 0;
+            }
             if (ForSave(pk, sav) is { } ready && Legality.IsLegal(ready, sav))
                 return ready;
         }
@@ -150,6 +158,18 @@ public static class EventPokemon
     }
 
     /// <summary>The Pokémon converted to the save's format (Pal Park etc. for older files), or null if it can't go there.</summary>
+    /// <summary>
+    /// Whether a gallery file's Pokémon can be given to this save legally. Some never can: a Korean Gen 4 game
+    /// can't legally get an international game's eggs or Classic Ribbon Pokémon, so English fallbacks are out.
+    /// </summary>
+    public static bool CanGive(GalleryArchive gallery, GalleryEntry entry, SaveFile sav) => gallery.Load(entry) switch
+    {
+        { Card: { IsEntity: true } card } => Generate(card, sav) is not null,
+        { Pokemon: not null } => FromGallery(gallery, entry, sav).Legal,
+        null => false,
+        _ => true, // items and Gen 3 event files
+    };
+
     private static PKM? ForSave(PKM pk, SaveFile sav)
     {
         var check = TransferService.Prepare(pk, sav, allowUnofficial: false, out var prepared);
