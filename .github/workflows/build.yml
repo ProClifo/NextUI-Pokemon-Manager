@@ -27,7 +27,7 @@ jobs:
           platforms: arm64
 
       - name: Install Pillow (PC box art)
-        run: python3 -m pip install --user pillow fonttools
+        run: python3 -m pip install --user pillow
 
       - name: Build pak
         run: scripts/build-pak.sh

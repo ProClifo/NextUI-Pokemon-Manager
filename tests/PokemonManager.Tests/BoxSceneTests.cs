@@ -128,13 +128,17 @@ public sealed class BoxSceneTests : IDisposable
     }
 
     [Fact]
-    public void SceneCarriesTheGameFont()
+    public void SceneUsesTheOgFontUnlessItLacksTheText()
     {
+        var dir = Directory.CreateTempSubdirectory("fonts").FullName;
+        var og = new UiFont(UiFontTests.WriteFont(dir, "font2.ttf", ('\u0000', '\u00FF')));
+        var next = new UiFont(UiFontTests.WriteFont(dir, "font1.ttf", ('\u0000', '\uFFFD')));
         var sav = _saves.Create(GameVersion.E, "Emerald.sav").Sav;
-        var font = new GameFont("l.ttf", "t.ttf", "m.ttf", 24, new HashSet<char>()) { Native = "/fonts/gen3-rse-native.ttf", NativeEm = 16 };
-        var json = _scene.Build(sav, "Emerald", new SlotRef(0, 0), font);
-        Assert.Equal("/fonts/gen3-rse-native.ttf", (string?)json["font"]);
-        Assert.Equal(16, (int)json["font_em"]!);
+        Assert.Equal(og.Path, (string?)_scene.Build(sav, "Emerald", new SlotRef(0, 0), og, next)["font"]);
+
+        sav.SetBoxSlotAtIndex(TestSaves.Make(sav, Species.NidoranM, 5), 0, 0); // NIDORAN♂: OG has no ♂
+        Assert.Equal(next.Path, (string?)_scene.Build(sav, "Emerald", new SlotRef(0, 0), og, next)["font"]);
+        Directory.Delete(dir, true);
     }
 
     [Fact]

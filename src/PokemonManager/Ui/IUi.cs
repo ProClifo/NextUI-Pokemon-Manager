@@ -8,8 +8,8 @@ namespace PokemonManager.Ui;
 /// </summary>
 public interface IUi
 {
-    /// <summary>The font screens are drawn with (a game's own font in its menus); null for the NextUI font.</summary>
-    GameFont? Font { get; set; }
+    /// <summary>The NextUI font screens are drawn with (Next on the main menu, OG in a save); null for the NextUI setting.</summary>
+    UiFont? Font { get; set; }
 
     /// <summary>The background drawn behind lists and messages that don't name their own (a game's title art in its menus).</summary>
     string? Background { get; set; }

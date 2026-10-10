@@ -24,7 +24,7 @@ public sealed class BoxScene(string assetDir)
 
     public bool AssetsPresent => File.Exists(Path.Combine(AssetDir, "cursor.png"));
 
-    public JsonObject Build(SaveFile sav, string title, SlotRef start, GameFont? font = null)
+    public JsonObject Build(SaveFile sav, string title, SlotRef start, UiFont? font = null, UiFont? fallbackFont = null)
     {
         var sets = ArtSets(sav);
         // Gen 3 Deoxys looks the way the game showing it draws it; LeafGreen's differs from FireRed's.
@@ -52,14 +52,20 @@ public sealed class BoxScene(string assetDir)
             ["slot"] = slot,
             ["boxes"] = boxes,
         };
-        // The viewer draws any text the game font lacks in the NextUI font.
-        if (font is { Native: { } native, NativeEm: > 0 })
-        {
-            scene["font"] = native;
-            scene["font_em"] = font.NativeEm;
-        }
+        // The font to draw in, unless it lacks some of the text (OG has no Japanese): then the fallback.
+        var chosen = font is not null && font.Covers(Strings(scene)) ? font : fallbackFont;
+        if (chosen is not null)
+            scene["font"] = chosen.Path;
         return scene;
     }
+
+    private static IEnumerable<string?> Strings(JsonNode? node) => node switch
+    {
+        JsonObject o => o.SelectMany(p => Strings(p.Value)),
+        JsonArray a => a.SelectMany(Strings),
+        JsonValue v when v.TryGetValue<string>(out var s) => [s],
+        _ => [],
+    };
 
     /// <summary>The art sets to take a save's icons and sprites from, best first: its own game's, then
     /// Emerald's and Platinum's for anything that game lacks (Gen 5 saves use Platinum's).</summary>

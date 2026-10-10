@@ -36,7 +36,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
 
 ### Building it yourself
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow and fontTools, and Docker, which builds the patched minui-list and the PC box viewer.
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow, and Docker, which builds the patched minui-list and the PC box viewer.
 
 ```sh
 scripts/build-pak.sh          # -> dist/PokemonManager.pak.zip and dist/PokemonManager-<platform>-sdcard.zip
@@ -69,7 +69,7 @@ To refresh the ROM list from a newer No-Intro database, run `scripts/update-vani
 - Each box shows its own wallpaper from the save (Gen 3 saves). Other games cycle through the 16 Emerald wallpapers.
 - Pokémon appear with the icons and front sprites of the save's own game: Red/Blue, Yellow, Gold, Silver, Crystal, Ruby/Sapphire, Emerald, FireRed/LeafGreen (LeafGreen shows its own Deoxys) or Platinum (used for every Gen 4 game, and for Black/White, which have no decompilation). Game Boy sprites are coloured the way the games colour them (Super Game Boy palettes for Red/Blue/Yellow, Game Boy Color palettes for Gold/Silver/Crystal), and Game Boy party icons keep their 16x16 size. Unown letters, Castform and Gen 4 forms, female differences, shiny palettes and eggs are shown. Art a game lacks comes from Emerald or Platinum; Pokémon newer than Gen 4 show a "?" icon.
 - The panel on the left shows the Pokémon under the cursor: front sprite, name, level, gender, held item and OT.
-- Text is drawn in the game's font (see [Game fonts](#game-fonts)) at the size the game draws it.
+- Text is drawn in NextUI's OG font (see [Fonts](#fonts)).
 - **D-pad** moves the hand cursor, **L/R** switch boxes (the first "box" is your party), **A** opens the Pokémon's actions, **B** goes back.
 
 The art isn't stored in this repository. It's generated at build time from the pret decompilations: the wallpapers, cursor and background by `scripts/build-box-assets.py` from [pret/pokeemerald](https://github.com/pret/pokeemerald), and each game's icons and sprites by `scripts/build-box-art.py`. Each game's art is packed into two sheets plus an index, so the SD card gets a few dozen files rather than thousands. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC box view** switches between the two.
@@ -101,14 +101,9 @@ Every item in these lists is marked **✅ Legal** or **☠️ Illegal**, shown f
 
 Picking a gift: event Pokémon are **generated fresh for your save**, as the real distributions did. PKHeX works out which distribution a gallery file came from and rolls a new PID, nature, IVs and so on with that event's own method, keeping the event's OT and ID. Each Pokémon must pass PKHeX's legality check for your game before it's added; generation is retried until one does. For the few events PKHeX can't recreate (the Berry Glitch Shiny Zigzagoon), you get a random legal copy from the gallery's originals. Pokémon that weren't generated per player (e.g. one specific traded Pokémon) are given as they are. Released files that PKHeX flags as illegal aren't bundled at all, and unreleased ones ask before adding an illegal Pokémon. Gen 1/2 Pokémon are judged as cartridge-era games, so the GB event Mews count as legal. The new Pokémon goes to the first free PC slot, never the party. Gen 4/5 Wonder Cards can go to the in-game Mystery Gift album (pick them up from the delivery person) (Diamond/Pearl/Platinum first need Mystery Gift unlocked in-game: the Jubilife TV questionnaire with "EVERYONE HAPPY" "WI-FI CONNECTION"; HeartGold/SoulSilver unlock it with the Pokédex, Gen 5 has it from the start) or, for Pokémon, straight to your PC. Gen 3 cards are injected as described under *Gen 3 events* below.
 
-### Game fonts
+### Fonts
 
-Each game's menus (and the messages shown from them) and its PC box screen are drawn in that game's own font: Red/Blue/Yellow, Gold/Silver, Crystal, Ruby/Sapphire/Emerald, FireRed/LeafGreen and Diamond/Pearl/Platinum/HeartGold/SoulSilver. `scripts/build-fonts.py` turns the font graphics, width tables and character maps of the pret decompilations into TrueType pixel fonts at build time:
-
-- Every font pixel is a whole number of screen pixels at the sizes minui-list and minui-presenter draw (one file per use and UI scale), so text stays sharp; checked with the SDL_ttf version NextUI ships (2.0.13).
-- The fonts declare themselves bold, so SDL_ttf doesn't fake bold by smearing the pixels sideways.
-- A screen with a character the game font doesn't have (e.g. Japanese event names) uses the NextUI font instead.
-- Black/White and Black 2/White 2 have no decompilation to take a font from, and Japanese/Korean games keep the NextUI font.
+The main menu is drawn in NextUI's **Next** font and everything inside a save (its menus, messages and PC box screen) in NextUI's **OG** font, whatever font NextUI itself is set to. Both are NextUI's own (`.system/res/font1.ttf` and `font2.ttf`). OG has no Japanese and no ♂/♀, so a screen with text it can't show (read from the font's character map) uses Next instead.
 
 ### Event gallery
 
@@ -201,7 +196,7 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 ## How it works
 
 - `src/PokemonManager` is a .NET 10 app using the [PKHeX.Core](https://www.nuget.org/packages/PKHeX.Core) library for save parsing, Pokémon conversion, legality checks, evolution data, Mystery Gift albums and the event database. It's published as one self-contained, partially trimmed, ReadyToRun `linux-arm64` executable (~65 MB). No .NET install is needed on the device, and it works with glibc 2.27 or newer.
-- The UI uses josegonzalez's [`minui-list`](https://github.com/josegonzalez/minui-list) and [`minui-presenter`](https://github.com/josegonzalez/minui-presenter) (NextUI builds, so they follow your theme). They're driven from C#, so the runtime starts once per session. minui-list is built from source with a small patch (`native/minui-list.patch`): the released binaries crash when given a font, which the game fonts need, and the patch adds an option to show the Legal/Illegal tag on the highlighted row only.
+- The UI uses josegonzalez's [`minui-list`](https://github.com/josegonzalez/minui-list) and [`minui-presenter`](https://github.com/josegonzalez/minui-presenter) (NextUI builds, so they follow your theme). They're driven from C#, so the runtime starts once per session. minui-list is built from source with a small patch (`native/minui-list.patch`): the released binaries crash when given a font, which picking NextUI's Next/OG font needs, and the patch adds an option to show the Legal/Illegal tag on the highlighted row only.
 - Gen 3 event injection isn't part of PKHeX itself. It follows the WC3 plugin's import procedure and goes through PKHeX's Gen 3 block accessors. Game-side details (flag IDs, CRC16, berry checksums, the Wonder Card save routine) were checked against the [pret](https://github.com/pret) decompilations.
 
 ## Credits
@@ -211,7 +206,6 @@ pkmgr [--sd <sdcard>] [--data <dir>] <command>
 - The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event file formats and import procedure
 - [NextUI](https://github.com/LoveRetro/NextUI)
 - PC box art from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeruby](https://github.com/pret/pokeruby), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), generated at build time
-- Game fonts from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), converted at build time
 - ✅ and ☠️ icons from Google's [Noto Emoji](https://github.com/googlefonts/noto-emoji) (Apache License 2.0), fetched at build time
 - ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
 - Event files from [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery), bundled at build time

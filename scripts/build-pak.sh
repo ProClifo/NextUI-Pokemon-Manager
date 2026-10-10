@@ -5,7 +5,7 @@
 #                                      dist/PokemonManager-<platform>-sdcard.zip (Tools/<platform>/Pokemon Manager.pak/..., unzip onto the SD card)
 #                                      for platform in tg5040, tg5050, my355, h700
 #
-# Needs the .NET 10 SDK, curl, zip, git and Python 3 with Pillow and fontTools (box art, game fonts).
+# Needs the .NET 10 SDK, curl, zip, git and Python 3 with Pillow (box art, sprites, icons).
 # The event gallery is bundled from projectpokemon/EventsGallery at a pinned commit.
 # minui-list (patched) and the PC box viewer are built with Docker (scripts/build-native.sh), so Docker is required.
 set -euo pipefail
@@ -20,7 +20,7 @@ MINUI_PRESENTER_VERSION="${MINUI_PRESENTER_VERSION:-0.13.4}"
 POKEEMERALD_COMMIT="${POKEEMERALD_COMMIT:-731ad5bfd6e6f265508d0efcca0ba42f9dcf5881}"
 EVENTSGALLERY_COMMIT="${EVENTSGALLERY_COMMIT:-154d81be88453f6f78ec1d6d86e85fe0f2f5c240}"
 NOTO_EMOJI_COMMIT="${NOTO_EMOJI_COMMIT:-e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e}"
-# pret decompilations the game fonts and each game's box icons/sprites are built from (pokeemerald is the commit above)
+# pret decompilations each game's box icons/sprites are built from (pokeemerald is the commit above)
 POKERED_COMMIT="${POKERED_COMMIT:-af519899719f0754965776faac0e836a3b906e6d}"
 POKEYELLOW_COMMIT="${POKEYELLOW_COMMIT:-e89ead154b9968aa50eed9328ff2b38b6c194382}"
 POKEGOLD_COMMIT="${POKEGOLD_COMMIT:-ef0201d8daf47e8b3ea1518eacf890f37d4cd5e8}"
@@ -61,7 +61,7 @@ for platform in "${PLATFORMS[@]}"; do
 done
 
 # Built from source: the PC box viewer, and minui-list $MINUI_LIST_VERSION patched (native/minui-list.patch) so its
-# font options don't crash (the release binaries segfault on --font-large, which the per-game menu fonts use) and
+# font options don't crash (the release binaries segfault on --font-large, which picking NextUI's Next/OG font uses) and
 # so it can show the Legal/Illegal tag on the highlighted row only.
 echo "==> PC box viewer and minui-list"
 missing=()
@@ -88,7 +88,7 @@ git -C "$GALLERY" sparse-checkout set --no-cone \
 dotnet run --project "$ROOT/src/PokemonManager/PokemonManager.csproj" -c Release -- \
     gallery-build "$GALLERY" "$PAK/res/gallery.zip" 2>"$BUILD/gallery-skipped.log"
 
-echo "==> pret decompilations (game fonts, PC box art)"
+echo "==> pret decompilations (PC box art, player sprites)"
 DECOMP="$BUILD/decomp"
 mkdir -p "$DECOMP"
 sparse_clone() {
@@ -99,16 +99,16 @@ sparse_clone() {
 }
 GB_ART=('/gfx/pokemon/' '/gfx/icons/' '/gfx/stats/' '/gfx/sprites/' '/gfx/overworld/' '/gfx/sprites.asm' '/data/pokemon/' '/data/sgb/'
     '/data/icon_pointers.asm' '/engine/gfx/mon_icons.asm')
-sparse_clone pokered "$POKERED_COMMIT" '/gfx/font/' '/constants/charmap.asm' "${GB_ART[@]}"
+sparse_clone pokered "$POKERED_COMMIT" "${GB_ART[@]}"
 sparse_clone pokeyellow "$POKEYELLOW_COMMIT" "${GB_ART[@]}"
-sparse_clone pokegold "$POKEGOLD_COMMIT" '/gfx/font/' '/constants/charmap.asm' "${GB_ART[@]}"
-sparse_clone pokecrystal "$POKECRYSTAL_COMMIT" '/gfx/font/' '/constants/charmap.asm' "${GB_ART[@]}"
+sparse_clone pokegold "$POKEGOLD_COMMIT" "${GB_ART[@]}"
+sparse_clone pokecrystal "$POKECRYSTAL_COMMIT" "${GB_ART[@]}"
 sparse_clone pokeruby "$POKERUBY_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c'
 sparse_clone pokeemerald "$POKEEMERALD_COMMIT" '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk' \
-    '/src/pokemon_icon.c' '/graphics/fonts/' '/charmap.txt' '/src/fonts.c' '/graphics/object_events/pics/people/'
-sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/fonts/' '/charmap.txt' '/src/text.c' '/graphics/pokemon/' '/src/pokemon_icon.c' \
+    '/src/pokemon_icon.c' '/graphics/object_events/pics/people/'
+sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' \
     '/graphics/object_events/pics/people/'
-sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/fonts/' '/tools/msgenc/charmap.txt' '/res/pokemon/' '/generated/species.txt' \
+sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \
     '/res/graphics/field_sprites/player/'
 # HeartGold's player sprites (MMODEL_HERO, MMODEL_HEROINE)
 sparse_clone pokeheartgold "$POKEHEARTGOLD_COMMIT" '/files/data/mmodel/mmodel/mmodel_00000069.NSBTX' '/files/data/mmodel/mmodel/mmodel_00000070.NSBTX'
@@ -119,9 +119,6 @@ python3 "$ROOT/scripts/build-box-art.py" "$DECOMP" "$PAK/res/box/art"
 
 echo "==> Players' overworld sprites (main menu)"
 python3 "$ROOT/scripts/build-trainers.py" "$DECOMP" "$PAK/res/trainers"
-
-echo "==> Game fonts"
-python3 "$ROOT/scripts/build-fonts.py" "$DECOMP" "$PAK/res/fonts"
 
 echo "==> Legal/Illegal icons (googlefonts/noto-emoji ${NOTO_EMOJI_COMMIT:0:7})"
 NOTO="$BUILD/noto-emoji"

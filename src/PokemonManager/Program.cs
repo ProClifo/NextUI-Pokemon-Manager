@@ -54,7 +54,7 @@ int RunUi()
         return 3;
     }
     IUi ui = console ? new ConsoleUi() : new MinUi(paths.TempDir, paths.IconsDir,
-        GameFonts.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE")));
+        UiFont.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE")), UiFont.Next(paths.SdRoot));
     return new App(ui, paths).Run();
 }
 
@@ -202,7 +202,7 @@ int BoxSceneCommand(List<string> a)
     var output = Arg(a, 1, "output file");
     var assets = a.Count > 2 ? a[2] : AppPaths.FromEnvironment(sd, data).BoxAssetsDir;
     var start = a.Count > 3 ? ParseSlot(a[3]) : new SlotRef(0, 0);
-    var font = a.Count > 4 ? new GameFonts(a[4], 2).For(entry.Sav, GalleryLanguage.English) : null;
+    var font = a.Count > 4 ? new UiFont(a[4]) : null;
     File.WriteAllText(output, new BoxScene(assets).Build(entry.Sav, entry.Label, start, font).ToJsonString());
     return 0;
 }
@@ -306,7 +306,7 @@ static int Usage(int code)
           events <save>                        list PKHeX's built-in events for this game
           redeem-event <save> <index>          send a built-in event Pokémon to the PC
           gen3-status <save>                   Gen 3 Mystery Gift / Event status
-          box-scene <save> <out.json> [assets] [slot] [fonts]   scene file for the PC box viewer (testing)
+          box-scene <save> <out.json> [assets] [slot] [font.ttf] scene file for the PC box viewer (testing)
           gallery-build <EventsGallery dir> <out.zip>   bundle the Gen 1-5 EventsGallery files (build time)
           gallery <save> [events|distributions|all] [--all-languages] [--unreleased]
                                                gallery files the game menus would list

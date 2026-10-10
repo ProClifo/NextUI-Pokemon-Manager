@@ -17,14 +17,14 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
 
     public bool IsAvailable => scene.AssetsPresent && FindOnPath(Tool) is not null;
 
-    public Outcome Pick(SaveFile sav, string title, ref SlotRef position, GameFont? font = null)
+    public Outcome Pick(SaveFile sav, string title, ref SlotRef position, UiFont? font = null, UiFont? fallbackFont = null)
     {
         Directory.CreateDirectory(tempDir);
         var scenePath = Path.Combine(tempDir, "box-scene.json");
         var outPath = Path.Combine(tempDir, "box-result.json");
         try
         {
-            File.WriteAllText(scenePath, scene.Build(sav, title, position, font).ToJsonString());
+            File.WriteAllText(scenePath, scene.Build(sav, title, position, font, fallbackFont).ToJsonString());
             File.Delete(outPath);
         }
         catch (Exception ex)

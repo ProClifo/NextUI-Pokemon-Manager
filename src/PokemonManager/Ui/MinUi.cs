@@ -17,13 +17,16 @@ public sealed class MinUi : IUi
     private readonly string _tmp;
     private readonly string? _iconsDir;
     private readonly int _scale;
+    private readonly UiFont? _fallbackFont;
     private Process? _busy;
 
-    public MinUi(string tempDir, string? iconsDir = null, int scale = 2)
+    /// <param name="fallbackFont">The font for screens <see cref="Font"/> can't show (NextUI's Next font, which has Japanese).</param>
+    public MinUi(string tempDir, string? iconsDir = null, int scale = 2, UiFont? fallbackFont = null)
     {
         _tmp = tempDir;
         _iconsDir = iconsDir;
         _scale = scale;
+        _fallbackFont = fallbackFont;
         Directory.CreateDirectory(_tmp);
         // launch.sh shows a "Loading..." screen while the runtime starts; take it down.
         foreach (var p in Process.GetProcessesByName("minui-presenter"))
@@ -45,22 +48,24 @@ public sealed class MinUi : IUi
 
     public static bool IsAvailable() => FindOnPath("minui-list") is not null && FindOnPath("minui-presenter") is not null;
 
-    public GameFont? Font { get; set; }
+    public UiFont? Font { get; set; }
 
     public string? Background { get; set; }
 
     /// <summary>minui-presenter's background option, when a background is set.</summary>
     private string[] MessageBackground() => Background is { } b && File.Exists(b) ? ["--background-image", b] : [];
 
-    /// <summary>minui-list's font options, when the game font has every character the list shows.</summary>
-    private string[] ListFont(params IEnumerable<string?>[] texts)
-        => Font is { } f && f.Covers(texts.SelectMany(t => t)) ? ["--font-large", f.List, "--font-medium", f.Title] : [];
+    /// <summary>The font file for a screen: <see cref="Font"/> if it has every character, else the fallback.</summary>
+    private string? FontFor(IEnumerable<string?> texts)
+        => Font is { } f && f.Covers(texts) ? f.Path : _fallbackFont?.Path;
 
-    /// <summary>minui-presenter's font options, when the game font has every character of the message and buttons.</summary>
+    /// <summary>minui-list's font options (opened at its own sizes).</summary>
+    private string[] ListFont(params IEnumerable<string?>[] texts)
+        => FontFor(texts.SelectMany(t => t)) is { } path ? ["--font-large", path, "--font-medium", path] : [];
+
+    /// <summary>minui-presenter's font option (opened at its own size).</summary>
     private string[] MessageFont(params string[] texts)
-        => Font is { } f && f.Covers(texts)
-            ? ["--font-default", f.Message, "--font-size-default", f.MessageSize.ToString(System.Globalization.CultureInfo.InvariantCulture)]
-            : [];
+        => FontFor(texts) is { } path ? ["--font-default", path] : [];
 
     public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null)
     {
@@ -280,7 +285,7 @@ public sealed class MinUi : IUi
 /// </summary>
 public sealed class ConsoleUi : IUi
 {
-    public GameFont? Font { get; set; }
+    public UiFont? Font { get; set; }
     public string? Background { get; set; }
 
     public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null)

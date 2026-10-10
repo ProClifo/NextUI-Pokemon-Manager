@@ -33,7 +33,8 @@ public sealed class App
     private readonly Dictionary<string, GameProfile> _profiles = new();
     private readonly Dictionary<string, List<TicketChoice>> _tickets = new();
     private readonly GalleryArchive _gallery;
-    private readonly GameFonts _fonts;
+    private readonly UiFont? _nextFont;
+    private readonly UiFont? _ogFont;
     private readonly int _uiScale;
 
     public App(IUi ui, AppPaths paths)
@@ -45,8 +46,11 @@ public sealed class App
         _boxViewer = new BoxViewer(new BoxScene(paths.BoxAssetsDir), paths.TempDir);
         _backgrounds = new GameBackgrounds(paths.BackgroundsDir);
         _gallery = new GalleryArchive(paths.GalleryFile);
-        _uiScale = GameFonts.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE"));
-        _fonts = new GameFonts(paths.FontsDir, _uiScale);
+        _uiScale = UiFont.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE"));
+        // NextUI's Next font on the main menu, its OG font inside a save.
+        _nextFont = UiFont.Next(paths.SdRoot);
+        _ogFont = UiFont.OG(paths.SdRoot);
+        _ui.Font = _nextFont;
         _settings = AppSettings.Load(paths.SettingsFile);
     }
 
@@ -154,16 +158,9 @@ public sealed class App
 
     private void SaveMenu(SaveEntry entry)
     {
-        // The game's menus are drawn in the game's own font.
+        // A save's menus are drawn in NextUI's OG font.
         var previousFont = _ui.Font;
-        try
-        {
-            _ui.Font = _fonts.For(entry.Sav, ProfileFor(entry).Language);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Couldn't pick the game font: {ex.Message}");
-        }
+        _ui.Font = _ogFont;
         // ...over the game's title art, which stays behind its sub-menus and messages (not Pokémon storage).
         var previousBackground = _ui.Background;
         _ui.Background = BackgroundFor(entry);
@@ -329,7 +326,7 @@ public sealed class App
             var position = _boxPositions.GetValueOrDefault(entry.Path, new SlotRef(0, 0));
             while (true)
             {
-                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ui.Font);
+                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ogFont, _nextFont);
                 _boxPositions[entry.Path] = position;
                 if (outcome == BoxViewer.Outcome.Back)
                     return;
