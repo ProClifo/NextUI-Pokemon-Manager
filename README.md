@@ -172,8 +172,8 @@ Notes:
 
 - Wonder Cards and Mystery Events share one script slot, so injecting one replaces the other. That's also how the games behave.
 - Japanese and international Wonder Cards/News have different sizes and only work in a save of the matching region.
-- Injecting a Wonder Card or Wonder News also unlocks the Mystery Gift menu. Injecting a Mystery Event into Ruby/Sapphire or Japanese Emerald unlocks Mystery Events.
-- **Non-Japanese Emerald** has no Mystery Event menu, and setting its Mystery Event flag corrupts the save. Pokémon Manager never sets that flag. It writes the event script and warns that the event may not trigger.
+- Events need the game's own menu unlocked first, as on the cartridge: Mystery Event in Ruby/Sapphire (fill in the questionnaire with "MYSTERY EVENT IS EXCITING"), Mystery Gift in FireRed/LeafGreen/Emerald ("LINK TOGETHER WITH ALL"; Wonder Cards, Wonder News and e-Cards), and Mystery Event in Japanese Emerald for `.me3` files. Pokémon Manager never unlocks these menus itself.
+- **Non-Japanese Emerald** has no Mystery Event menu (and setting its flag corrupts the save), so `.me3` files can't go into it.
 - Like the WC3 plugin, stale checksums in a file (e.g. after hand-editing) are recalculated, and the result message says so. Files for the wrong game or region, and Wonder Cards without an event flag, are refused.
 - Injecting a Mystery Event into Emerald clears any Wonder Card, because the card would point at the replaced script.
 

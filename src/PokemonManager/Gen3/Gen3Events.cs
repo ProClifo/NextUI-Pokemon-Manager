@@ -145,6 +145,8 @@ public static class Gen3Events
     /// </summary>
     public static OpResult Inject(SAV3 sav, Gen3EventFile file)
     {
+        if (MenuLocked(sav, file.Kind) is { } locked)
+            return OpResult.Fail(locked);
         var repaired = new List<string>();
         var result = file.Kind switch
         {
@@ -201,10 +203,7 @@ public static class Gen3Events
         }
         sav.LargeBlock.MysteryData = script;
 
-        bool enabled = EnableMysteryGift(sav);
         var msg = $"Wonder Card \"{card.Title.Trim()}\" injected.\nTalk to the delivery man in green on the 2nd floor of any Pokémon Center.";
-        if (enabled)
-            msg += "\nMystery Gift was also unlocked in the main menu.";
         msg += "\nNote: a game holds one card/event script at a time; this replaced any previous one.";
         return OpResult.Success(msg);
     }
@@ -226,11 +225,7 @@ public static class Gen3Events
         }
         block.SetWonderNews(sav.Japanese, news.Data);
 
-        bool enabled = EnableMysteryGift(sav);
-        var msg = "Wonder News injected. Read it from Mystery Gift > Wonder News on the title menu.";
-        if (enabled)
-            msg += "\nMystery Gift was also unlocked in the main menu.";
-        return OpResult.Success(msg);
+        return OpResult.Success("Wonder News injected. Read it from Mystery Gift > Wonder News on the title menu.");
     }
 
     private static OpResult InjectMysteryEvent(SAV3 sav, Gen3EventFile file, List<string> repaired)
@@ -276,21 +271,9 @@ public static class Gen3Events
                 msg += $"\nIt also shares {Names.Item(gift.Item, EntityContext.Gen3)} with friends through Record Mixing.";
         }
 
-        if (sav is SAV3RS)
-        {
-            sav.Large[Sector2 + 0x3A9] |= 0x10; // FLAG_SYS_EXDATA_ENABLE (Mystery Event menu)
-            msg += "\nFollow the event's original instructions (for the Eon Ticket: visit your dad at the Petalburg Gym).";
-        }
-        else if (sav.Japanese)
-        {
-            sav.Large[Sector2 + 0x405] |= 0x10; // FLAG_SYS_MYSTERY_EVENT_ENABLE (Japanese Emerald only)
-            msg += "\nThe event is now active in your game.";
-        }
-        else
-        {
-            // Non-Japanese Emerald corrupts the save if the Mystery Event flag is set, so never touch it.
-            msg += "\nMystery Events were cut from non-Japanese Emerald; the script was written but the event may not trigger.";
-        }
+        msg += sav is SAV3RS
+            ? "\nFollow the event's original instructions (for the Eon Ticket: visit your dad at the Petalburg Gym)."
+            : "\nThe event is now active in your game.";
         msg += "\nNote: this replaced any Wonder Card or event script already in the save.";
         return OpResult.Success(msg);
     }
@@ -332,20 +315,32 @@ public static class Gen3Events
         return OpResult.Success($"e-Reader Berry {sav.EBerryName} injected. It replaces the Enigma Berry data in the save, as scanning the e-Card would.");
     }
 
-    /// <summary>Sets FLAG_SYS_MYSTERY_GIFT_ENABLE on FR/LG/E. Returns true if it was previously off.</summary>
-    private static bool EnableMysteryGift(SAV3 sav)
+    // The menus events arrive through, unlocked in-game by the questionnaire (pokeruby/pokeemerald/pokefirered flags.h).
+    internal const int FlagExdataEnableRS = 0x84C;         // FLAG_SYS_EXDATA_ENABLE: Mystery Event
+    internal const int FlagMysteryEventEnableE = 0x8AC;    // FLAG_SYS_MYSTERY_EVENT_ENABLE (Japanese Emerald)
+    internal const int FlagMysteryGiftEnableE = 0x8DB;     // FLAG_SYS_MYSTERY_GIFT_ENABLE
+    internal const int FlagMysteryGiftEnableFRLG = 0x839;  // FLAG_SYS_MYSTERY_GIFT_ENABLED
+
+    /// <summary>
+    /// Why this save can't receive the event yet: the game's own menu for it (Ruby/Sapphire's Mystery Event,
+    /// FireRed/LeafGreen/Emerald's Mystery Gift, Japanese Emerald's Mystery Event) must be unlocked in-game first.
+    /// </summary>
+    public static string? MenuLocked(SAV3 sav, Gen3EventKind kind)
     {
-        var (offset, mask) = sav switch
+        const string eventPhrase = "\"MYSTERY EVENT IS EXCITING\"";
+        const string giftPhrase = "\"LINK TOGETHER WITH ALL\"";
+        var (flag, menu, phrase) = (sav, kind) switch
         {
-            SAV3E => (Sector2 + 0x40B, (byte)0x08),
-            SAV3FRLG => (Sector2 + 0x67, (byte)0x02),
-            _ => (-1, (byte)0),
+            (SAV3RS, _) => (FlagExdataEnableRS, "Mystery Event", eventPhrase),
+            (SAV3E, Gen3EventKind.MysteryEvent) => (sav.Japanese ? FlagMysteryEventEnableE : -1, "Mystery Event", eventPhrase),
+            (SAV3E, _) => (FlagMysteryGiftEnableE, "Mystery Gift", giftPhrase),
+            _ => (FlagMysteryGiftEnableFRLG, "Mystery Gift", giftPhrase),
         };
-        if (offset < 0)
-            return false;
-        bool was = (sav.Large[offset] & mask) != 0;
-        sav.Large[offset] |= mask;
-        return !was;
+        if (flag < 0)
+            return "Non-Japanese Emerald has no Mystery Event, so this event can't be received.";
+        if (sav.GetEventFlag(flag))
+            return null;
+        return $"Unlock {menu} in {Names.Game(sav)} first: fill in the questionnaire with {phrase}.";
     }
 
     // pokeemerald include/constants/flags.h and items.h
@@ -404,7 +399,7 @@ public static class Gen3Events
                 : "Wonder News: none");
         }
         if (sav is SAV3RS)
-            lines.Add($"Mystery Event unlocked: {((large[Sector2 + 0x3A9] & 0x10) != 0 ? "yes" : "no")}");
+            lines.Add($"Mystery Event unlocked: {(sav.GetEventFlag(FlagExdataEnableRS) ? "yes" : "no")}");
         lines.Add($"e-Reader Berry: {(sav.IsEBerryEngima ? "none (Enigma)" : sav.EBerryName)}");
         lines.Add($"e-Card Trainer: {(sav.SmallBlock.EReaderTrainer.ContainsAnyExcept((byte)0, (byte)0xFF) ? Text(sav.SmallBlock.EReaderTrainer.Slice(4, sav.Japanese ? 5 : 7), sav.Japanese) : "none")}");
 
