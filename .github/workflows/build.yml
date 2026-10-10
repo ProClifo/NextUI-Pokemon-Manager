@@ -5,6 +5,12 @@ on:
     branches: ["**"]
     tags: ["v*"]
   pull_request:
+  # Run by hand to publish a release of the chosen branch: the tag (e.g. v0.1.0-alpha.1) is created on its commit
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to create, e.g. v0.1.0-alpha.1 (a suffix makes it a pre-release)"
+        required: true
 
 permissions:
   contents: write
@@ -38,10 +44,12 @@ jobs:
           path: dist/*.zip
 
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: dist/*.zip
           generate_release_notes: true
           # v0.1.0-alpha.1 and the like are marked as pre-releases
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(inputs.release_tag || github.ref_name, '-') }}
