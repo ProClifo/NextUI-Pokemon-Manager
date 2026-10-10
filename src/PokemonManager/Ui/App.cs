@@ -691,7 +691,12 @@ public sealed class App
         if (!GalleryAvailable())
             return;
         var profile = ProfileFor(entry);
-        var list = GalleryLists.Distributions(_gallery, profile);
+        // Only released distributions are listed, and every Pokémon handed out passes the legality check.
+        var list = GalleryLists.Distributions(_gallery, profile)
+            .Select(e => (e.Title, Tag: (string?)"Legal", Run: (Action)(() => GiveGalleryFile(entry, e)))).ToList();
+        // Ruby/Sapphire/Emerald also get the Regi dolls, which no normal play hands out (decorations can't be illegal).
+        if (entry.Sav is SAV3RS or SAV3E)
+            list.AddRange(Gen3Events.RegiDolls.Select(d => (d.Name, Tag: (string?)null, Run: (Action)(() => GiveDoll(entry, d.Id)))));
         if (list.Count == 0)
         {
             _ui.Message($"Every Pokémon the gallery has for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)} can be obtained without an event. See the Gallery for all distributions.");
@@ -700,14 +705,35 @@ public sealed class App
         int selected = 0;
         while (true)
         {
-            // Only released distributions are listed, and every Pokémon handed out passes the legality check.
             var choice = _ui.Choose($"Distributions ({list.Count})", list.Select(e => e.Title).ToList(), selected,
-                tags: list.Select(_ => (string?)"Legal").ToList());
+                tags: list.Select(e => e.Tag).ToList());
             if (choice is null)
                 return;
             selected = choice.Value;
-            GiveGalleryFile(entry, list[choice.Value]);
+            list[choice.Value].Run();
         }
+    }
+
+    private void GiveDoll(SaveEntry entry, byte doll)
+    {
+        var sav = (SAV3)entry.Sav;
+        if (TradeRules.CheckDistribution(sav) is { Ok: false } noDex)
+        {
+            _ui.Message(noDex.Message);
+            return;
+        }
+        var name = Gen3Events.RegiDolls.First(d => d.Id == doll).Name;
+        if (!_ui.Confirm($"Send the {name} to {Names.Game(sav)}'s PC?", "SEND", "CANCEL"))
+            return;
+        var result = Gen3Events.GiveDoll(sav, doll);
+        if (!result.Ok)
+        {
+            entry.Reload();
+            _ui.Message(result.Message);
+            return;
+        }
+        if (TryWrite(entry, out _))
+            _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
     }
 
     private void GalleryMenu(SaveEntry entry)

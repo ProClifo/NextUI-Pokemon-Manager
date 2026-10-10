@@ -351,6 +351,29 @@ public static class Gen3Events
         }
     }
 
+    // The Regi dolls (decorations.h), kept in SaveBlock1's doll inventory (global.h: RS 0x2704, E 0x2798, 40 slots).
+    public static readonly (byte Id, string Name)[] RegiDolls = [(118, "Regirock Doll"), (119, "Regice Doll"), (120, "Registeel Doll")];
+    private const int DollSlots = 40;
+
+    /// <summary>
+    /// Adds a doll decoration to Ruby/Sapphire/Emerald as a Mystery Event's adddecoration did (DecorationAdd: the
+    /// first empty slot of the doll inventory). One of each is enough, so a doll the player has isn't added again.
+    /// </summary>
+    public static OpResult GiveDoll(SAV3 sav, byte doll)
+    {
+        if (sav is SAV3FRLG)
+            return OpResult.Fail("FireRed and LeafGreen have no decorations.");
+        var name = RegiDolls.First(d => d.Id == doll).Name.ToUpperInvariant();
+        var dolls = sav.Large.Slice(sav is SAV3E ? 0x2798 : 0x2704, DollSlots);
+        if (dolls.Contains(doll))
+            return OpResult.Fail($"You already have the {name}.");
+        int free = dolls.IndexOf((byte)0);
+        if (free < 0)
+            return OpResult.Fail("There's no more room for dolls in your PC.");
+        dolls[free] = doll;
+        return OpResult.Success($"The {name} was sent to your PC. Decorate your room or Secret Base with it.");
+    }
+
     // pokeemerald include/constants/flags.h and items.h
     private const int FlagSysGameClearE = 0x864;             // FLAG_SYS_GAME_CLEAR
     private const int FlagEnableShipSouthernIslandE = 0x8B3; // FLAG_ENABLE_SHIP_SOUTHERN_ISLAND
