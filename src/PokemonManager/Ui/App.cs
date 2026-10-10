@@ -183,6 +183,8 @@ public sealed class App
             var sav = entry.Sav;
             Legality.For(sav); // legality reports in this save's menus are for this game and trainer
             var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
+            if (GameClock.Supported(sav))
+                actions.Add(("Clock", null, () => ClockMenu(entry)));
             // A game with one event gets that event on its menu; a game with several gets an Events menu.
             var tickets = TicketsFor(entry);
             if (sav is SAV2 { Version: GameVersion.C } crystal)
@@ -356,17 +358,21 @@ public sealed class App
             if (pk.Species == 0)
                 return; // moved away or slot compacted
             // Transfer moves the Pokémon (no copies: that would be a clone); Evolve is a trade evolution.
-            var actions = new List<(string Label, Func<bool> Run)>
+            // Transfer/Evolve are greyed out when they can't be done; picking one then does nothing.
+            var actions = new List<(string Label, bool Enabled, Func<bool> Run)>
             {
-                ("Transfer", () => TransferFlow(entry, slot, TransferMode.Move)),
-                ("Summary", () => { _ui.Message(Names.Details(pk)); return false; }),
-                ("Evolve", () => EvolveFlow(entry, slot)),
-                ("Cancel", () => true),
+                ("Transfer", CanTransfer(entry, slot), () => TransferFlow(entry, slot, TransferMode.Move)),
+                ("Summary", true, () => { _ui.Message(Names.Details(pk)); return false; }),
+                ("Evolve", CanEvolve(entry, slot), () => EvolveFlow(entry, slot)),
+                ("Cancel", true, () => true),
             };
 
-            var choice = _ui.Choose($"{slot}: {Names.Summary(pk)}", actions.Select(a => a.Label).ToList());
+            var choice = _ui.Choose($"{slot}: {Names.Summary(pk)}", actions.Select(a => a.Label).ToList(),
+                disabled: actions.Select(a => !a.Enabled).ToList());
             if (choice is null)
                 return;
+            if (!actions[choice.Value].Enabled)
+                continue;
             bool slotChanged = actions[choice.Value].Run();
             if (slotChanged)
                 return;
@@ -375,7 +381,11 @@ public sealed class App
 
     // ---------------------------------------------------------------- transfers
 
-    private SaveEntry? PickOtherSave(SaveEntry exclude, string title)
+    /// <summary>
+    /// The other saves, shown like the main menu ("[ENG] Emerald" with NAME, sprite and ID); the ones the
+    /// Pokémon can't go to are greyed out and do nothing when picked.
+    /// </summary>
+    private SaveEntry? PickOtherSave(SaveEntry exclude, string title, SlotRef? from = null)
     {
         var others = GetSaves().Where(s => s.Path != exclude.Path).ToList();
         if (others.Count == 0)
@@ -383,8 +393,50 @@ public sealed class App
             _ui.Message("No other Pokémon saves were found. Put the other game's save in the SD card's Saves folder.");
             return null;
         }
-        var choice = _ui.Choose(title, others.Select(s => s.Label).ToList());
-        return choice is null ? null : others[choice.Value];
+        var sprites = others.Select(s => TrainerSprite(s.Sav)).ToList();
+        var tags = others.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
+        var blocked = others.Select(s => from is { } f && !CanTransferTo(exclude, f, s)).ToList();
+        int selected = Math.Max(blocked.IndexOf(false), 0);
+        while (true)
+        {
+            var choice = _ui.Choose(title, others.Select(SaveName).ToList(), selected, tags: tags, images: sprites, disabled: blocked);
+            if (choice is null)
+                return null;
+            if (!blocked[choice.Value])
+                return others[choice.Value];
+            selected = choice.Value;
+        }
+    }
+
+    /// <summary>Whether the Pokémon can be moved to <paramref name="dest"/>, following the games' trade rules.</summary>
+    private bool CanTransferTo(SaveEntry source, SlotRef from, SaveEntry dest)
+    {
+        var pk = from.Get(source.Sav);
+        if (!_settings.AllowIllegalTransfers
+            && TradeRules.CheckTransfer(pk, source.Sav, dest.Sav, ProfileFor(source).Language, ProfileFor(dest).Language) is { Ok: false })
+            return false;
+        return TransferService.Prepare(pk, dest.Sav, _settings.AllowIllegalTransfers, out _).Ok
+               && SlotRef.FirstEmptyBoxSlot(dest.Sav) is not null;
+    }
+
+    /// <summary>Whether Transfer can be used: the Pokémon may leave its slot and some other save can take it.</summary>
+    private bool CanTransfer(SaveEntry entry, SlotRef slot)
+    {
+        if (!TransferService.CanMove(entry.Sav, slot).Ok)
+            return false;
+        if (slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, slot.Get(entry.Sav)) is not null)
+            return false;
+        return GetSaves().Any(s => s.Path != entry.Path && CanTransferTo(entry, slot, s));
+    }
+
+    /// <summary>Whether Evolve can be used: a trade evolution whose conditions (held item...) are met, no Everstone.</summary>
+    private static bool CanEvolveNow(PKM pk)
+        => !TradeEvolution.HoldsEverstone(pk) && TradeEvolution.GetOptions(pk).Any(o => o.ConditionsMet);
+
+    private bool CanEvolve(SaveEntry entry, SlotRef slot)
+    {
+        var pk = slot.Get(entry.Sav);
+        return CanEvolveNow(pk) && !(slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null);
     }
 
     /// <returns>True if the source slot no longer holds this Pokémon.</returns>
@@ -392,7 +444,7 @@ public sealed class App
     {
         if (PartyTradeBlocked(source, from))
             return false;
-        var dest = PickOtherSave(source, mode == TransferMode.Move ? "Move to which game?" : "Copy to which game?");
+        var dest = PickOtherSave(source, mode == TransferMode.Move ? "Move to which game?" : "Copy to which game?", from);
         if (dest is null)
             return false;
 
@@ -400,7 +452,7 @@ public sealed class App
         if (!_settings.AllowIllegalTransfers
             && TradeRules.CheckTransfer(pk, source.Sav, dest.Sav, ProfileFor(source).Language, ProfileFor(dest).Language) is { Ok: false } refused)
         {
-            _ui.Message($"{refused.Message}\n\n(Settings > Illegal transfers turns these rules off.)");
+            _ui.Message(refused.Message);
             return false;
         }
         var check = TransferService.Prepare(pk, dest.Sav, _settings.AllowIllegalTransfers, out _);
@@ -427,6 +479,9 @@ public sealed class App
         }
 
         var message = result.Message;
+        // Ruby/Sapphire get the National Pokédex from a trade partner that has it.
+        if (TradeRules.UnlockNationalDexByTrade(source.Sav, dest.Sav) is { } unlocked)
+            message += $"\n{Names.Game(unlocked)} received the National Pokédex!";
 
         // A trade between games of the same era triggers trade evolutions, just like a link cable.
         var placed = placedAt.Get(dest.Sav);
@@ -466,6 +521,52 @@ public sealed class App
         return true;
     }
 
+    // ---------------------------------------------------------------- clock
+
+    /// <summary>The game's clock: the time of day, and in Gen 2 the day of the week (left/right to change).</summary>
+    private void ClockMenu(SaveEntry entry)
+    {
+        var sav = entry.Sav;
+        var rtcPath = RomIndex.FindRoms(entry.Path).FirstOrDefault() is { } rom
+            ? Path.Combine(Path.GetDirectoryName(entry.Path)!, Path.GetFileName(rom) + ".rtc")
+            : null;
+        var now = GameClock.Read(sav, rtcPath, DateTime.Now);
+        bool weekdays = GameClock.HasWeekdays(sav);
+        var names = new List<string>();
+        var options = new List<string[]>();
+        var values = new List<int>();
+        if (weekdays)
+        {
+            names.Add("Day");
+            options.Add(GameClock.Weekdays);
+            values.Add(now.Weekday);
+        }
+        names.Add("Hour");
+        options.Add(Enumerable.Range(0, 24).Select(h => $"{h:00}").ToArray());
+        values.Add(now.Hour);
+        names.Add("Minute");
+        options.Add(Enumerable.Range(0, 60).Select(m => $"{m:00}").ToArray());
+        values.Add(now.Minute);
+
+        if (_ui.Options("Clock", names, options, values) is not { } result)
+            return;
+        int i = weekdays ? 1 : 0;
+        var rtc = GameClock.Set(sav, DateTime.Now, weekdays ? result.Values[0] : 0, result.Values[i], result.Values[i + 1]);
+        if (!TryWrite(entry, out _))
+            return;
+        if (rtc is not null && rtcPath is not null)
+        {
+            try
+            {
+                File.WriteAllBytes(rtcPath, rtc);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _ui.Message($"Couldn't set the cartridge clock ({ex.Message}).");
+            }
+        }
+    }
+
     // ---------------------------------------------------------------- trade evolution
 
     private bool EvolveFlow(SaveEntry entry, SlotRef slot)
@@ -473,17 +574,10 @@ public sealed class App
         if (PartyTradeBlocked(entry, slot))
             return false;
         var pk = slot.Get(entry.Sav);
-        var options = TradeEvolution.GetOptions(pk);
-        if (options.Count == 0)
-        {
-            _ui.Message($"{Names.Species(pk)} doesn't evolve by trading.");
+        // Only evolutions a real trade would trigger: Onix must hold the Metal Coat to become Steelix.
+        var options = TradeEvolution.GetOptions(pk).Where(o => o.ConditionsMet).ToList();
+        if (options.Count == 0 || TradeEvolution.HoldsEverstone(pk))
             return false;
-        }
-        if (TradeEvolution.HoldsEverstone(pk))
-        {
-            _ui.Message($"{Names.Summary(pk)} is holding an Everstone. Take it away in-game first.");
-            return false;
-        }
 
         var option = options[0];
         if (options.Count > 1)
@@ -494,10 +588,7 @@ public sealed class App
             option = options[pick.Value];
         }
 
-        var question = $"Evolve {Names.Summary(pk)} into {Names.Species(option.Species)}?";
-        if (option.Method == EvolutionType.TradeHeldItem && !option.HoldsRequiredItem)
-            question += $"\n\nIt isn't holding {Names.Item(option.RequiredItem, pk.Context)}, which a real trade needs. Evolve anyway?";
-        if (!_ui.Confirm(question, "EVOLVE", "CANCEL"))
+        if (!_ui.Confirm($"Evolve {Names.Summary(pk)} into {Names.Species(option.Species)}?", "EVOLVE", "CANCEL"))
             return false;
 
         var result = TradeEvolution.Evolve(entry.Sav, slot, option);
@@ -925,60 +1016,57 @@ public sealed class App
 
     private void SettingsMenu()
     {
+        // Like NextUI's own settings: the name on the left, Enabled/Disabled on the right (left/right to change).
+        string[] onOff = ["Disabled", "Enabled"];
+        var names = new List<string>
+        {
+            "Illegal Transfers", "Official ROMs Only", "PC Box View", "Save State Deletion",
+            "Gallery: All Languages", "Gallery: Unreleased Files", "Show Welcome Screen Again",
+        };
+        int selected = 0;
         while (true)
         {
-            var items = new List<string>
-            {
-                $"Illegal transfers: {(_settings.AllowIllegalTransfers ? "ON" : "OFF")}",
-                $"Official ROMs only: {(_settings.OnlyOfficialRoms ? "ON" : "OFF")}",
-                $"PC box view: {(_settings.PcBoxView ? "ON" : "OFF (lists)")}",
-                $"Show all languages in gallery: {(_settings.GalleryAllLanguages ? "ON" : "OFF")}",
-                $"Show unreleased files in gallery: {(_settings.GalleryUnreleased ? "ON" : "OFF")}",
-                "Show welcome screen again",
-            };
-            var choice = _ui.Choose("Settings", items);
-            if (choice is null)
+            bool[] current =
+            [
+                _settings.AllowIllegalTransfers, _settings.OnlyOfficialRoms, _settings.PcBoxView, _settings.SaveStateDeletion,
+                _settings.GalleryAllLanguages, _settings.GalleryUnreleased,
+            ];
+            var options = names.Select((_, i) => i < current.Length ? onOff : []).ToList();
+            var values = names.Select((_, i) => i < current.Length && current[i] ? 1 : 0).ToList();
+            if (_ui.Options("Settings", names, options, values, selected) is not { } result)
                 return;
-            if (choice == 0)
-            {
-                if (!_settings.AllowIllegalTransfers && !_ui.Confirm(
-                        "Illegal transfers let you move Pokémon in ways the real games never allowed: between any " +
-                        "generations (Gen 4 back to Gen 3, Gen 2 up to Gen 3...) and without the games' requirements, such as " +
-                        "having the National Pokédex. Those Pokémon are usually flagged as illegal. Turn on?", "TURN ON", "CANCEL"))
-                    continue;
-                _settings.AllowIllegalTransfers = !_settings.AllowIllegalTransfers;
-            }
-            else if (choice == 1)
-            {
-                if (_settings.OnlyOfficialRoms && !_ui.Confirm(
-                        "Show saves from ROM hacks and other unofficial ROMs too? PKHeX may misread a hack's save, " +
-                        "and editing it can corrupt it. Backups are still made before every change.", "SHOW ALL", "CANCEL"))
-                    continue;
-                _settings.OnlyOfficialRoms = !_settings.OnlyOfficialRoms;
+            selected = Math.Max(result.Selected, 0);
+            bool On(int i) => result.Values[i] == 1;
+
+            if (On(0) && !_settings.AllowIllegalTransfers && !_ui.Confirm(
+                    "Illegal transfers let you move Pokémon in ways the real games never allowed: between any " +
+                    "generations (Gen 4 back to Gen 3, Gen 2 up to Gen 3...) and without the games' requirements, such as " +
+                    "having the National Pokédex. Those Pokémon are usually flagged as illegal. Turn on?", "TURN ON", "CANCEL"))
+                result.Values[0] = 0;
+            if (!On(1) && _settings.OnlyOfficialRoms && !_ui.Confirm(
+                    "Show saves from ROM hacks and other unofficial ROMs too? PKHeX may misread a hack's save, " +
+                    "and editing it can corrupt it. Backups are still made before every change.", "SHOW ALL", "CANCEL"))
+                result.Values[1] = 1;
+            if (On(5) && !_settings.GalleryUnreleased && !_ui.Confirm(
+                    "Unreleased files are debug and test data that were never distributed. PKHeX flags their " +
+                    "Pokémon as illegal, and some may not work in-game. Show them in the gallery?", "SHOW", "CANCEL"))
+                result.Values[5] = 0;
+
+            _settings.AllowIllegalTransfers = On(0);
+            if (_settings.OnlyOfficialRoms != On(1))
                 _saves = null; // rescan with the new rule
-            }
-            else if (choice == 2)
-            {
-                _settings.PcBoxView = !_settings.PcBoxView;
+            _settings.OnlyOfficialRoms = On(1);
+            if (_settings.PcBoxView != On(2))
                 _boxViewFailed = false;
-            }
-            else if (choice == 3)
-            {
-                _settings.GalleryAllLanguages = !_settings.GalleryAllLanguages;
-            }
-            else if (choice == 4)
-            {
-                if (!_settings.GalleryUnreleased && !_ui.Confirm(
-                        "Unreleased files are debug and test data that were never distributed. PKHeX flags their " +
-                        "Pokémon as illegal, and some may not work in-game. Show them in the gallery?", "SHOW", "CANCEL"))
-                    continue;
-                _settings.GalleryUnreleased = !_settings.GalleryUnreleased;
-            }
-            else
-            {
+            _settings.PcBoxView = On(2);
+            _settings.SaveStateDeletion = On(3);
+            _settings.GalleryAllLanguages = On(4);
+            _settings.GalleryUnreleased = On(5);
+            if (result.Selected == names.Count - 1)
                 _settings.SeenWelcome = false;
-            }
             _settings.Save(_paths.SettingsFile);
+            if (result.Selected != names.Count - 1)
+                return; // saved
         }
     }
 
@@ -988,6 +1076,13 @@ public sealed class App
         try
         {
             backup = _library.Write(entry);
+            if (_settings.SaveStateDeletion && _paths.SdRoot is { } sd)
+            {
+                // Resuming the game would load a state from before this change and undo it.
+                foreach (var rom in RomIndex.FindRoms(entry.Path))
+                    foreach (var root in _paths.RomRoots)
+                        SaveStates.DeleteSelected(sd, root, rom);
+            }
             return true;
         }
         catch (Exception ex)

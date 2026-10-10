@@ -111,6 +111,19 @@ public static class TransferService
         return OpResult.Success(msg);
     }
 
+    /// <summary>Whether the Pokémon can leave its slot at all (not locked, not the last party Pokémon).</summary>
+    public static OpResult CanMove(SaveFile src, SlotRef from)
+    {
+        var pk = from.Get(src);
+        if (pk.Species == 0)
+            return OpResult.Fail("That slot is empty.");
+        if (from.IsLocked(src))
+            return OpResult.Fail("That slot is locked by the game and can't be moved.");
+        if (from.IsParty && CountUsableParty(src) <= 1 && !pk.IsEgg)
+            return OpResult.Fail("You can't move your last party Pokémon. Put another one in your party first.");
+        return OpResult.Success("");
+    }
+
     private static int CountUsableParty(SaveFile sav)
     {
         int count = 0;

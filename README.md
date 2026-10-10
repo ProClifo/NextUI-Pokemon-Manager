@@ -58,7 +58,7 @@ By default the app only lists saves made with **unmodified, official Pokémon RO
 - Each ROM is hashed once and the result is cached in `PokemonManager/rom-check-cache.txt`, so only the first scan is slow.
 - The main menu lists each save as its language and game, e.g. **[ENG] Emerald** or **[JPN] Ruby**, with the trainer's name, the player's overworld sprite from that game (boy or girl) and the trainer ID on the right. The sprites come from the pret decompilations at build time (`scripts/build-trainers.py`; HeartGold/SoulSilver's are decoded from the game's DS textures). Black/White have no decompilation, so their saves show just the name and ID.
 - Only saves with their ROM on the card (matched by name, as above) that have received the Pokédex are listed. The Pokédex is read the same way as for distributions (see *Transfers*). Hidden saves appear as **[N hidden saves]** in the main menu. Select it to see each file and the reason.
-- To manage saves from unofficial ROMs anyway, turn off **Settings → Official ROMs only**. A save without its ROM is never listed.
+- To manage saves from unofficial ROMs anyway, turn off **Settings → Official ROMs Only**. A save without its ROM is never listed.
 
 To refresh the ROM list from a newer No-Intro database, run `scripts/update-vanilla-roms.py <libretro-database>/metadat/no-intro`.
 
@@ -72,7 +72,7 @@ To refresh the ROM list from a newer No-Intro database, run `scripts/update-vani
 - Text is drawn in NextUI's OG font (see [Fonts](#fonts)).
 - **D-pad** moves the hand cursor, **L/R** switch boxes (the first "box" is your party), **A** opens the Pokémon's actions, **B** goes back.
 
-The art isn't stored in this repository. It's generated at build time from the pret decompilations: the wallpapers, cursor and background by `scripts/build-box-assets.py` from [pret/pokeemerald](https://github.com/pret/pokeemerald), and each game's icons and sprites by `scripts/build-box-art.py`. Each game's art is packed into two sheets plus an index, so the SD card gets a few dozen files rather than thousands. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC box view** switches between the two.
+The art isn't stored in this repository. It's generated at build time from the pret decompilations: the wallpapers, cursor and background by `scripts/build-box-assets.py` from [pret/pokeemerald](https://github.com/pret/pokeemerald), and each game's icons and sprites by `scripts/build-box-art.py`. Each game's art is packed into two sheets plus an index, so the SD card gets a few dozen files rather than thousands. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC Box View** switches between the two.
 
 ### Game backgrounds
 
@@ -80,7 +80,8 @@ A save's menus show its game's title art (without the logo and text) behind them
 
 | Menu | What it does |
 | --- | --- |
-| Pokémon | Browse the party and boxes. For each Pokémon: *Transfer* (move it to another game), *Summary*, *Evolve* (trade evolution) or *Cancel*. |
+| Pokémon | Browse the party and boxes. For each Pokémon: *Transfer* (move it to another game), *Summary*, *Evolve* (trade evolution) or *Cancel*. *Transfer* and *Evolve* are greyed out when they can't be done: Evolve needs a trade evolution whose conditions a real trade would meet (Onix only becomes Steelix holding the Metal Coat; an Everstone stops it), and Transfer needs a game that can take the Pokémon. In the list of games to move it to (shown like the main menu), the games that can't take it are greyed out. |
+| Clock | Ruby, Sapphire, Emerald, Gold, Silver and Crystal: set the game's time of day (hour and minute) and, in Gold/Silver/Crystal, the day of the week. Ruby/Sapphire/Emerald get a new clock offset from the device clock (the emulator's cartridge clock), as the game's own clock setting does; Gold/Silver/Crystal get their start time set in the save and the cartridge clock in `Saves/GBC/<rom>.rtc` restarted (NextUI's gambatte core keeps it there). |
 | Events | Every event ticket the game has, legitimate or not (see below). Games with a single event show it on the game menu instead: *Eon Ticket* (Ruby/Sapphire), *Enigma Stone* (HeartGold/SoulSilver), *Liberty Pass* (Black/White), *GS Ball* (Crystal). |
 | Mew / Celebi | Gen 1/2: legal event Pokémon generated for the save like the Game Boy era distributions, from PKHeX's events. *Mew* in Red/Blue/Yellow (the international or Japanese Mew, whichever is legal for the save's language) and in Korean Gold/Silver, which can't link with Gen 1 (an international Mew, as if moved up by Time Capsule and traded over). *Celebi* in Gold/Silver/Crystal outside Japan: the Pokémon Center New York Celebi, since the GS Ball event only ran on Japanese cartridges. |
 | Distributions | Gen 3–5: one distribution of each Pokémon you can't legally get any other way in this game's language and that the previous generation doesn't already provide (Gen 4 gets Mew, Celebi, Jirachi and Deoxys from Gen 3 by Pal Park, except in Korean games, which have no Gen 3; Gen 5 gets everything up to Arceus by Poké Transfer). Where there are several, it's Aura Mew, 10 ANIV Celebi, WISHMKR Jirachi and the Manaphy Egg, else the one in the game's language that most players received (most copies in the gallery). Ruby, Sapphire and Emerald also list the Regirock, Regice and Registeel Dolls, decorations no normal play hands out; each goes to the PC's doll inventory once, as a Mystery Event's `adddecoration` did, once the save has visited Mauville City (Record Mixing and the old man who traded them both need it). Every other distribution and copy is in the Gallery. Gen 1/2 games have no Distributions menu. |
@@ -111,8 +112,10 @@ The gallery is [projectpokemon/EventsGallery](https://github.com/projectpokemon/
 
 - **Game**: from the ROM header, e.g. `BPEE` = Emerald, `CPUE` = Platinum, `IRBO` = Black 2; otherwise from the save. Cards only show for the games named in their file name (a HeartGold/SoulSilver card doesn't show for Platinum). Pokémon files show for every game of their generation, since they can be traded between them.
 - **Language**: from the ROM header's region letter (`E`/`P` English, `D` German, `F` French, `I` Italian, `S` Spanish, `J` Japanese, `K` Korean); otherwise from the save (Gen 4/5) or the player's own Pokémon (Gen 3). Gen 1–2 only distinguish Japanese, Korean and international.
-- **Settings → Show all languages in gallery** (off by default) lists every language in the Gallery. Events and Distributions always stick to the game's language.
-- **Settings → Show unreleased files in gallery** (off by default) adds the gallery's *Unreleased* folder: debug and test data that was never distributed.
+- **Settings → Gallery: All Languages** (off by default) lists every language in the Gallery. Events and Distributions always stick to the game's language.
+- **Settings → Gallery: Unreleased Files** (off by default) adds the gallery's *Unreleased* folder: debug and test data that was never distributed.
+
+**Settings** look like NextUI's own: each setting's name on the left and *Enabled*/*Disabled* on the right, changed with left/right and kept with A (SAVE). **Save State Deletion** (disabled by default) deletes the ROM's save state in its selected slot, its preview and NextUI's resume entry whenever Pokémon Manager changes a save, so pressing X can't resume a state from before the change and undo it: the game has to start from its save. NextUI keeps the selected slot in `.userdata/shared/.minui/<EMU>/<rom>.txt` and the states in `.userdata/shared/<EMU>-<core>/`.
 
 ### ⚠️ Save states
 
@@ -130,7 +133,7 @@ SDCARD/
 
 ### Transfers
 
-By default Pokémon only move the way the real games allowed, and only once each game has progressed far enough. **Settings → Illegal transfers** (off by default) turns all of this off: Pokémon can then go between any generations PKHeX can convert (e.g. Gen 4 → Gen 3), but they'll usually be flagged as illegal.
+By default Pokémon only move the way the real games allowed, and only once each game has progressed far enough. As in the games, Ruby/Sapphire get the National Pokédex by trading with a game that has it (pokeruby's trade code checks the partner's flag), so a transfer either way between Ruby/Sapphire and a Gen 3 game with the National Pokédex unlocks it. **Settings → Illegal Transfers** (off by default) turns all of this off: Pokémon can then go between any generations PKHeX can convert (e.g. Gen 4 → Gen 3), but they'll usually be flagged as illegal.
 
 | Route | Allowed | Requirements (from the pret decompilations) |
 | --- | --- | --- |

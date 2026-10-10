@@ -19,8 +19,16 @@ public interface IUi
     /// background image is drawn behind the list where the UI supports it, and <paramref name="tags"/>
     /// (e.g. "Legal") are shown at the right of the highlighted item. With <paramref name="images"/> every
     /// item shows its tag, and a tag written "LEFT\tRIGHT" has the item's image between the two parts.
+    /// <paramref name="disabled"/> items are greyed out; picking one returns its index, which callers ignore.
     /// </summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null);
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null);
+
+    /// <summary>
+    /// A settings list like NextUI's: each row's name on the left and its value on the right, changed with
+    /// left/right. Rows without values are actions. Returns every row's value index and the highlighted row
+    /// when A is pressed, or null for B.
+    /// </summary>
+    (int[] Values, int Selected)? Options(string title, IReadOnlyList<string> names, IReadOnlyList<string[]> options, IReadOnlyList<int> values, int selected = 0);
 
     /// <summary>Shows text until the user presses A or B. Long text is split into pages.</summary>
     void Message(string text);

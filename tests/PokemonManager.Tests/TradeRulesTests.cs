@@ -168,4 +168,19 @@ public sealed class TradeRulesTests : IDisposable
         Assert.True(em.NationalDex);
         Assert.False(TradeRules.NationalDex3(em));
     }
+
+    [Theory]
+    [InlineData(GameVersion.E)]
+    [InlineData(GameVersion.FR)]
+    public void RubySapphireGetTheNationalDexFromATradePartnerThatHasIt(GameVersion partnerVersion)
+    {
+        var ruby = (SAV3)_saves.Create(GameVersion.R, "R.sav").Sav;
+        var partner = (SAV3)_saves.Create(partnerVersion, $"{partnerVersion}.sav").Sav;
+        Assert.Null(TradeRules.UnlockNationalDexByTrade(ruby, partner)); // the partner hasn't got it either
+
+        TestSaves.Progress(partner); // includes the National Pokédex
+        Assert.Same(ruby, TradeRules.UnlockNationalDexByTrade(partner, ruby)); // either direction
+        Assert.True(TradeRules.NationalDex3(ruby));
+        Assert.Null(TradeRules.UnlockNationalDexByTrade(ruby, partner)); // already has it
+    }
 }

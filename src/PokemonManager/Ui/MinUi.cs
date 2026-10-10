@@ -67,7 +67,7 @@ public sealed class MinUi : IUi
     private string[] MessageFont(params string[] texts)
         => FontFor(texts) is { } path ? ["--font-default", path] : [];
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -78,14 +78,14 @@ public sealed class MinUi : IUi
         // that wrap-around, so reopen the list at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
-            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, out bool crashed);
+            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, out bool crashed);
             if (!crashed || attempt == MaxCrashRetries)
                 return result;
             selected = 0;
         }
     }
 
-    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, out bool crashed)
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, IReadOnlyList<bool>? disabled, out bool crashed)
     {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
@@ -102,6 +102,12 @@ public sealed class MinUi : IUi
                 var image = images is not null && i < images.Count ? images[i] : TagIcon(tag);
                 if (image is not null && File.Exists(image))
                     features["images"] = new JsonObject { ["default"] = image };
+                row["features"] = features;
+            }
+            if (disabled is not null && i < disabled.Count && disabled[i])
+            {
+                var features = row["features"] as JsonObject ?? new JsonObject();
+                features["disabled"] = true;
                 row["features"] = features;
             }
             array.Add((JsonNode)row);
@@ -149,6 +155,54 @@ public sealed class MinUi : IUi
             using var doc = JsonDocument.Parse(File.ReadAllText(output));
             int index = doc.RootElement.GetProperty("selected").GetInt32();
             return index >= 0 && index < items.Count ? index : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    public (int[] Values, int Selected)? Options(string title, IReadOnlyList<string> names, IReadOnlyList<string[]> options, IReadOnlyList<int> values, int selected = 0)
+    {
+        StopBusy();
+        var input = Path.Combine(_tmp, "options.json");
+        var output = Path.Combine(_tmp, "options-out.json");
+        var array = new JsonArray();
+        for (int i = 0; i < names.Count; i++)
+        {
+            var row = new JsonObject { ["name"] = names[i] };
+            if (options[i].Length > 0)
+            {
+                row["options"] = new JsonArray(options[i].Select(o => (JsonNode)o).ToArray());
+                row["selected"] = Math.Clamp(values[i], 0, options[i].Length - 1);
+                row["features"] = new JsonObject { ["show_confirm"] = true };
+            }
+            array.Add((JsonNode)row);
+        }
+        File.WriteAllText(input, new JsonObject { ["items"] = array, ["selected"] = Math.Clamp(selected, 0, names.Count - 1) }.ToJsonString());
+        File.Delete(output);
+        string[] args =
+        [
+            "--file", input,
+            "--title", title,
+            "--write-location", output,
+            "--write-value", "state",
+            "--confirm-text", "SAVE",
+            "--cancel-text", "BACK",
+        ];
+        if (Background is { } background && File.Exists(background))
+            args = [.. args, "--background-image", background];
+        args = [.. args, .. ListFont([title], names, options.SelectMany(o => o), ["SAVE", "BACK"])];
+        if (Run("minui-list", args) != ExitSelected || !File.Exists(output))
+            return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(output));
+            var items = doc.RootElement.GetProperty("items");
+            var result = new int[names.Count];
+            for (int i = 0; i < names.Count && i < items.GetArrayLength(); i++)
+                result[i] = items[i].TryGetProperty("selected", out var v) ? v.GetInt32() : 0;
+            return (result, doc.RootElement.GetProperty("selected").GetInt32());
         }
         catch (Exception)
         {
@@ -288,7 +342,7 @@ public sealed class ConsoleUi : IUi
     public UiFont? Font { get; set; }
     public string? Background { get; set; }
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null)
     {
         if (items.Count == 0)
             return null;
@@ -301,6 +355,30 @@ public sealed class ConsoleUi : IUi
         if (line is null || !int.TryParse(line.Trim(), out var n) || n < 1 || n > items.Count)
             return null;
         return n - 1;
+    }
+
+    public (int[] Values, int Selected)? Options(string title, IReadOnlyList<string> names, IReadOnlyList<string[]> options, IReadOnlyList<int> values, int selected = 0)
+    {
+        var current = values.ToArray();
+        while (true)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"== {title} ==");
+            for (int i = 0; i < names.Count; i++)
+                Console.WriteLine($"{i + 1,3}. {names[i]}{(options[i].Length > 0 ? $"  [{options[i][current[i]]}]" : "")}");
+            Console.Write("Number to change/run, S to save, blank = back: ");
+            var line = Console.ReadLine()?.Trim();
+            if (string.IsNullOrEmpty(line))
+                return null;
+            if (line.Equals("s", StringComparison.OrdinalIgnoreCase))
+                return (current, -1);
+            if (int.TryParse(line, out var n) && n >= 1 && n <= names.Count)
+            {
+                if (options[n - 1].Length == 0)
+                    return (current, n - 1);
+                current[n - 1] = (current[n - 1] + 1) % options[n - 1].Length;
+            }
+        }
     }
 
     public void Message(string text)

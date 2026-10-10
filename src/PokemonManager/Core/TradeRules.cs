@@ -196,6 +196,24 @@ public static class TradeRules
         return OpResult.Success("");
     }
 
+    /// <summary>
+    /// Ruby/Sapphire get the National Pokédex by trading with a game that has it (pokeruby trade.c: the
+    /// partner's link data says so, and EnableNationalPokedex runs). Call after a transfer between two Gen 3
+    /// saves, either way round; returns the Ruby/Sapphire save that just got it, or null.
+    /// </summary>
+    public static SaveFile? UnlockNationalDexByTrade(SaveFile a, SaveFile b)
+    {
+        foreach (var (rs, partner) in new[] { (a, b), (b, a) })
+        {
+            if (rs is SAV3RS ruby && partner is SAV3 other && !NationalDex3(ruby) && NationalDex3(other))
+            {
+                ruby.NationalDex = true; // the magic byte, VAR_NATIONAL_DEX, FLAG_SYS_NATIONAL_DEX and the Pokédex mode
+                return ruby;
+            }
+        }
+        return null;
+    }
+
     /// <summary>The game's own IsNationalPokedexEnabled: PKHeX's NationalDex only checks the magic byte.</summary>
     public static bool NationalDex3(SAV3 sav) => sav.NationalDex && sav switch
     {

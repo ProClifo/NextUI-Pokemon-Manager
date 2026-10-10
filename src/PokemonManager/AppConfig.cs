@@ -78,6 +78,11 @@ public sealed class AppSettings
     public bool GalleryAllLanguages { get; set; }
     /// <summary>List the gallery's unreleased files: debug and test cards never distributed (off by default).</summary>
     public bool GalleryUnreleased { get; set; }
+    /// <summary>
+    /// Delete the ROM's save state in its selected slot whenever a save is changed, so NextUI can't resume a state
+    /// that would undo the change: the game has to start from its save (off by default).
+    /// </summary>
+    public bool SaveStateDeletion { get; set; }
 
     public static AppSettings Load(string path)
     {
@@ -98,6 +103,7 @@ public sealed class AppSettings
                 case "pc_box_view": s.PcBoxView = on; break;
                 case "gallery_all_languages": s.GalleryAllLanguages = on; break;
                 case "gallery_unreleased": s.GalleryUnreleased = on; break;
+                case "save_state_deletion": s.SaveStateDeletion = on; break;
             }
         }
         return s;
@@ -115,6 +121,7 @@ public sealed class AppSettings
                 $"pc_box_view={PcBoxView.ToString().ToLowerInvariant()}",
                 $"gallery_all_languages={GalleryAllLanguages.ToString().ToLowerInvariant()}",
                 $"gallery_unreleased={GalleryUnreleased.ToString().ToLowerInvariant()}",
+                $"save_state_deletion={SaveStateDeletion.ToString().ToLowerInvariant()}",
             ]);
         }
         catch (IOException)
