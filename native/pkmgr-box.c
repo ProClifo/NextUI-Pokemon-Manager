@@ -1394,12 +1394,8 @@ int main(int argc, char *argv[])
         if (dx || dy || a || b || l1 || r1)
             dirty = 1;
 
-        if (PAD_justReleased(BTN_MENU))
-        {
-            exit_code = EXIT_MENU;
-            quitting = true;
-        }
-        else if (st.message && (dx || dy || a || b || l1 || r1))
+        // MENU does nothing: B goes back
+        if (st.message && (dx || dy || a || b || l1 || r1))
             st.message = NULL; // a button closes the explanation
         else if (st.mode == VIEW_BOX)
         {

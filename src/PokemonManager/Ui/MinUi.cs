@@ -73,9 +73,9 @@ public sealed class MinUi : IUi
         if (items.Count == 0)
             return null;
 
-        // minui-list 0.15.4 reads one past the end of its list when down is pressed on the last
-        // item, and with some list lengths (6, 10, 14...) that crashes it. The crash only happens on
-        // that wrap-around, so reopen the list at the top as the wrap would have.
+        // Unpatched minui-list 0.15.4 reads one past the end of its list when down is pressed on the last
+        // item, and with some list lengths (6, 10, 14...) that crashes it (native/minui-list.patch fixes it).
+        // Should a list still crash, reopen it at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
             int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, out bool crashed);

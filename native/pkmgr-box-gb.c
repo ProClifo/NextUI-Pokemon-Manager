@@ -613,12 +613,8 @@ static int gb_run(SDL_Surface *screen, Scene *scene, const char *write_location)
 
         Box *box = &scene->boxes[scene->box];
         int count = gb_count(box);
-        if (PAD_justReleased(BTN_MENU))
-        {
-            exit_code = EXIT_MENU;
-            quitting = true;
-        }
-        else if (st.message && (dx || dy || a || b || l1 || r1))
+        // MENU does nothing: B goes back
+        if (st.message && (dx || dy || a || b || l1 || r1))
             st.message = NULL; // a button closes the explanation
         else if (st.mode == GB_LIST)
         {

@@ -253,15 +253,24 @@ public sealed class App
         while (true)
         {
             var actions = new List<(string Label, Action Run)> { ("Details", () => _ui.Message(SaveInfo(entry))) };
+            var tags = new List<string?> { null };
             if (GameClock.Supported(entry.Sav))
+            {
                 actions.Add(("Clock", () => ClockMenu(entry)));
+                tags.Add(ClockText(entry));
+            }
             if (_boxViewer.HasCard(entry.Sav))
                 actions.Add(("Trainer Card", () =>
                 {
                     if (!_boxViewer.ShowCard(entry.Sav, _ogFont?.Path))
                         _ui.Message("The Trainer Card couldn't be shown.");
                 }));
-            var choice = _ui.Choose(Path.GetFileName(entry.Path), actions.Select(a => a.Label).ToList(), selected);
+            while (tags.Count < actions.Count)
+                tags.Add(null);
+            // the game's time beside Clock on every row, not just the highlighted one (images: none, so the tags
+            // show on all rows)
+            var choice = _ui.Choose(Path.GetFileName(entry.Path), actions.Select(a => a.Label).ToList(), selected,
+                tags: tags, images: actions.Select(_ => (string?)null).ToList());
             if (choice is null)
                 return;
             selected = choice.Value;
@@ -671,12 +680,31 @@ public sealed class App
     // ---------------------------------------------------------------- clock
 
     /// <summary>The game's clock: the time of day, and in Gen 2 the day of the week (left/right to change).</summary>
+    /// <summary>The cartridge clock file NextUI's gambatte core keeps next to the save (Gold/Silver/Crystal).</summary>
+    private string? RtcPath(SaveEntry entry) => RomIndex.FindRoms(entry.Path).FirstOrDefault() is { } rom
+        ? Path.Combine(Path.GetDirectoryName(entry.Path)!, Path.GetFileName(rom) + ".rtc")
+        : null;
+
+    /// <summary>The game's time as the Clock editor shows it: "08:41 PM", or "Sunday 08:41 PM" with weekdays.</summary>
+    private string? ClockText(SaveEntry entry)
+    {
+        try
+        {
+            var t = GameClock.Read(entry.Sav, RtcPath(entry), DateTime.Now);
+            int h12 = t.Hour % 12 == 0 ? 12 : t.Hour % 12;
+            var time = $"{h12:00}:{t.Minute:00} {(t.Hour >= 12 ? "PM" : "AM")}";
+            return GameClock.HasWeekdays(entry.Sav) ? $"{GameClock.Weekdays[t.Weekday % 7]} {time}" : time;
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or IndexOutOfRangeException)
+        {
+            return null;
+        }
+    }
+
     private void ClockMenu(SaveEntry entry)
     {
         var sav = entry.Sav;
-        var rtcPath = RomIndex.FindRoms(entry.Path).FirstOrDefault() is { } rom
-            ? Path.Combine(Path.GetDirectoryName(entry.Path)!, Path.GetFileName(rom) + ".rtc")
-            : null;
+        var rtcPath = RtcPath(entry);
         var now = GameClock.Read(sav, rtcPath, DateTime.Now);
         bool weekdays = GameClock.HasWeekdays(sav);
         // "Sunday 08:41 PM": Left/Right pick a part, Up/Down change it (the viewer's Clock editor)

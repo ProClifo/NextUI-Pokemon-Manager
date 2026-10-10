@@ -206,11 +206,6 @@ static int clock_run(const char *spec, const char *font_path, const char *backgr
         }
         else if (PAD_justReleased(BTN_B))
             quitting = true;
-        else if (PAD_justReleased(BTN_MENU))
-        {
-            exit_code = EXIT_MENU;
-            quitting = true;
-        }
         if (dirty && !quitting)
         {
             clock_draw(screen, big, title, background, &c);

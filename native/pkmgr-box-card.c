@@ -574,12 +574,8 @@ static int card_run(const char *card_path, const char *screenshot, const char *s
         PAD_poll();
         bool a = PAD_justReleased(BTN_A), b = PAD_justReleased(BTN_B);
         bool left = PAD_justRepeated(BTN_LEFT), right = PAD_justRepeated(BTN_RIGHT);
-        if (PAD_justReleased(BTN_MENU))
-        {
-            exit_code = EXIT_MENU;
-            quitting = true;
-        }
-        else if (card3_game >= 0)
+        // MENU does nothing: B goes back
+        if (card3_game >= 0)
         {
             // A turns the card over, then closes it; B closes the front and (but in Ruby/Sapphire) turns the
             // back over again
