@@ -169,6 +169,8 @@ static char *dup_string(JSON_Object *obj, const char *key)
     return value ? strdup(value) : NULL;
 }
 
+static void load_game_fonts(const char *skin, JSON_Object *layout);
+
 static bool load_scene(const char *path, Scene *scene)
 {
     memset(scene, 0, sizeof(*scene));
@@ -191,6 +193,7 @@ static bool load_scene(const char *path, Scene *scene)
         fprintf(stderr, "could not read %s\n", layout_path);
         return false;
     }
+    load_game_fonts(scene->skin, scene->layout);
 
     JSON_Array *boxes = json_object_get_array(obj, "boxes");
     scene->box_count = boxes ? (int)json_array_get_count(boxes) : 0;
@@ -312,8 +315,216 @@ static void open_text_font(Scene *scene, const Layout *l)
         text_cap_offset = TTF_FontAscent(text_font) - maxy;
 }
 
+// ------------------------------------------------------------------ the games' own fonts
+//
+// A skin's fonts (scripts/pc_ui game_fonts): font_<name>.png holds every glyph in a 16-column grid of cells,
+// foreground pixels red and shadow pixels green; font_<name>.json its cell size and glyph widths; charmap.json the
+// game's character codes. Text is drawn as the game's text printer does: each glyph's cell top-left at the pen,
+// advancing by the glyph's width. Without them, NextUI's font stands in.
+
+typedef struct
+{
+    char name[16];
+    SDL_Surface *sheet;
+    int cell_w;
+    int columns;
+    int widths[640];
+    int count;
+} GameFont;
+
+static GameFont game_fonts[6];
+static int game_font_count = 0;
+static int active_font = 0;
+static JSON_Value *charmap_root = NULL;
+static JSON_Object *charmap_chars = NULL, *charmap_names = NULL;
+
+static void load_game_fonts(const char *skin, JSON_Object *layout)
+{
+    JSON_Array *names = json_object_get_array(layout, "fonts");
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/charmap.json", skin ? skin : ".");
+    charmap_root = names ? json_parse_file(path) : NULL;
+    charmap_chars = json_object_get_object(json_value_get_object(charmap_root), "chars");
+    charmap_names = json_object_get_object(json_value_get_object(charmap_root), "names");
+    if (charmap_chars == NULL)
+        return;
+    for (size_t i = 0; names && i < json_array_get_count(names) && game_font_count < 6; i++)
+    {
+        const char *name = json_array_get_string(names, i);
+        GameFont *f = &game_fonts[game_font_count];
+        snprintf(path, sizeof(path), "%s/font_%s.png", skin, name);
+        f->sheet = load_image(path);
+        snprintf(path, sizeof(path), "%s/font_%s.json", skin, name);
+        JSON_Value *meta = json_parse_file(path);
+        JSON_Object *mo = json_value_get_object(meta);
+        if (f->sheet == NULL || mo == NULL)
+        {
+            json_value_free(meta);
+            continue;
+        }
+        snprintf(f->name, sizeof(f->name), "%s", name);
+        JSON_Array *cell = json_object_get_array(mo, "cell");
+        f->cell_w = cell ? (int)json_array_get_number(cell, 0) : 8;
+        f->columns = (int)json_object_get_number(mo, "columns");
+        JSON_Array *widths = json_object_get_array(mo, "widths");
+        f->count = widths ? (int)json_array_get_count(widths) : 0;
+        if (f->count > 640)
+            f->count = 640;
+        for (int g = 0; g < f->count; g++)
+            f->widths[g] = (int)json_array_get_number(widths, g);
+        json_value_free(meta);
+        game_font_count++;
+    }
+}
+
+// Selects the font a layout names ("normal", "short", "small", "copy1"); returns the previous one.
+static int use_font(const char *name)
+{
+    int previous = active_font;
+    for (int i = 0; name && i < game_font_count; i++)
+        if (strcmp(game_fonts[i].name, name) == 0)
+            active_font = i;
+    return previous;
+}
+
+static void append_codes(JSON_Array *codes, int *out, int *n, int max)
+{
+    for (size_t i = 0; codes && i < json_array_get_count(codes) && *n < max; i++)
+        out[(*n)++] = (int)json_array_get_number(codes, i);
+}
+
+// The text as glyph numbers: characters and {NAMES} through the game's charmap; F9 xx is extra glyph 0x100 + xx.
+static int encode_glyphs(const char *text, int *glyphs, int max)
+{
+    int codes[512], n = 0;
+    for (const char *p = text; p && *p && n < 500;)
+    {
+        if (*p == '{' && strchr(p, '}'))
+        {
+            const char *end = strchr(p, '}');
+            char name[32];
+            snprintf(name, sizeof(name), "%.*s", (int)(end - p - 1), p + 1);
+            append_codes(json_object_get_array(charmap_names, name), codes, &n, 500);
+            p = end + 1;
+            continue;
+        }
+        int len = (*p & 0x80) == 0 ? 1 : (*p & 0xE0) == 0xC0 ? 2 : (*p & 0xF0) == 0xE0 ? 3 : 4;
+        char ch[5] = {0};
+        memcpy(ch, p, len);
+        p += len;
+        JSON_Array *found = json_object_get_array(charmap_chars, ch);
+        append_codes(found ? found : json_object_get_array(charmap_chars, "?"), codes, &n, 500);
+    }
+    int count = 0;
+    for (int i = 0; i < n && count < max; i++)
+    {
+        if (codes[i] == 0xFF)
+            break;
+        if (codes[i] == 0xFE)
+            continue;
+        if (codes[i] == 0xF9 && i + 1 < n)
+        {
+            glyphs[count++] = 0x100 | codes[++i];
+            continue;
+        }
+        glyphs[count++] = codes[i];
+    }
+    return count;
+}
+
+static int game_text_width(const char *text)
+{
+    GameFont *f = &game_fonts[active_font];
+    int glyphs[256], n = encode_glyphs(text, glyphs, 256), w = 0;
+    for (int i = 0; i < n; i++)
+        w += glyphs[i] < f->count ? f->widths[glyphs[i]] : 0;
+    return w;
+}
+
+static int draw_game_text(SDL_Surface *dst, const Layout *l, const char *text, int x, int y, int align, SDL_Color color, SDL_Color shadow)
+{
+    GameFont *f = &game_fonts[active_font];
+    int glyphs[256], n = encode_glyphs(text, glyphs, 256);
+    int w = 0;
+    for (int i = 0; i < n; i++)
+        w += glyphs[i] < f->count ? f->widths[glyphs[i]] : 0;
+    if (w <= 0)
+        return 0;
+    if (align == 1)
+        x -= w / 2;
+    else if (align == 2)
+        x -= w;
+    SDL_Surface *line = SDL_CreateRGBSurfaceWithFormat(0, w, 16, 32, SDL_PIXELFORMAT_RGBA8888);
+    if (line == NULL)
+        return w;
+    SDL_FillRect(line, NULL, 0);
+    Uint32 fg = SDL_MapRGBA(line->format, color.r, color.g, color.b, 255);
+    Uint32 sh = SDL_MapRGBA(line->format, shadow.r, shadow.g, shadow.b, 255);
+    SDL_Surface *sheet = f->sheet;
+    int pen = 0;
+    for (int i = 0; i < n; i++)
+    {
+        int g = glyphs[i];
+        if (g >= f->count)
+            continue;
+        int gw = f->widths[g] < f->cell_w ? f->widths[g] : f->cell_w;
+        int sx = (g % f->columns) * f->cell_w, sy = (g / f->columns) * 16;
+        for (int yy = 0; yy < 16 && sy + yy < sheet->h; yy++)
+        {
+            Uint32 *src = (Uint32 *)((Uint8 *)sheet->pixels + (sy + yy) * sheet->pitch);
+            Uint32 *out = (Uint32 *)((Uint8 *)line->pixels + yy * line->pitch);
+            for (int xx = 0; xx < gw && pen + xx < w; xx++)
+            {
+                Uint8 r, gg, b, a;
+                SDL_GetRGBA(src[sx + xx], sheet->format, &r, &gg, &b, &a);
+                if (a == 0)
+                    continue;
+                if (r > 128)
+                    out[pen + xx] = fg;
+                else if (gg > 128 && shadow.a)
+                    out[pen + xx] = sh;
+            }
+        }
+        pen += f->widths[g];
+    }
+    SDL_SetSurfaceBlendMode(line, SDL_BLENDMODE_BLEND);
+    blit_scaled(line, NULL, dst, l, x, y);
+    SDL_FreeSurface(line);
+    return w;
+}
+
+// NextUI's font has no special glyphs: they're spelled out.
+static void spell_tokens(const char *text, char *out, size_t size)
+{
+    static const char *TOKENS[][2] = {{"{LV}", "Lv"}, {"{LV_2}", "Lv"}, {"{NO}", "No"}, {"{PP}", "PP"}, {"{ID}", "ID"}};
+    size_t n = 0;
+    for (const char *p = text; p && *p && n + 1 < size;)
+    {
+        bool replaced = false;
+        for (size_t i = 0; i < sizeof(TOKENS) / sizeof(TOKENS[0]); i++)
+        {
+            size_t len = strlen(TOKENS[i][0]);
+            if (strncmp(p, TOKENS[i][0], len) == 0)
+            {
+                n += (size_t)snprintf(out + n, size - n, "%s", TOKENS[i][1]);
+                p += len;
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced)
+            out[n++] = *p++;
+    }
+    out[n < size ? n : size - 1] = '\0';
+}
+
 static int text_width(const char *text, const Layout *l)
 {
+    if (game_font_count)
+        return game_text_width(text);
+    char spelled[512];
+    spell_tokens(text, spelled, sizeof(spelled));
+    text = spelled;
     int w = 0;
     if (text_font && text && text[0])
         TTF_SizeUTF8(text_font, text, &w, NULL);
@@ -324,7 +535,12 @@ static int text_width(const char *text, const Layout *l)
 // align: 0 left, 1 centre, 2 right (x is the right edge). Returns the width in GBA pixels.
 static int draw_text_c(SDL_Surface *dst, const Layout *l, const char *text, int x, int y, int align, SDL_Color color, SDL_Color shadow)
 {
-    if (text_font == NULL || text == NULL || text[0] == '\0')
+    if (game_font_count && text)
+        return draw_game_text(dst, l, text, x, y, align, color, shadow);
+    char spelled[512];
+    spell_tokens(text, spelled, sizeof(spelled));
+    text = spelled;
+    if (text_font == NULL || text[0] == '\0')
         return 0;
     int w = text_width(text, l);
     if (align == 1)
@@ -386,6 +602,7 @@ static void draw_field(SDL_Surface *dst, const Layout *l, JSON_Object *layout, c
         return;
     SDL_Color color = get_color(f, "color", text_color), shadow = get_color(f, "shadow", text_shadow);
     const char *prefix = json_object_get_string(f, "prefix");
+    int previous_font = use_font(json_object_get_string(f, "font"));
     char buf[256];
     if (prefix && json_object_has_value(f, "prefix_x"))
     {
@@ -395,6 +612,7 @@ static void draw_field(SDL_Surface *dst, const Layout *l, JSON_Object *layout, c
     else
         snprintf(buf, sizeof(buf), "%s%s", prefix ? prefix : "", value);
     draw_text_c(dst, l, buf, get_int(f, "x", 0), get_int(f, "y", 0), field_align(f), color, shadow);
+    active_font = previous_font;
 }
 
 // The gender symbol in the field's male/female colours.
@@ -485,6 +703,7 @@ static void draw_message(SDL_Surface *screen, Scene *scene, const Layout *l, con
     JSON_Object *lo = scene->layout;
     SDL_Rect m = get_rect(lo, "pc.message"), mt = get_rect(lo, "pc.message_text");
     SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
+    int font_before = use_font(json_object_dotget_string(lo, "pc.message_font"));
     char lines[2][160];
     int n = wrap_two_lines(text, m.w - 2 * mt.x - 2, measure_text, l, lines);
     if (n == 2)
@@ -495,6 +714,7 @@ static void draw_message(SDL_Surface *screen, Scene *scene, const Layout *l, con
     draw_window(screen, scene, l, json_object_dotget_string(lo, "pc.message_frame"), m.x, m.y, m.w, m.h);
     for (int i = 0; i < n; i++)
         draw_text_c(screen, l, lines[i], m.x + mt.x, m.y + mt.y + i * 16, 0, color, shadow);
+    active_font = font_before;
 }
 
 typedef enum
@@ -658,8 +878,10 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     SDL_Rect wp = get_rect(lo, "pc.wallpaper");
     blit_scaled(load_image(box->wallpaper), NULL, screen, l, wp.x, wp.y);
     SDL_Rect name = get_rect(lo, "pc.box_name");
+    int font_before = use_font(json_object_dotget_string(lo, "pc.box_name_font"));
     draw_text_c(screen, l, box->name, name.x, name.y, 1,
                 get_color(lo, "pc.box_name_color", (SDL_Color){255, 255, 255, 255}), get_color(lo, "pc.box_name_shadow", (SDL_Color){57, 57, 57, 255}));
+    active_font = font_before;
     int bob = (int)((ticks / 250) % 2);
     SDL_Rect al = get_rect(lo, "pc.arrows.left"), ar = get_rect(lo, "pc.arrows.right");
     blit_scaled(skin_image(scene, "arrow_left.png"), NULL, screen, l, al.x - bob, al.y);
@@ -755,6 +977,7 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     if (st->mode == VIEW_MENU && cur && cur->filled)
     {
         int line = get_int(lo, "pc.menu.line_height", 16), text_x = get_int(lo, "pc.menu.text_x", 8), text_y = get_int(lo, "pc.menu.text_y", 1);
+        int menu_font_before = use_font(json_object_dotget_string(lo, "pc.menu.font"));
         SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
         int widest = 0;
         for (int i = 0; i < MENU_COUNT; i++)
@@ -784,6 +1007,7 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
                     fill_logical(screen, l, x + 1, ty + cap_top + (font_height - 7) / 2 + r, r < 4 ? r + 1 : 7 - r, 1, color);
             }
         }
+        active_font = menu_font_before;
         char msg[160];
         const char *nick = json_object_get_string(cur->summary, "nickname");
         snprintf(msg, sizeof(msg), "%s is selected.", nick ? nick : cur->name);

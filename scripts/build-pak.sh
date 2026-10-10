@@ -99,7 +99,7 @@ sparse_clone() {
 }
 GB_ART=('/gfx/pokemon/' '/gfx/icons/' '/gfx/stats/' '/gfx/sprites/' '/gfx/overworld/' '/gfx/sprites.asm' '/data/pokemon/' '/data/sgb/'
     '/data/icon_pointers.asm' '/engine/gfx/mon_icons.asm'
-    '/gfx/font/' '/gfx/frames/' '/gfx/pc/' '/gfx/battle/')  # the PC and stats screens' tiles (scripts/gb_ui)
+    '/gfx/font/' '/gfx/frames/' '/gfx/pc/' '/gfx/battle/' '/constants/charmap.asm')  # the PC and stats screens' tiles and font (scripts/gb_ui)
 sparse_clone pokered "$POKERED_COMMIT" "${GB_ART[@]}"
 sparse_clone pokeyellow "$POKEYELLOW_COMMIT" "${GB_ART[@]}"
 sparse_clone pokegold "$POKEGOLD_COMMIT" "${GB_ART[@]}"

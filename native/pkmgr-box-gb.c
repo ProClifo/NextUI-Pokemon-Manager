@@ -112,6 +112,34 @@ static const struct
     {"<BOXR>", "arrow_right.png", 1},
 };
 
+// The game's font (scripts/gb_ui game_font): font.png's tiles in white, tinted when drawn, and charmap.json.
+static JSON_Value *gb_charmap_root = NULL;
+static JSON_Object *gb_charmap = NULL;
+
+static void gb_load_font(Scene *scene)
+{
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/charmap.json", scene->skin ? scene->skin : ".");
+    gb_charmap_root = json_parse_file(path);
+    gb_charmap = json_object_get_object(json_value_get_object(gb_charmap_root), "chars");
+}
+
+// One character from the game's font at a tile position; false if the font has no such character.
+static bool gb_game_char(SDL_Surface *dst, Scene *scene, const Layout *l, const char *ch, int col, int row, SDL_Color color)
+{
+    if (gb_charmap == NULL || !json_object_has_value(gb_charmap, ch))
+        return false;
+    int index = (int)json_object_get_number(gb_charmap, ch);
+    SDL_Surface *font = skin_image(scene, "font.png");
+    if (index < 0 || font == NULL)
+        return true; // a blank tile
+    SDL_Rect src = {(index % 16) * 8, (index / 16) * 8, 8, 8};
+    SDL_SetSurfaceColorMod(font, color.r, color.g, color.b);
+    blit_scaled(font, &src, dst, l, col * 8, row * 8);
+    SDL_SetSurfaceColorMod(font, 255, 255, 255);
+    return true;
+}
+
 // Text one character per tile from (col, row) on, in colour; returns the tiles used.
 static int gb_print_c(SDL_Surface *dst, Scene *scene, const Layout *l, const char *text, int col, int row, SDL_Color color)
 {
@@ -133,11 +161,26 @@ static int gb_print_c(SDL_Surface *dst, Scene *scene, const Layout *l, const cha
         }
         if (token)
             continue;
-        // one UTF-8 character
+        // the font's two-character tiles ('s, 'd...), then one UTF-8 character
+        if (p[0] == '\'' && p[1] && p[1] != ' ')
+        {
+            char pair[3] = {p[0], p[1], 0};
+            if (gb_game_char(dst, scene, l, pair, x, row, color))
+            {
+                p += 2;
+                x++;
+                continue;
+            }
+        }
         int n = (*p & 0x80) == 0 ? 1 : (*p & 0xE0) == 0xC0 ? 2 : (*p & 0xF0) == 0xE0 ? 3 : 4;
         char ch[5] = {0};
         memcpy(ch, p, n);
         p += n;
+        if (gb_game_char(dst, scene, l, ch, x, row, color))
+        {
+            x++;
+            continue;
+        }
         if (ch[0] != ' ' && text_font)
         {
             SDL_Surface *g = TTF_RenderUTF8_Blended(text_font, ch, color);
@@ -490,6 +533,7 @@ static void gb_stats_step(Scene *scene, GbState *st, int delta)
 static void gb_init(Scene *scene, GbState *st)
 {
     gb_gen = get_int(scene->layout, "gen", 2);
+    gb_load_font(scene);
     gb_bg = get_color(scene->layout, "colors.bg", gb_bg);
     gb_fg = get_color(scene->layout, "colors.fg", gb_fg);
     gb_grey = get_color(scene->layout, "colors.disabled", gb_grey);

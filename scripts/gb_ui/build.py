@@ -76,6 +76,32 @@ def save(img, out, name):
 TEXT = [None, (170, 170, 170), (85, 85, 85), BLACK]
 
 
+def game_font(repo, font, out):
+    """The game's own font for the viewer: font.png (gfx/font/font.png, loaded at tile $80) in white on
+    see-through, so the viewer can tint it, and charmap.json: each character's tile in it (constants/charmap.asm:
+    letters, digits, punctuation, é, 's...)."""
+    import re
+    save(tile(font, 0, 0, [None, None, None, (255, 255, 255)], 128), out, "font_row.png")
+    sheet = Image.new("RGBA", (128, 64), (0, 0, 0, 0))
+    strip = Image.open(os.path.join(out, "font_row.png"))
+    for i in range(128):
+        sheet.alpha_composite(strip.crop((i * 8, 0, i * 8 + 8, 8)), ((i % 16) * 8, (i // 16) * 8))
+    os.remove(os.path.join(out, "font_row.png"))
+    save(sheet, out, "font.png")
+    chars = {}
+    for line in open(os.path.join(repo, "constants", "charmap.asm"), encoding="utf-8"):
+        m = re.match(r'\s*charmap\s+"([^"<>]+)",\s*\$([0-9a-fA-F]{2})', line)
+        if not m:
+            continue
+        text, code = m.group(1), int(m.group(2), 16)
+        # the Western games' Latin characters (the Japanese ones share codes with them)
+        if code >= 0x80 and text not in chars and all(ord(c) < 0x3000 for c in text):
+            chars[text] = code - 0x80
+    chars[" "] = -1  # a blank tile
+    with open(os.path.join(out, "charmap.json"), "w", encoding="utf-8") as f:
+        json.dump({"chars": chars}, f, ensure_ascii=False)
+
+
 def font_glyphs(font, out):
     """gfx/font/font.png at $80: <PK><MN> $E1-$E2, ▷ $EC, ▶ $ED, ▼ $EE, ♂ $EF, ♀ $F5, <DOT> $F2."""
     save(tiles(font, [(1, 6), (2, 6)], TEXT), out, "pkmn.png")
@@ -95,6 +121,7 @@ def gen1(repo, out):
     hud1, hud2, hud3 = (os.path.join(gfx, "battle", f"battle_hud_{n}.png") for n in (1, 2, 3))
     save(tiles(extra, [(9, 1), (10, 1), (11, 1), (12, 1), (13, 1), (14, 1)], TEXT), out, "frame.png")
     font_glyphs(os.path.join(gfx, "font", "font.png"), out)
+    game_font(repo, os.path.join(gfx, "font", "font.png"), out)
     save(tile(hud1, 1, 0, TEXT), out, "lv.png")  # $6E ":L" (battle_hud_1 over font_battle_extra)
     save(tile(battle, 2, 1, TEXT), out, "id.png")  # $73
     save(tile(battle, 3, 1, TEXT), out, "no.png")  # $74
@@ -119,6 +146,7 @@ def gen2(repo, out, crystal):
     frame = os.path.join(gfx, "frames", "1.png")  # ┌ ─ ┐ / │ └ ┘ (3x2)
     save(tiles(frame, [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)], TEXT), out, "frame.png")
     font_glyphs(os.path.join(gfx, "font", "font.png"), out)
+    game_font(repo, os.path.join(gfx, "font", "font.png"), out)
     battle = os.path.join(gfx, "font", "font_battle_extra.png")  # $60-$78, 16 tiles a row
     save(tile(os.path.join(gfx, "battle", "enemy_hp_bar_border.png"), 2, 0, TEXT), out, "lv.png")  # $6E
     save(tile(battle, 3, 1, TEXT), out, "id.png")  # $73

@@ -30,14 +30,14 @@ TOKENS = {"{LV}": "Lv", "{LV_2}": "Lv", "{NO}": "No", "{PP}": "PP"}
 
 
 def text(value):
-    for token, replacement in TOKENS.items():
-        value = value.replace(token, replacement)
+    """Prefixes keep the games' special glyphs ({LV}, {NO}, {PP}...): the viewer draws them with the game's font
+    (charmap.json), or spells them out (TOKENS) when it falls back to NextUI's font."""
     return value
 
 
 def field(f, color, shadow):
     """A text/position field with its colours filled in and its prefix spelled out."""
-    out = {k: v for k, v in f.items() if k in ("field", "x", "y", "align", "width", "line_height", "w", "h")}
+    out = {k: v for k, v in f.items() if k in ("field", "x", "y", "align", "width", "line_height", "w", "h", "font")}
     out["color"] = f.get("color", color)
     out["shadow"] = f.get("shadow", shadow)
     if "prefix" in f:
@@ -56,7 +56,7 @@ def gender_and_level(fields, color, shadow):
     for f in fields:
         if f["field"] == "level" and "num_right" in f:  # Ruby/Sapphire: Lv, number right-aligned, then the gender
             out.append({**field(f, color, shadow), "x": f["num_right"], "align": "right",
-                        "prefix": "Lv", "prefix_x": f["x"]})
+                        "prefix": "{LV}", "prefix_x": f["x"]})
             gender = next((g for g in fields if g["field"] == "gender"), None)
             if gender:
                 out.append({**field(gender, color, shadow), "x": f["num_right"] + gender.get("x_after_level", 8)})
@@ -72,7 +72,7 @@ def gender_and_level(fields, color, shadow):
             level.pop("male", None)
             level.pop("female", None)
             level["x"] = f["x"] + f.get("gender_width", 6) + 3
-            level["prefix"] = "Lv"
+            level["prefix"] = "{LV}"
             out += [gender, level]
         elif f["field"] == "gender" and any(o["field"] == "gender" for o in out):
             for g in ("male", "female"):
@@ -178,6 +178,8 @@ def normalize(full):
             "box_name": [pc["box_name"][0], name_text.get("top", name_text.get("cell_top", pc.get("box_name_text_top", pc["box_name"][1] - 7)))],
             "box_name_color": name_text.get("color", pc.get("box_name_color", [255, 255, 255])),
             "box_name_shadow": name_text.get("shadow", pc.get("box_name_shadow", [57, 57, 57])),
+            "box_name_font": pc.get("box_name_font", name_text.get("font", "normal")),
+            "message_font": pc.get("message_font", "normal"),
             "arrows": pc["arrows"],
             "grid": pc["grid"],
             "party_button": pc["party_button"],
@@ -197,6 +199,7 @@ def normalize(full):
                 "right": menu["right"], "bottom": menu["bottom"], "line_height": menu["line_height"],
                 "text_x": menu["text_x"], "text_y": menu.get("text_y", 1),
                 "color": menu.get("color", color), "shadow": menu.get("shadow", shadow),
+                "font": menu.get("font", "normal"),
             },
             "message": message,
             "message_text": message_text,
@@ -266,6 +269,75 @@ def game_wallpapers(decomp, out):
             frlg_wallpaper(os.path.join(src, name)).save(os.path.join(dst, f"{i:02d}.png"))
 
 
+def _font_sheet(target, name, count, cell_w, widths, rows_of):
+    """font_<name>.png: every glyph in a 16-column grid of cell_w x 16 cells, the game's foreground pixels red
+    and its shadow pixels green (the viewer colours them); and font_<name>.json with the cell size and widths."""
+    from PIL import Image
+    sheet = Image.new("RGBA", (16 * cell_w, ((count + 15) // 16) * 16), (0, 0, 0, 0))
+    px = sheet.load()
+    for g in range(count):
+        rows = rows_of(g)
+        ox, oy = (g % 16) * cell_w, (g // 16) * 16
+        for y in range(16):
+            for x in range(cell_w):
+                v = rows[y][x]
+                if v == 1:
+                    px[ox + x, oy + y] = (255, 0, 0, 255)
+                elif v == 2:
+                    px[ox + x, oy + y] = (0, 255, 0, 255)
+    sheet.save(os.path.join(target, f"font_{name}.png"))
+    with open(os.path.join(target, f"font_{name}.json"), "w", encoding="utf-8") as f:
+        json.dump({"cell": [cell_w, 16], "columns": 16, "widths": list(widths[:count])}, f)
+
+
+def game_fonts(game, repo, target):
+    """The game's own fonts as glyph sheets (font_<name>.png/.json) and its charmap (charmap.json: characters
+    and {NAMES} to byte codes; F9 xx is extra glyph 0x100 + xx), so the viewer can draw text exactly as the game
+    does: each glyph's top-left at the text position, advancing by its width."""
+    from pc_ui import gba
+    cm = gba.Charmap(repo)
+    names = []
+    if game == "e":
+        for name in ("normal", "short", "small"):
+            font = gba.Font(repo, name, cm)
+
+            def rows(g, font=font):
+                gx, gy = (g % 16) * 16, (g // 16) * 16
+                return [[font.data[(gy + y) * font.png_w + gx + x] if gx + x < font.png_w else 0 for x in range(16)] for y in range(16)]
+            count = min(len(font.widths), (len(font.data) // font.png_w // 16) * (font.png_w // 16))
+            _font_sheet(target, name, count, 16, font.widths, rows)
+            names.append(name)
+    elif game == "frlg":
+        from pc_ui import frlg
+        for name in ("normal", "copy1", "small"):
+            font = frlg.Font(repo, name, cm)
+
+            def rows(g, font=font):
+                gx, gy = font.glyph_xy(g)
+                return [[font.data[(gy + y) * font.w + gx + x] for x in range(font.cell)] for y in range(16)]
+            per_row = font.w // font.cell
+            count = min(len(font.widths), (len(font.data) // font.w // 16) * per_row)
+            _font_sheet(target, name, count, font.cell, font.widths, rows)
+            names.append(name)
+    elif game == "rs":
+        from pc_ui import rs
+        for name, num in (("normal", 3), ("small", 4)):
+            font = rs.Font(repo, num)
+            count = len(font.widths)
+
+            def rows(g, font=font):
+                try:
+                    r = font.glyph_rows(g)
+                    return [list(row) + [0] * (8 - len(row)) for row in r]
+                except (IndexError, KeyError):
+                    return [[0] * 8 for _ in range(16)]
+            _font_sheet(target, name, count, 8, font.widths, rows)
+            names.append(name)
+    with open(os.path.join(target, "charmap.json"), "w", encoding="utf-8") as f:
+        json.dump({"chars": cm.chars, "names": cm.names}, f, ensure_ascii=False)
+    return names
+
+
 def main():
     decomp, out = sys.argv[1], sys.argv[2]
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -282,8 +354,10 @@ def main():
             full = json.load(f)
         with open(os.path.join(target, "layout_full.json"), "w", encoding="utf-8") as f:
             json.dump(full, f, indent=1)
+        layout = normalize(copy.deepcopy(full))
+        layout["fonts"] = game_fonts(game, os.path.join(decomp, repo), target)
         with open(layout_path, "w", encoding="utf-8") as f:
-            json.dump(normalize(copy.deepcopy(full)), f, indent=1)
+            json.dump(layout, f, indent=1)
         for preview in [p for p in os.listdir(target) if p.startswith("preview_")]:
             os.remove(os.path.join(target, preview))
         print(f"pc_ui: {game}")

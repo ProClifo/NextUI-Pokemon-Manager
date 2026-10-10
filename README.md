@@ -74,7 +74,7 @@ Gen 1 and 2 saves get the Game Boy's BILL'S PC instead, on the Game Boy's 160x14
 - **PARTY POKéMON** at the top opens the party, as in the games; **CLOSE BOX** leaves.
 - **A** on a Pokémon opens the white menu with *Transfer*, *Summary*, *Evolve* and *Cancel* ("MEW is selected."). Transfer and Evolve are greyed out when they can't be done; picking one anyway closes the menu and the message box says why in a few words ("No games to send to!", "Go to a PokéCenter to evolve!", "It needs to hold a Metal Coat!"...).
 - *Summary* shows the game's summary pages (**Left/Right** turn them): Pokémon info with the trainer memo in that game's wording, skills (stats, experience, held item, ribbons) and moves with their PP.
-- Text is drawn in NextUI's OG font (see [Fonts](#fonts)), sized to the game's letters.
+- Text is drawn in each game's own font, glyph for glyph (Red/Blue/Yellow's, Gold/Silver/Crystal's, Ruby/Sapphire's, Emerald's and FireRed/LeafGreen's, from the decompilations), as the games print it. If a skin's font is missing, NextUI's OG font stands in.
 - Only what the games themselves show: no hidden values such as EVs, IVs, PIDs or secret IDs, anywhere in the pak.
 - **D-pad** moves the hand, **L/R** switch boxes, **B** goes back.
 
@@ -110,7 +110,7 @@ Picking a gift: event Pokémon are **generated fresh for your save**, as the rea
 
 ### Fonts
 
-The main menu is drawn in NextUI's **Next** font and everything inside a save (its menus, messages and PC box screen) in NextUI's **OG** font, whatever font NextUI itself is set to. Both are NextUI's own (`.system/res/font1.ttf` and `font2.ttf`). OG has no Japanese and no ♂/♀, so a screen with text it can't show (read from the font's character map) uses Next instead.
+The main menu is drawn in NextUI's **Next** font and everything inside a save (its menus and messages) in NextUI's **OG** font; the Pokémon storage screens use the games' own fonts, whatever font NextUI itself is set to. Both are NextUI's own (`.system/res/font1.ttf` and `font2.ttf`). OG has no Japanese and no ♂/♀, so a screen with text it can't show (read from the font's character map) uses Next instead.
 
 ### Event gallery
 
