@@ -400,12 +400,14 @@ public sealed class Gen3EventTests : IDisposable
     }
 
     [Theory]
-    [InlineData(GameVersion.R, 0x2704)]
-    [InlineData(GameVersion.E, 0x2798)]
-    public void RegiDollsGoToTheDollInventoryOnce(GameVersion version, int dolls)
+    [InlineData(GameVersion.R, 0x2704, 0x818)]
+    [InlineData(GameVersion.E, 0x2798, 0x878)]
+    public void RegiDollsGoToTheDollInventoryOnce(GameVersion version, int dolls, int visitedMauville)
     {
         var entry = _saves.Create(version, $"{version}.sav");
         var sav = (SAV3)entry.Sav;
+        Assert.Contains("Mauville", Gen3Events.GiveDoll(sav, 120).Message);
+        sav.SetEventFlag(visitedMauville, true);
         sav.Large[dolls] = 42; // a doll already there: the new one takes the next free slot
         Assert.True(Gen3Events.GiveDoll(sav, 120).Ok);
         Assert.False(Gen3Events.GiveDoll(sav, 120).Ok); // already has it

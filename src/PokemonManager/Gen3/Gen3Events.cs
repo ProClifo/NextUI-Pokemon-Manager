@@ -358,12 +358,16 @@ public static class Gen3Events
     /// <summary>
     /// Adds a doll decoration to Ruby/Sapphire/Emerald as a Mystery Event's adddecoration did (DecorationAdd: the
     /// first empty slot of the doll inventory). One of each is enough, so a doll the player has isn't added again.
+    /// Players without the event got the dolls from the Mauville old man's trades after Record Mixing, so the
+    /// save must have visited Mauville City (FLAG_VISITED_MAUVILLE_CITY: R/S 0x818, E 0x878).
     /// </summary>
     public static OpResult GiveDoll(SAV3 sav, byte doll)
     {
         if (sav is SAV3FRLG)
             return OpResult.Fail("FireRed and LeafGreen have no decorations.");
         var name = RegiDolls.First(d => d.Id == doll).Name.ToUpperInvariant();
+        if (!sav.GetEventFlag(sav is SAV3E ? 0x878 : 0x818))
+            return OpResult.Fail($"Visit Mauville City first: the {name} was traded by the old man there.");
         var dolls = sav.Large.Slice(sav is SAV3E ? 0x2798 : 0x2704, DollSlots);
         if (dolls.Contains(doll))
             return OpResult.Fail($"You already have the {name}.");
