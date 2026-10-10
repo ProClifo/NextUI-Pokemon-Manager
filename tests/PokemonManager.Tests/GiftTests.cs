@@ -179,10 +179,10 @@ public sealed class GiftTests : IDisposable
         var sav = _saves.Create(GameVersion.E, "Emerald.sav").Sav;
         var mew = TestSaves.Make(sav, Species.Mew, 10);
         Assert.Equal("Inject Mew (Lv. 10) into Emerald?", Names.InjectQuestion(mew, sav));
-        Assert.Equal("MEW has arrived!", Names.Arrived(mew));
+        Assert.Equal("MEW has arrived in your PC!", Names.Arrived(mew));
 
         mew.IsEgg = true;
         Assert.Equal("Inject Mew Egg into Emerald?", Names.InjectQuestion(mew, sav));
-        Assert.Equal("The EGG has arrived!", Names.Arrived(mew));
+        Assert.Equal("The EGG has arrived in your PC!", Names.Arrived(mew));
     }
 }

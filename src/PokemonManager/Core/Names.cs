@@ -18,9 +18,9 @@ public static class Names
     public static string InjectQuestion(PKM pk, SaveFile sav)
         => pk.IsEgg ? $"Inject {Species(pk.Species)} Egg into {Game(sav)}?" : $"Inject {Species(pk.Species)} (Lv. {pk.CurrentLevel}) into {Game(sav)}?";
 
-    /// <summary>"MEW has arrived!" (the in-game capitals) or "The EGG has arrived!"</summary>
+    /// <summary>"MEW has arrived in your PC!" (the in-game capitals) or "The EGG has arrived in your PC!"</summary>
     public static string Arrived(PKM pk)
-        => pk.IsEgg ? "The EGG has arrived!" : $"{Species(pk.Species).ToUpperInvariant()} has arrived!";
+        => pk.IsEgg ? "The EGG has arrived in your PC!" : $"{Species(pk.Species).ToUpperInvariant()} has arrived in your PC!";
 
     public static string Move(ushort move)
         => move < Strings.movelist.Length ? Strings.movelist[move] : $"Move {move}";
