@@ -274,10 +274,12 @@ static void fill_logical(SDL_Surface *dst, const Layout *l, int x, int y, int w,
 
 // ------------------------------------------------------------------ text
 
-// The game's text, in NextUI's font sized so a capital letter is as tall as the game's.
+// The game's text, in NextUI's font sized so a capital letter is as tall as the game's. Layout positions are
+// the top of the game's 16-pixel glyph cell; capitals start font.cap_top pixels below it.
 static TTF_Font *text_font = NULL;
-static int text_cap_offset = 0; // screen pixels from the font's top to the top of a capital letter
+static int text_cap_offset = 0; // screen pixels from the TTF line's top to the top of a capital letter
 static int font_height = 10;    // GBA pixels of a capital letter
+static int cap_top = 2;         // GBA pixels from the glyph cell's top to a capital's top
 static SDL_Color text_color = {96, 96, 96, 255};
 static SDL_Color text_shadow = {208, 208, 200, 255};
 
@@ -289,6 +291,7 @@ static void open_text_font(Scene *scene, const Layout *l)
         path = getenv("PKMGR_FONT");
 #endif
     font_height = get_int(scene->layout, "font.height", 10);
+    cap_top = get_int(scene->layout, "font.cap_top", 2);
     text_color = get_color(scene->layout, "font.color", text_color);
     text_shadow = get_color(scene->layout, "font.shadow", text_shadow);
     if (path == NULL)
@@ -312,8 +315,8 @@ static int text_width(const char *text, const Layout *l)
     return (w + l->scale - 1) / l->scale;
 }
 
-// Draws text with the top of its capital letters at GBA (x, y), with the game's shadow (one GBA pixel right,
-// down and diagonal). align: 0 left, 1 centre, 2 right (x is the right edge). Returns the width in GBA pixels.
+// Draws text in a glyph cell whose top is GBA y, with the game's shadow one GBA pixel right, down and diagonal.
+// align: 0 left, 1 centre, 2 right (x is the right edge). Returns the width in GBA pixels.
 static int draw_text_c(SDL_Surface *dst, const Layout *l, const char *text, int x, int y, int align, SDL_Color color, SDL_Color shadow)
 {
     if (text_font == NULL || text == NULL || text[0] == '\0')
@@ -323,7 +326,7 @@ static int draw_text_c(SDL_Surface *dst, const Layout *l, const char *text, int 
         x -= w / 2;
     else if (align == 2)
         x -= w;
-    int px = l->origin_x + x * l->scale, py = l->origin_y + y * l->scale - text_cap_offset;
+    int px = l->origin_x + x * l->scale, py = l->origin_y + (y + cap_top) * l->scale - text_cap_offset;
     SDL_Surface *s = shadow.a ? TTF_RenderUTF8_Blended(text_font, text, shadow) : NULL;
     SDL_Surface *t = TTF_RenderUTF8_Blended(text_font, text, color);
     if (s)
@@ -350,7 +353,7 @@ static int draw_text(SDL_Surface *dst, const Layout *l, const char *text, int x,
     return draw_text_c(dst, l, text, x, y, align, text_color, text_shadow);
 }
 
-// A layout field: {"field": name, "x", "y", "color"?, "shadow"?, "align"?}.
+// A layout field: {"field": name, "x", "y", "color", "shadow", "align"?, "prefix"?, "prefix_x"?, "male"/"female"?}.
 static JSON_Object *find_field(JSON_Object *layout, const char *list, const char *name)
 {
     JSON_Array *fields = json_object_dotget_array(layout, list);
@@ -370,39 +373,62 @@ static int field_align(JSON_Object *f)
     return a == NULL ? 0 : strcmp(a, "center") == 0 ? 1 : strcmp(a, "right") == 0 ? 2 : 0;
 }
 
-static void draw_field(SDL_Surface *dst, const Layout *l, JSON_Object *layout, const char *list, const char *name, const char *text)
+// A text field: its prefix ("/", "Lv") and value. A prefix_x draws the prefix there and the value on its own.
+static void draw_field(SDL_Surface *dst, const Layout *l, JSON_Object *layout, const char *list, const char *name, const char *value)
 {
     JSON_Object *f = find_field(layout, list, name);
-    if (f == NULL || text == NULL)
+    if (f == NULL || value == NULL || value[0] == '\0')
         return;
-    draw_text_c(dst, l, text, get_int(f, "x", 0), get_int(f, "y", 0), field_align(f),
-                get_color(f, "color", text_color), get_color(f, "shadow", text_shadow));
+    SDL_Color color = get_color(f, "color", text_color), shadow = get_color(f, "shadow", text_shadow);
+    const char *prefix = json_object_get_string(f, "prefix");
+    char buf[256];
+    if (prefix && json_object_has_value(f, "prefix_x"))
+    {
+        draw_text_c(dst, l, prefix, get_int(f, "prefix_x", 0), get_int(f, "y", 0), 0, color, shadow);
+        snprintf(buf, sizeof(buf), "%s", value);
+    }
+    else
+        snprintf(buf, sizeof(buf), "%s%s", prefix ? prefix : "", value);
+    draw_text_c(dst, l, buf, get_int(f, "x", 0), get_int(f, "y", 0), field_align(f), color, shadow);
 }
 
-// The trainer memo: lines split at \n, parts in { } in the highlight colour.
-static void draw_memo(SDL_Surface *dst, const Layout *l, JSON_Object *f, const char *memo, SDL_Color highlight, SDL_Color highlight_shadow)
+// The gender symbol in the field's male/female colours.
+static void draw_gender(SDL_Surface *dst, const Layout *l, JSON_Object *layout, const char *list, const char *gender)
 {
-    if (f == NULL || memo == NULL)
+    JSON_Object *f = find_field(layout, list, "gender");
+    if (f == NULL || gender == NULL)
         return;
-    int x0 = get_int(f, "x", 0), y = get_int(f, "y", 0), line_height = get_int(f, "line_height", 13);
+    bool male = strcmp(gender, "male") == 0;
+    SDL_Color fallback = male ? (SDL_Color){66, 206, 255, 255} : (SDL_Color){255, 156, 148, 255};
+    draw_text_c(dst, l, male ? "♂" : "♀", get_int(f, "x", 0), get_int(f, "y", 0), 0,
+                get_color(f, male ? "male.color" : "female.color", fallback), get_color(f, male ? "male.shadow" : "female.shadow", text_shadow));
+}
+
+// Multi-line text: lines split at \n, parts in { } in the highlight colour.
+static void draw_lines(SDL_Surface *dst, const Layout *l, JSON_Object *f, const char *text)
+{
+    if (f == NULL || text == NULL)
+        return;
+    int x0 = get_int(f, "x", 0), y = get_int(f, "y", 0), line_height = get_int(f, "line_height", 16);
     SDL_Color normal = get_color(f, "color", text_color), shadow = get_color(f, "shadow", text_shadow);
-    bool hl = false;
+    SDL_Color hl = get_color(f, "highlight.color", (SDL_Color){231, 8, 8, 255}), hl_shadow = get_color(f, "highlight.shadow", shadow);
+    bool highlight = false;
     int x = x0;
     char part[256];
     int n = 0;
-    for (const char *p = memo;; p++)
+    for (const char *p = text;; p++)
     {
         char c = *p;
         if (c == '{' || c == '}' || c == '\n' || c == '\0')
         {
             part[n] = '\0';
             if (n)
-                x += draw_text_c(dst, l, part, x, y, 0, hl ? highlight : normal, hl ? highlight_shadow : shadow);
+                x += draw_text_c(dst, l, part, x, y, 0, highlight ? hl : normal, highlight ? hl_shadow : shadow);
             n = 0;
             if (c == '{')
-                hl = true;
+                highlight = true;
             else if (c == '}')
-                hl = false;
+                highlight = false;
             else if (c == '\n')
             {
                 x = x0;
@@ -416,23 +442,23 @@ static void draw_memo(SDL_Surface *dst, const Layout *l, JSON_Object *f, const c
     }
 }
 
-// The standard window: window_frame.png is 3x3 tiles (corners, edges, centre fill).
-static void draw_window(SDL_Surface *dst, Scene *scene, const Layout *l, int x, int y, int w, int h)
+// A window: the frame image's 3x3 tiles drawn one tile outside the inner rect, which is filled from the centre.
+static void draw_window(SDL_Surface *dst, Scene *scene, const Layout *l, const char *frame_name, int x, int y, int w, int h)
 {
-    SDL_Surface *frame = skin_image(scene, "window_frame.png");
+    SDL_Surface *frame = skin_image(scene, frame_name ? frame_name : "window_frame.png");
     if (frame == NULL)
     {
-        fill_logical(dst, l, x, y, w, h, (SDL_Color){96, 96, 96, 255});
-        fill_logical(dst, l, x + 1, y + 1, w - 2, h - 2, (SDL_Color){255, 255, 255, 255});
+        fill_logical(dst, l, x - 2, y - 2, w + 4, h + 4, (SDL_Color){96, 96, 96, 255});
+        fill_logical(dst, l, x, y, w, h, (SDL_Color){255, 255, 255, 255});
         return;
     }
     int t = frame->w / 3;
-    for (int ty = y; ty < y + h; ty += t)
+    for (int ty = y - t; ty < y + h + t; ty += t)
     {
-        for (int tx = x; tx < x + w; tx += t)
+        for (int tx = x - t; tx < x + w + t; tx += t)
         {
-            int col = tx == x ? 0 : tx + t >= x + w ? 2 : 1;
-            int row = ty == y ? 0 : ty + t >= y + h ? 2 : 1;
+            int col = tx < x ? 0 : tx >= x + w ? 2 : 1;
+            int row = ty < y ? 0 : ty >= y + h ? 2 : 1;
             SDL_Rect src = {col * t, row * t, t, t};
             blit_scaled(frame, &src, dst, l, tx, ty);
         }
@@ -451,16 +477,16 @@ typedef enum
 
 typedef enum
 {
-    MODE_BOX,
-    MODE_PARTY,
-    MODE_MENU,
-    MODE_SUMMARY,
+    VIEW_BOX,
+    VIEW_PARTY,
+    VIEW_MENU,
+    VIEW_SUMMARY,
 } Mode;
 
 typedef struct
 {
     Mode mode;
-    Mode menu_from; // MODE_BOX or MODE_PARTY: where the menu and summary return to
+    Mode menu_from; // VIEW_BOX or VIEW_PARTY: where the menu and summary return to
     Target target;
     int party_slot; // 0-5, 6 = CANCEL
     int menu_item;
@@ -487,7 +513,9 @@ static void draw_icon(SDL_Surface *screen, const Layout *l, Slot *slot, int x, i
     blit_scaled(icon, &src, screen, l, x, y);
 }
 
-static void draw_sprite(SDL_Surface *screen, const Layout *l, Slot *slot, int cx, int cy)
+// The front picture centred on (cx, cy); the summary screens mirror it unless the species is one the games
+// never flip (IsMonSpriteNotFlipped).
+static void draw_sprite(SDL_Surface *screen, const Layout *l, Slot *slot, int cx, int cy, bool flip)
 {
     SDL_Surface *sprite = load_image(slot->sprite);
     if (sprite == NULL)
@@ -503,12 +531,35 @@ static void draw_sprite(SDL_Surface *screen, const Layout *l, Slot *slot, int cx
         src.y += src.h - 64;
         src.h = 64;
     }
-    blit_scaled(sprite, &src, screen, l, cx - src.w / 2, cy - src.h / 2);
+    if (!flip)
+    {
+        blit_scaled(sprite, &src, screen, l, cx - src.w / 2, cy - src.h / 2);
+        return;
+    }
+    SDL_Surface *part = SDL_CreateRGBSurfaceWithFormat(0, src.w, src.h, 32, SDL_PIXELFORMAT_ARGB8888);
+    SDL_Surface *mirror = SDL_CreateRGBSurfaceWithFormat(0, src.w, src.h, 32, SDL_PIXELFORMAT_ARGB8888);
+    if (part && mirror)
+    {
+        SDL_SetSurfaceBlendMode(sprite, SDL_BLENDMODE_NONE);
+        SDL_BlitSurface(sprite, &src, part, NULL);
+        SDL_SetSurfaceBlendMode(sprite, SDL_BLENDMODE_BLEND);
+        for (int y = 0; y < src.h; y++)
+        {
+            Uint32 *from = (Uint32 *)((Uint8 *)part->pixels + y * part->pitch);
+            Uint32 *to = (Uint32 *)((Uint8 *)mirror->pixels + y * mirror->pitch);
+            for (int x = 0; x < src.w; x++)
+                to[x] = from[src.w - 1 - x];
+        }
+        SDL_SetSurfaceBlendMode(mirror, SDL_BLENDMODE_BLEND);
+        blit_scaled(mirror, NULL, screen, l, cx - src.w / 2, cy - src.h / 2);
+    }
+    SDL_FreeSurface(part);
+    SDL_FreeSurface(mirror);
 }
 
 static bool party_open(State *st)
 {
-    return st->mode == MODE_PARTY || (st->mode != MODE_BOX && st->menu_from == MODE_PARTY);
+    return st->mode == VIEW_PARTY || (st->mode != VIEW_BOX && st->menu_from == VIEW_PARTY);
 }
 
 // The slot the hand is on, or NULL.
@@ -542,61 +593,26 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     SDL_Rect wp = get_rect(lo, "pc.wallpaper");
     blit_scaled(load_image(box->wallpaper), NULL, screen, l, wp.x, wp.y);
     SDL_Rect name = get_rect(lo, "pc.box_name");
-    draw_text_c(screen, l, box->name, name.x, name.y - font_height / 2, 1,
-                get_color(lo, "pc.box_name_color", text_color), get_color(lo, "pc.box_name_shadow", text_shadow));
+    draw_text_c(screen, l, box->name, name.x, name.y, 1,
+                get_color(lo, "pc.box_name_color", (SDL_Color){255, 255, 255, 255}), get_color(lo, "pc.box_name_shadow", (SDL_Color){57, 57, 57, 255}));
     int bob = (int)((ticks / 250) % 2);
     SDL_Rect al = get_rect(lo, "pc.arrows.left"), ar = get_rect(lo, "pc.arrows.right");
     blit_scaled(skin_image(scene, "arrow_left.png"), NULL, screen, l, al.x - bob, al.y);
     blit_scaled(skin_image(scene, "arrow_right.png"), NULL, screen, l, ar.x + bob, ar.y);
 
-    // Icons.
+    // The hand's position: over the slot, the box title or a button.
     int gx = get_int(lo, "pc.grid.x", 0), gy = get_int(lo, "pc.grid.y", 0);
     int dx = get_int(lo, "pc.grid.dx", 24), dy = get_int(lo, "pc.grid.dy", 24);
-    for (int i = 0; i < box->columns * box->rows; i++)
-    {
-        if (box->slots[i].filled)
-            draw_icon(screen, l, &box->slots[i], gx + (i % box->columns) * dx, gy + (i / box->columns) * dy,
-                      st->mode == MODE_BOX && st->target == TARGET_SLOT && i == scene->slot, ticks);
-    }
-
-    // The party, when open.
-    if (party_open(st))
-    {
-        blit_scaled(skin_image(scene, "pc_party.png"), NULL, screen, l, get_int(lo, "pc.party.x", 0), get_int(lo, "pc.party.y", 0));
-        for (int i = 0; i < 6; i++)
-        {
-            int x, y;
-            if (scene->boxes[0].slots[i].filled && party_slot_xy(lo, i, &x, &y))
-                draw_icon(screen, l, &scene->boxes[0].slots[i], x, y, st->mode == MODE_PARTY && i == st->party_slot, ticks);
-        }
-    }
-
-    // PKMN DATA: the Pokémon under the hand.
-    Slot *cur = hovered(scene, st);
-    if (cur && cur->filled)
-    {
-        SDL_Rect sp = get_rect(lo, "pc.mon_sprite");
-        draw_sprite(screen, l, cur, sp.x, sp.y);
-        JSON_Object *s = cur->summary;
-        draw_field(screen, l, lo, "pc.mon_text", "nickname", json_object_get_string(s, "nickname"));
-        draw_field(screen, l, lo, "pc.mon_text", "species", json_object_get_string(s, "species"));
-        draw_field(screen, l, lo, "pc.mon_text", "level", json_object_get_string(s, "level"));
-        const char *item = json_object_get_string(s, "item");
-        if (item && strcmp(item, "NONE") != 0)
-            draw_field(screen, l, lo, "pc.mon_text", "item", item);
-    }
-
-    // The hand: over the slot, the box title or a button, bobbing like the game's.
-    SDL_Surface *hand = skin_image(scene, "hand.png");
+    SDL_Rect ho = get_rect(lo, "pc.hand_offset");
     int hx = 0, hy = 0;
-    SDL_Rect ho = get_rect(lo, "pc.hand_offset"), hbo = get_rect(lo, "pc.hand_button_offset");
+    bool in_box = false;
     if (party_open(st))
     {
         if (st->party_slot >= 6 || !party_slot_xy(lo, st->party_slot, &hx, &hy))
         {
-            SDL_Rect c = get_rect(lo, "pc.party.cancel");
-            hx = c.x + c.w / 2 - 16 + hbo.x;
-            hy = c.y + hbo.y;
+            SDL_Rect c = get_rect(lo, "pc.hand_cancel");
+            hx = c.x;
+            hy = c.y;
         }
         else
         {
@@ -608,67 +624,107 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     {
         hx = gx + (scene->slot % box->columns) * dx + ho.x;
         hy = gy + (scene->slot / box->columns) * dy + ho.y;
-    }
-    else if (st->target == TARGET_TITLE)
-    {
-        hx = name.x - 16;
-        hy = name.y - 24;
+        in_box = true;
     }
     else
     {
-        SDL_Rect b = get_rect(lo, st->target == TARGET_PARTY_BUTTON ? "pc.party_button" : "pc.close_button");
-        hx = b.x + b.w / 2 - 16 + hbo.x;
-        hy = b.y + hbo.y;
+        SDL_Rect at = get_rect(lo, st->target == TARGET_TITLE ? "pc.hand_title" : st->target == TARGET_PARTY_BUTTON ? "pc.hand_party_button" : "pc.hand_close_button");
+        hx = at.x;
+        hy = at.y;
     }
-    int hand_bob = st->mode == MODE_MENU ? 0 : (int)(2.0 * sin(ticks / 160.0)) + 2;
+    int hand_bob = st->mode == VIEW_MENU ? 0 : (int)((ticks / 300) % 2) * 2;
+
+    // In the box the hand's shadow falls on the wallpaper, under the icons.
+    if (in_box)
+    {
+        SDL_Rect so = get_rect(lo, "pc.hand_shadow_offset");
+        blit_scaled(skin_image(scene, "hand_shadow.png"), NULL, screen, l, hx + so.x, hy + so.y);
+    }
+
+    for (int i = 0; i < box->columns * box->rows; i++)
+    {
+        if (box->slots[i].filled)
+            draw_icon(screen, l, &box->slots[i], gx + (i % box->columns) * dx, gy + (i / box->columns) * dy,
+                      st->mode == VIEW_BOX && st->target == TARGET_SLOT && i == scene->slot, ticks);
+    }
+
+    // The party, when open, over the wallpaper.
+    if (party_open(st))
+    {
+        blit_scaled(skin_image(scene, "pc_party.png"), NULL, screen, l, get_int(lo, "pc.party.x", 0), get_int(lo, "pc.party.y", 0));
+        for (int i = 0; i < 6; i++)
+        {
+            int x, y;
+            if (scene->boxes[0].slots[i].filled && party_slot_xy(lo, i, &x, &y))
+                draw_icon(screen, l, &scene->boxes[0].slots[i], x, y, st->mode == VIEW_PARTY && i == st->party_slot, ticks);
+        }
+    }
+
+    // PKMN DATA: the Pokémon under the hand.
+    Slot *cur = hovered(scene, st);
+    if (cur && cur->filled)
+    {
+        SDL_Rect bg = get_rect(lo, "pc.mon_text_bg.rect");
+        if (bg.w)
+            fill_logical(screen, l, bg.x, bg.y, bg.w, bg.h, get_color(lo, "pc.mon_text_bg.color", (SDL_Color){148, 148, 172, 255}));
+        SDL_Rect sp = get_rect(lo, "pc.mon_sprite");
+        draw_sprite(screen, l, cur, sp.x, sp.y, false);
+        JSON_Object *s = cur->summary;
+        draw_field(screen, l, lo, "pc.mon_text", "nickname", json_object_get_string(s, "nickname"));
+        draw_field(screen, l, lo, "pc.mon_text", "species", json_object_get_string(s, "species"));
+        draw_field(screen, l, lo, "pc.mon_text", "level", json_object_get_string(s, "level"));
+        draw_gender(screen, l, lo, "pc.mon_text", json_object_get_string(s, "gender"));
+        const char *item = json_object_get_string(s, "item");
+        if (item && strcmp(item, "NONE") != 0)
+            draw_field(screen, l, lo, "pc.mon_text", "item", item);
+    }
+
+    SDL_Surface *hand = skin_image(scene, "hand.png");
     if (hand)
     {
         SDL_Rect src = {0, 0, hand->w >= 64 ? 32 : hand->w, hand->h >= 32 ? 32 : hand->h};
         blit_scaled(hand, &src, screen, l, hx, hy + hand_bob);
     }
 
-    // The action menu and its message.
-    if (st->mode == MODE_MENU && cur && cur->filled)
+    // The action menu, in a window whose bottom-right corner is fixed, and its message.
+    if (st->mode == VIEW_MENU && cur && cur->filled)
     {
-        int line = get_int(lo, "pc.menu.line_height", 16), pad = get_int(lo, "pc.menu.padding", 8);
-        int text_x = get_int(lo, "pc.menu.text_x", 16);
-        int w = 0;
+        int line = get_int(lo, "pc.menu.line_height", 16), text_x = get_int(lo, "pc.menu.text_x", 8), text_y = get_int(lo, "pc.menu.text_y", 1);
+        SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
+        int widest = 0;
         for (int i = 0; i < MENU_COUNT; i++)
         {
             int tw = text_width(MENU_ITEMS[i], l);
-            if (tw > w)
-                w = tw;
+            if (tw > widest)
+                widest = tw;
         }
-        w = ((text_x + w + pad + 7) / 8) * 8;
-        int h = ((MENU_COUNT * line + pad * 2 + 7) / 8) * 8;
-        int x = get_int(lo, "pc.menu.right", GBA_W - 8) - w, y = get_int(lo, "pc.menu.bottom", 120) - h;
-        draw_window(screen, scene, l, x, y, w, h);
+        int w = ((widest + 7) / 8 + 2) * 8, h = MENU_COUNT * line;
+        int x = get_int(lo, "pc.menu.right", 232) - w, y = get_int(lo, "pc.menu.bottom", 120) - h;
+        draw_window(screen, scene, l, NULL, x, y, w, h);
         for (int i = 0; i < MENU_COUNT; i++)
         {
-            int ty = y + pad + i * line + (line - font_height) / 2;
+            int ty = y + text_y + i * line;
             if (menu_enabled(cur, i))
-                draw_text(screen, l, MENU_ITEMS[i], x + text_x, ty, 0);
+                draw_text_c(screen, l, MENU_ITEMS[i], x + text_x, ty, 0, color, shadow);
             else
-                draw_text_c(screen, l, MENU_ITEMS[i], x + text_x, ty, 0, get_color(lo, "pc.menu.disabled_color", (SDL_Color){176, 176, 176, 255}),
-                            get_color(lo, "pc.menu.disabled_shadow", (SDL_Color){224, 224, 224, 255}));
+                draw_text_c(screen, l, MENU_ITEMS[i], x + text_x, ty, 0, (SDL_Color){176, 176, 176, 255}, (SDL_Color){224, 224, 224, 255});
             if (i != st->menu_item)
                 continue;
-            // The game's black triangle cursor.
             SDL_Surface *arrow = skin_image(scene, "cursor_menu.png");
             if (arrow)
-                blit_scaled(arrow, NULL, screen, l, x + text_x - arrow->w - 1, ty + (font_height - arrow->h) / 2);
+                blit_scaled(arrow, NULL, screen, l, x, ty);
             else
             {
                 for (int r = 0; r < 7; r++)
-                    fill_logical(screen, l, x + text_x - 8, ty + (font_height - 7) / 2 + r, r < 4 ? r + 1 : 7 - r, 1, text_color);
+                    fill_logical(screen, l, x + 1, ty + cap_top + (font_height - 7) / 2 + r, r < 4 ? r + 1 : 7 - r, 1, color);
             }
         }
-        SDL_Rect m = get_rect(lo, "pc.message");
-        draw_window(screen, scene, l, m.x, m.y, m.w, m.h);
+        SDL_Rect m = get_rect(lo, "pc.message"), mt = get_rect(lo, "pc.message_text");
+        draw_window(screen, scene, l, json_object_dotget_string(lo, "pc.message_frame"), m.x, m.y, m.w, m.h);
         char msg[160];
         const char *nick = json_object_get_string(cur->summary, "nickname");
         snprintf(msg, sizeof(msg), "%s is selected.", nick ? nick : cur->name);
-        draw_text(screen, l, msg, m.x + 8, m.y + (m.h - font_height) / 2, 0);
+        draw_text_c(screen, l, msg, m.x + mt.x, m.y + mt.y, 0, color, shadow);
     }
 }
 
@@ -681,6 +737,22 @@ static void draw_type(SDL_Surface *screen, Scene *scene, const Layout *l, const 
     char name[96];
     snprintf(name, sizeof(name), "types/%s.png", type);
     blit_scaled(skin_image(scene, name), NULL, screen, l, x, y);
+}
+
+// The game's PP colours (GetCurrentPPToMaxPPState): full, half, a quarter or none left.
+static const char *pp_state(int pp, int max)
+{
+    if (pp == max)
+        return "high";
+    if (max <= 2)
+        return pp > 1 ? "high" : pp == 1 ? "quarter" : "zero";
+    if (max <= 7)
+        return pp > 2 ? "high" : pp == 2 ? "half" : pp == 1 ? "quarter" : "zero";
+    if (pp == 0)
+        return "zero";
+    if (pp <= max / 4)
+        return "quarter";
+    return pp > max / 2 ? "high" : "half";
 }
 
 static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Layout *l)
@@ -697,76 +769,90 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
     blit_scaled(skin_image(scene, PAGES[page]), NULL, screen, l, 0, 0);
     const char *list = LISTS[page];
 
-    // The left column, shown on every page.
+    // The Pokémon's picture, name, species, level, gender and ball (on every page where the layout has them).
     SDL_Rect sp = get_rect(lo, "summary.sprite");
-    draw_sprite(screen, l, cur, sp.x, sp.y);
-    draw_field(screen, l, lo, list, "nickname", json_object_get_string(s, "nickname"));
-    draw_field(screen, l, lo, list, "species", json_object_get_string(s, "species"));
-    draw_field(screen, l, lo, list, "level", json_object_get_string(s, "level"));
-    const char *gender = json_object_get_string(s, "gender");
-    JSON_Object *g = find_field(lo, list, "gender");
-    if (gender && g)
+    draw_sprite(screen, l, cur, sp.x, sp.y, json_object_get_boolean(s, "flip") == 1);
+    static const char *TEXT[] = {"dex_no", "nickname", "species", "level", "ot", "id", "ability", "item", "ribbon",
+                                 "hp", "attack", "defense", "sp_atk", "sp_def", "speed", "exp_points", "next_lv"};
+    for (size_t i = 0; i < sizeof(TEXT) / sizeof(TEXT[0]); i++)
     {
-        bool male = strcmp(gender, "male") == 0;
-        draw_text_c(screen, l, male ? "♂" : "♀", get_int(g, "x", 0), get_int(g, "y", 0), field_align(g),
-                    get_color(g, male ? "male" : "female", male ? (SDL_Color){48, 80, 200, 255} : (SDL_Color){224, 8, 8, 255}),
-                    get_color(g, male ? "male_shadow" : "female_shadow", text_shadow));
+        if (strcmp(TEXT[i], "ot") == 0)
+        {
+            JSON_Object *ot = find_field(lo, list, "ot");
+            if (ot)
+            {
+                bool female = json_object_get_boolean(s, "ot_female") == 1;
+                draw_text_c(screen, l, json_object_get_string(s, "ot"), get_int(ot, "x", 0), get_int(ot, "y", 0), field_align(ot),
+                            get_color(ot, female ? "female.color" : "male.color", get_color(ot, "color", text_color)),
+                            get_color(ot, female ? "female.shadow" : "male.shadow", get_color(ot, "shadow", text_shadow)));
+            }
+            continue;
+        }
+        draw_field(screen, l, lo, list, TEXT[i], json_object_get_string(s, TEXT[i]));
+    }
+    draw_gender(screen, l, lo, list, json_object_get_string(s, "gender"));
+    JSON_Object *ball = find_field(lo, list, "ball");
+    if (ball && json_object_get_string(s, "ball"))
+    {
+        char name[96];
+        snprintf(name, sizeof(name), "balls/%s.png", json_object_get_string(s, "ball"));
+        blit_scaled(skin_image(scene, name), NULL, screen, l, get_int(ball, "x", 0), get_int(ball, "y", 0));
+    }
+    JSON_Array *types = json_object_get_array(s, "types");
+    JSON_Object *t1 = find_field(lo, list, "type1"), *t2 = find_field(lo, list, "type2");
+    if (types && t1)
+        draw_type(screen, scene, l, json_array_get_string(types, 0), get_int(t1, "x", 0), get_int(t1, "y", 0));
+    if (types && t2 && json_array_get_count(types) > 1)
+        draw_type(screen, scene, l, json_array_get_string(types, 1), get_int(t2, "x", 0), get_int(t2, "y", 0));
+    draw_lines(screen, l, find_field(lo, list, "ability_desc"), json_object_get_string(s, "ability_desc"));
+    draw_lines(screen, l, find_field(lo, list, "memo"), json_object_get_string(s, "memo"));
+
+    // HP and EXP bars.
+    JSON_Object *exp = find_field(lo, list, "exp_bar");
+    if (exp)
+        fill_logical(screen, l, get_int(exp, "x", 0), get_int(exp, "y", 0), (int)(get_int(exp, "w", 64) * json_object_get_number(s, "exp_fill")),
+                     get_int(exp, "h", 3), get_color(exp, "color", (SDL_Color){64, 200, 248, 255}));
+    JSON_Object *hpbar = find_field(lo, list, "hp_bar");
+    int hp_max = (int)json_object_get_number(s, "hp_max"), hp_cur = (int)json_object_get_number(s, "hp_cur");
+    if (hpbar && hp_max > 0)
+    {
+        const char *band = hp_cur * 2 > hp_max ? "green" : hp_cur * 5 > hp_max ? "yellow" : "red";
+        int w = get_int(hpbar, "w", 48);
+        fill_logical(screen, l, get_int(hpbar, "x", 0), get_int(hpbar, "y", 0), (w * hp_cur + hp_max - 1) / hp_max, get_int(hpbar, "h", 3),
+                     get_color(hpbar, band, (SDL_Color){90, 214, 132, 255}));
     }
 
-    if (page == 0)
+    // Moves: type, name and PP (coloured by how much is left).
+    JSON_Object *m = find_field(lo, list, "moves");
+    JSON_Array *moves = json_object_get_array(s, "moves");
+    int row_dy = get_int(m, "row_dy", 16);
+    for (int i = 0; m && moves && i < 4 && i < (int)json_array_get_count(moves); i++)
     {
-        JSON_Object *ot = find_field(lo, list, "ot");
-        if (ot)
+        JSON_Object *mv = json_array_get_object(moves, i);
+        int y = i * row_dy;
+        draw_type(screen, scene, l, json_object_get_string(mv, "type"), get_int(m, "type.x", 0), get_int(m, "type.y", 0) + y);
+        draw_text_c(screen, l, json_object_get_string(mv, "name"), get_int(m, "name.x", 0), get_int(m, "name.y", 0) + y, 0,
+                    get_color(m, "name.color", text_color), get_color(m, "name.shadow", text_shadow));
+        if (!json_object_has_value(mv, "max_pp"))
         {
-            bool female = json_object_get_boolean(s, "ot_female") == 1;
-            draw_text_c(screen, l, json_object_get_string(s, "ot"), get_int(ot, "x", 0), get_int(ot, "y", 0), field_align(ot),
-                        get_color(ot, female ? "female" : "male", female ? (SDL_Color){248, 56, 32, 255} : (SDL_Color){48, 184, 248, 255}),
-                        get_color(ot, female ? "female_shadow" : "male_shadow", text_shadow));
+            draw_text_c(screen, l, json_object_dotget_string(m, "empty.text"), get_int(m, "empty.x", 0), get_int(m, "pp.y", 0) + y, 0,
+                        get_color(m, "states.high.color", text_color), get_color(m, "states.high.shadow", text_shadow));
+            continue;
         }
-        draw_field(screen, l, lo, list, "id", json_object_get_string(s, "id"));
-        JSON_Array *types = json_object_get_array(s, "types");
-        JSON_Object *f1 = find_field(lo, list, "type1"), *f2 = find_field(lo, list, "type2");
-        if (types && f1)
-            draw_type(screen, scene, l, json_array_get_string(types, 0), get_int(f1, "x", 0), get_int(f1, "y", 0));
-        if (types && f2 && json_array_get_count(types) > 1)
-            draw_type(screen, scene, l, json_array_get_string(types, 1), get_int(f2, "x", 0), get_int(f2, "y", 0));
-        draw_field(screen, l, lo, list, "ability", json_object_get_string(s, "ability"));
-        draw_field(screen, l, lo, list, "ability_desc", json_object_get_string(s, "ability_desc"));
-        draw_memo(screen, l, find_field(lo, list, "memo"), json_object_get_string(s, "memo"),
-                  get_color(lo, "summary.memo_highlight", (SDL_Color){248, 0, 0, 255}),
-                  get_color(lo, "summary.memo_highlight_shadow", (SDL_Color){248, 184, 112, 255}));
-    }
-    else if (page == 1)
-    {
-        static const char *FIELDS[] = {"item", "ribbon", "hp", "attack", "defense", "sp_atk", "sp_def", "speed", "exp_points", "next_lv"};
-        for (size_t i = 0; i < sizeof(FIELDS) / sizeof(FIELDS[0]); i++)
-            draw_field(screen, l, lo, list, FIELDS[i], json_object_get_string(s, FIELDS[i]));
-        JSON_Object *bar = find_field(lo, list, "exp_bar");
-        if (bar)
-        {
-            int w = (int)(get_int(bar, "w", 64) * json_object_get_number(s, "exp_fill"));
-            fill_logical(screen, l, get_int(bar, "x", 0), get_int(bar, "y", 0), w, get_int(bar, "h", 2),
-                         get_color(bar, "color", (SDL_Color){64, 200, 248, 255}));
-        }
-    }
-    else
-    {
-        JSON_Object *m = find_field(lo, list, "moves");
-        JSON_Array *moves = json_object_get_array(s, "moves");
-        int row_dy = get_int(m, "row_dy", 16);
-        for (int i = 0; m && moves && i < 4 && i < (int)json_array_get_count(moves); i++)
-        {
-            JSON_Object *mv = json_array_get_object(moves, i);
-            int y = i * row_dy;
-            draw_type(screen, scene, l, json_object_get_string(mv, "type"), get_int(m, "type_x", 0), get_int(m, "type_y", 0) + y);
-            draw_text(screen, l, json_object_get_string(mv, "name"), get_int(m, "name_x", 0), get_int(m, "name_y", 0) + y, 0);
-            char pp[32];
-            if (json_object_has_value(mv, "max_pp"))
-                snprintf(pp, sizeof(pp), "PP%2d/%2d", (int)json_object_get_number(mv, "pp"), (int)json_object_get_number(mv, "max_pp"));
-            else
-                snprintf(pp, sizeof(pp), "--");
-            draw_text(screen, l, pp, get_int(m, "pp_x", 0), get_int(m, "pp_y", 0) + y, 2);
-        }
+        int pp = (int)json_object_get_number(mv, "pp"), max = (int)json_object_get_number(mv, "max_pp");
+        char key[64], key2[64];
+        snprintf(key, sizeof(key), "states.%s.color", pp_state(pp, max));
+        snprintf(key2, sizeof(key2), "states.%s.shadow", pp_state(pp, max));
+        SDL_Color c = get_color(m, key, get_color(m, "states.high.color", text_color)), sh = get_color(m, key2, get_color(m, "states.high.shadow", text_shadow));
+        if (json_object_dothas_value(m, "pp_label.image"))
+            blit_scaled(skin_image(scene, json_object_dotget_string(m, "pp_label.image")), NULL, screen, l, get_int(m, "pp_label.x", 0),
+                        get_int(m, "pp_label.y", 0) + y);
+        else if (json_object_has_value(m, "pp_label"))
+            draw_text_c(screen, l, json_object_dotget_string(m, "pp_label.text"), get_int(m, "pp_label.x", 0), get_int(m, "pp_label.y", 0) + y, 0, c, sh);
+        const char *prefix = json_object_dotget_string(m, "pp.prefix");
+        char text[48];
+        snprintf(text, sizeof(text), "%s%2d/%2d", prefix ? prefix : "", pp, max);
+        draw_text_c(screen, l, text, get_int(m, "pp.x", 0), get_int(m, "pp.y", 0) + y, 2, c, sh);
     }
 }
 
@@ -836,7 +922,7 @@ static void party_move(State *st, int dx, int dy)
 // The next filled slot in the same box or party, for flicking through summaries.
 static void summary_step(Scene *scene, State *st, int delta)
 {
-    bool party = st->menu_from == MODE_PARTY;
+    bool party = st->menu_from == VIEW_PARTY;
     Box *box = party ? &scene->boxes[0] : &scene->boxes[scene->box];
     int count = party ? 6 : box->columns * box->rows;
     int at = party ? st->party_slot : scene->slot;
@@ -861,7 +947,7 @@ static void write_result(const char *path, Scene *scene, State *st, const char *
     FILE *f = fopen(path, "w");
     if (f == NULL)
         return;
-    bool party = st->menu_from == MODE_PARTY;
+    bool party = st->menu_from == VIEW_PARTY;
     fprintf(f, "{\"box\": %d, \"slot\": %d, \"action\": \"%s\"}\n", party ? 0 : scene->box, party ? st->party_slot : scene->slot, action);
     fclose(f);
 }
@@ -869,7 +955,7 @@ static void write_result(const char *path, Scene *scene, State *st, const char *
 static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, Uint32 ticks)
 {
     SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0, 0, 0));
-    if (st->mode == MODE_SUMMARY)
+    if (st->mode == VIEW_SUMMARY)
         draw_summary(screen, scene, st, l);
     else
         draw_pc(screen, scene, st, l, ticks);
@@ -914,11 +1000,11 @@ int main(int argc, char *argv[])
     Layout layout = make_layout(screen);
     open_text_font(&scene, &layout);
 
-    State st = {MODE_BOX, MODE_BOX, TARGET_SLOT, 0, 0, 0};
+    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0};
     if (scene.box == 0)
     {
         // Back from a party Pokémon: the party is open again.
-        st.mode = st.menu_from = MODE_PARTY;
+        st.mode = st.menu_from = VIEW_PARTY;
         st.party_slot = scene.slot < 6 ? scene.slot : 0;
         scene.box = 1;
         scene.slot = 0;
@@ -928,12 +1014,12 @@ int main(int argc, char *argv[])
     if (screenshot)
     {
         if (strcmp(state_name, "party") == 0)
-            st.mode = st.menu_from = MODE_PARTY;
+            st.mode = st.menu_from = VIEW_PARTY;
         else if (strcmp(state_name, "menu") == 0)
-            st.mode = MODE_MENU;
+            st.mode = VIEW_MENU;
         else if (strncmp(state_name, "summary", 7) == 0)
         {
-            st.mode = MODE_SUMMARY;
+            st.mode = VIEW_SUMMARY;
             st.page = atoi(state_name + 7);
         }
         else if (strcmp(state_name, "party_button") == 0)
@@ -971,7 +1057,7 @@ int main(int argc, char *argv[])
             exit_code = EXIT_MENU;
             quitting = true;
         }
-        else if (st.mode == MODE_BOX)
+        else if (st.mode == VIEW_BOX)
         {
             if (l1 || (st.target == TARGET_TITLE && dx < 0))
                 change_box(&scene, -1);
@@ -981,13 +1067,13 @@ int main(int argc, char *argv[])
                 box_move(&scene, &st, dx, dy);
             else if (a && st.target == TARGET_SLOT && scene.boxes[scene.box].slots[scene.slot].filled)
             {
-                st.mode = MODE_MENU;
-                st.menu_from = MODE_BOX;
+                st.mode = VIEW_MENU;
+                st.menu_from = VIEW_BOX;
                 st.menu_item = 0;
             }
             else if (a && st.target == TARGET_PARTY_BUTTON)
             {
-                st.mode = st.menu_from = MODE_PARTY;
+                st.mode = st.menu_from = VIEW_PARTY;
                 st.party_slot = 0;
             }
             else if ((a && st.target == TARGET_CLOSE_BUTTON) || b)
@@ -996,23 +1082,23 @@ int main(int argc, char *argv[])
                 quitting = true;
             }
         }
-        else if (st.mode == MODE_PARTY)
+        else if (st.mode == VIEW_PARTY)
         {
             if (dx || dy)
                 party_move(&st, dx, dy);
             else if (a && st.party_slot < 6 && scene.boxes[0].slots[st.party_slot].filled)
             {
-                st.mode = MODE_MENU;
-                st.menu_from = MODE_PARTY;
+                st.mode = VIEW_MENU;
+                st.menu_from = VIEW_PARTY;
                 st.menu_item = 0;
             }
             else if ((a && st.party_slot == 6) || b)
             {
-                st.mode = st.menu_from = MODE_BOX;
+                st.mode = st.menu_from = VIEW_BOX;
                 st.target = TARGET_PARTY_BUTTON;
             }
         }
-        else if (st.mode == MODE_MENU)
+        else if (st.mode == VIEW_MENU)
         {
             if (dy)
                 st.menu_item = (st.menu_item + dy + MENU_COUNT) % MENU_COUNT;
@@ -1024,13 +1110,13 @@ int main(int argc, char *argv[])
             }
             else if (a && st.menu_item == 1)
             {
-                st.mode = MODE_SUMMARY;
+                st.mode = VIEW_SUMMARY;
                 st.page = 0;
             }
             else if ((a && st.menu_item == 3) || b)
                 st.mode = st.menu_from;
         }
-        else if (st.mode == MODE_SUMMARY)
+        else if (st.mode == VIEW_SUMMARY)
         {
             if (dx || l1 || r1)
                 st.page = (st.page + (dx ? dx : l1 ? -1 : 1) + 3) % 3;

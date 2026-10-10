@@ -42,8 +42,8 @@ public sealed class BoxSummaryTests : IDisposable
         pk.Move1_PP = pk.GetMovePP(pk.Move1, 0);
         var s = BoxSummary.For(pk, sav, inParty: false);
         Assert.Equal("PIKACHU", (string?)s["nickname"]);
-        Assert.Equal("/PIKACHU", (string?)s["species"]);
-        Assert.Equal("Lv30", (string?)s["level"]);
+        Assert.Equal("PIKACHU", (string?)s["species"]);
+        Assert.Equal("30", (string?)s["level"]);
         Assert.Equal("electric", (string?)s["types"]![0]);
         Assert.Equal("THUNDER SHOCK", (string?)s["moves"]![0]!["name"]);
         Assert.Equal(30, (int)s["moves"]![0]!["max_pp"]!);

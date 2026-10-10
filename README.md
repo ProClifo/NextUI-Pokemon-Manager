@@ -64,15 +64,18 @@ To refresh the ROM list from a newer No-Intro database, run `scripts/update-vani
 
 ### PC box view
 
-**Pokémon (view / transfer / evolve)** opens a PC box screen styled after Pokémon Emerald:
+**Pokémon (view / transfer / evolve)** opens a full-screen PC drawn like the game's own: Ruby/Sapphire, Emerald and FireRed/LeafGreen saves each get their game's PC and summary screens; every other game uses Emerald's.
 
 - Each box shows its own wallpaper from the save (Gen 3 saves). Other games cycle through the 16 Emerald wallpapers.
 - Pokémon appear with the icons and front sprites of the save's own game: Red/Blue, Yellow, Gold, Silver, Crystal, Ruby/Sapphire, Emerald, FireRed/LeafGreen or Platinum (used for every Gen 4 game, and for Black/White, which have no decompilation). Game Boy sprites are coloured the way the games colour them (Super Game Boy palettes for Red/Blue/Yellow, Game Boy Color palettes for Gold/Silver/Crystal), and Game Boy party icons keep their 16x16 size. Unown letters, Castform and Gen 4 forms, female differences, shiny palettes and eggs are shown. Gen 3 Deoxys is in the form its game shows (Normal in Ruby/Sapphire, Speed in Emerald, Attack in FireRed, Defense in LeafGreen), with that form's icon; from Gen 4 on, each Deoxys shows its own form. Art a game lacks comes from Emerald or Platinum; Pokémon newer than Gen 4 show a "?" icon.
-- The panel on the left shows the Pokémon under the cursor: front sprite, name, level, gender, held item and OT.
-- Text is drawn in NextUI's OG font (see [Fonts](#fonts)).
-- **D-pad** moves the hand cursor, **L/R** switch boxes (the first "box" is your party), **A** opens the Pokémon's actions, **B** goes back.
+- The PKMN DATA panel on the left shows the Pokémon under the white hand: front sprite, name, species, level and gender.
+- **PARTY POKéMON** at the top opens the party, as in the games; **CLOSE BOX** leaves.
+- **A** on a Pokémon opens the white menu with *Transfer*, *Summary*, *Evolve* and *Cancel* ("MEW is selected."). Transfer and Evolve are greyed out when they can't be done.
+- *Summary* shows the game's summary pages (**Left/Right** turn them): Pokémon info with the trainer memo in that game's wording, skills (stats, experience, held item, ribbons) and moves with their PP.
+- Text is drawn in NextUI's OG font (see [Fonts](#fonts)), sized to the game's letters.
+- **D-pad** moves the hand, **L/R** switch boxes, **B** goes back.
 
-The art isn't stored in this repository. It's generated at build time from the pret decompilations: the wallpapers, cursor and background by `scripts/build-box-assets.py` from [pret/pokeemerald](https://github.com/pret/pokeemerald), and each game's icons and sprites by `scripts/build-box-art.py`. Each game's art is packed into two sheets plus an index, so the SD card gets a few dozen files rather than thousands. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC Box View** switches between the two.
+The art isn't stored in this repository. It's generated at build time from the pret decompilations: the wallpapers, cursor and background by `scripts/build-box-assets.py` from [pret/pokeemerald](https://github.com/pret/pokeemerald), each game's icons and sprites by `scripts/build-box-art.py`, and the Gen 3 PC and summary screens (art, window frames, text positions and colours, read from pokeruby, pokeemerald and pokefirered) by `scripts/pc_ui/build.py`. Each game's art is packed into two sheets plus an index, so the SD card gets a few dozen files rather than thousands. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, the app falls back to lists; **Settings → PC Box View** switches between the two.
 
 ### Game backgrounds
 

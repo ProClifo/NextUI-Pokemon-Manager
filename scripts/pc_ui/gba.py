@@ -61,27 +61,34 @@ def split16(cols):
 # Tiles
 # --------------------------------------------------------------------------
 
+def _pixels(im):
+    """Flat pixel list (get_flattened_data on new Pillow, getdata on old)."""
+    f = getattr(im, "get_flattened_data", None)
+    return list(f() if f else im.getdata())
+
+
 def png_indices(path, bpp=4):
     """Return (width, height, list-of-indices) of a PNG as gbagfx would see it.
 
-    Indexed images give their palette index (masked to the bit depth);
-    1/2/4-bit greyscale images (Pillow expands them to 0..255) are reduced back
-    to their raw sample value."""
+    Indexed images give their palette index (masked to the bit depth).
+    Greyscale images (Pillow expands 1/2/4-bit samples to 0..255) are reduced
+    back to their raw sample value and then INVERTED (index = max - value), as
+    gbagfx does for PNGs without a palette (ConvertToTiles*Bpp invertColors)."""
     im = Image.open(path)
     w, h = im.size
     mask = (1 << bpp) - 1
     if im.mode == "P":
-        data = [v & mask for v in im.getdata()]
+        data = [v & mask for v in _pixels(im)]
     elif im.mode in ("L", "I", "I;16"):
-        raw = list(im.convert("L").getdata())
+        raw = _pixels(im.convert("L"))
         levels = sorted(set(raw))
         # 4-bit greyscale stored as multiples of 17 by Pillow
         if all(v % 17 == 0 for v in levels):
-            data = [(v // 17) & mask for v in raw]
+            data = [mask - ((v // 17) & mask) for v in raw]
         else:
-            data = [(v >> (8 - bpp)) & mask for v in raw]
+            data = [mask - ((v >> (8 - bpp)) & mask) for v in raw]
     elif im.mode == "1":
-        data = [1 if v else 0 for v in im.getdata()]
+        data = [0 if v else 1 for v in _pixels(im)]
     else:
         raise ValueError("unsupported PNG mode %s for %s" % (im.mode, path))
     return w, h, data

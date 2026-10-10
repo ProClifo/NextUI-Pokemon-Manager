@@ -36,6 +36,8 @@ TYPE_PAL = {
 }
 BALLS = ["poke", "great", "ultra", "master", "safari", "net", "dive", "nest",
          "repeat", "timer", "luxury", "premier"]
+# Text window frame type matching the reference screenshots (Options > FRAME, 1-based).
+WINDOW_FRAME_TYPE = 6
 STATUS = ["poison", "paralysis", "sleep", "freeze", "burn", "pokerus", "fainted"]
 
 
@@ -67,6 +69,7 @@ def _pc_palettes(root):
 
 def _build_pc(root, out, font, layout):
     g = _p(root, "graphics", "pokemon_storage")
+    font_short = gba.Font(root, "short", font.charmap)
     pals = _pc_palettes(root)
     # BG1 (charBaseIndex 1, baseTile 0x100): gStorageSystemMenu_Gfx (menu.png) is
     # loaded by DecompressAndLoadBgGfxUsingHeap(1, ...) at tile 0x100, so map
@@ -108,6 +111,19 @@ def _build_pc(root, out, font, layout):
     gba.draw_sprite(img, wave_tiles, 2, 2, 1, 8 - 8, 9 - 4, wave_pal)
     gba.draw_sprite(img, wave_tiles, 10, 2, 1, 63 + 8 - 8, 9 - 4, wave_pal)
     img.save(_p(out, "pc_bg.png"))
+
+    # "No Pokémon displayed" variant of the top-left strip (UpdateWaveformAnimation with
+    # SPECIES_NONE): PKMN DATA rows 2-3 (grey) + waveform "off" frames (tiles 0 / 8).
+    under = Image.new("RGBA", (240, 160), tuple(pals[0][0]) + (255,))
+    bg3.render(under, gba.load_tiles(_p(g, "scrolling_bg.png")), pals)
+    bg1off = gba.BgLayer(fill=0x100)
+    bg1off.map = list(bg1.map)
+    bg1off.copy_rect(pkmn_data, 8, 1, 0, 0, 2, 8, 2)
+    bg1off.render(under, menu_tiles, pals, tile_base=MENU_BASE)
+    off = under.crop((0, 0, 80, 16))
+    gba.draw_sprite(off, wave_tiles, 0, 2, 1, 8 - 8, 9 - 4, wave_pal)
+    gba.draw_sprite(off, wave_tiles, 8, 2, 1, 63 + 8 - 8, 9 - 4, wave_pal)
+    off.save(_p(out, "pc_pkmn_data_off.png"))
 
     # Waveform animation strips (left on: 2,4,6; right on: 10,4,12; 8 frames each)
     strip = gba.new_screen(16 * 3, 16)
@@ -167,23 +183,13 @@ def _build_pc(root, out, font, layout):
     # use LoadUserWindowBorderGfx = the player's frame type (default type 0 =
     # graphics/text_window/1.png with its own palette). Interior = window fill
     # PIXEL_FILL(1) of palette 15 (text_windows.pal colour 1).
+    # The frame tiles 0..8 are laid out row-major as the 3x3 corners/edges
+    # (WindowFunc_DrawStdFrameWithCustomTileAndPalette / DrawTextBorderOuter).
     tw = _p(root, "graphics", "text_window")
-    frame_tiles = gba.load_tiles(_p(tw, "1.png"))
-    frame_pal = gba.png_palette(_p(tw, "1.png"))
     fill = tuple(pals[15][1]) + (255,)
-    frame = gba.new_screen(24, 24)
-    for k in range(9):
-        if k == 4:
-            frame.paste(Image.new("RGBA", (8, 8), fill), (8, 8))
-            continue
-        gba.draw_tile(frame, frame_tiles[k], (k % 3) * 8, (k // 3) * 8, frame_pal)
-    frame.save(_p(out, "window_frame.png"))
-    # all 20 user-selectable frames, same layout, for completeness
-    os.makedirs(_p(out, "window_frames"), exist_ok=True)
-    for n in range(1, 21):
+
+    def frame_png(n):
         f = _p(tw, "%d.png" % n)
-        if not os.path.exists(f):
-            continue
         ts, pl = gba.load_tiles(f), gba.png_palette(f)
         im = gba.new_screen(24, 24)
         for k in range(9):
@@ -191,7 +197,18 @@ def _build_pc(root, out, font, layout):
                 im.paste(Image.new("RGBA", (8, 8), fill), (8, 8))
             else:
                 gba.draw_tile(im, ts[k], (k % 3) * 8, (k // 3) * 8, pl)
-        im.save(_p(out, "window_frames", "%d.png" % n))
+        return im
+
+    # window_frame.png = frame type 6 (graphics/text_window/6.png): the one in the
+    # reference screenshots (the player's option). window_frame_default.png = type 1
+    # (new game default, optionsWindowFrameType = 0).
+    frame_png(WINDOW_FRAME_TYPE).save(_p(out, "window_frame.png"))
+    frame_png(1).save(_p(out, "window_frame_default.png"))
+    # all 20 user-selectable frames, same layout
+    os.makedirs(_p(out, "window_frames"), exist_ok=True)
+    for n in range(1, 21):
+        if os.path.exists(_p(tw, "%d.png" % n)):
+            frame_png(n).save(_p(out, "window_frames", "%d.png" % n))
 
     # Menu cursor: Menu_MoveCursor prints gText_SelectorArrow3 ("▶") with FONT_NORMAL
     # at (0, 1 + 16*pos) in the window, default colours (fg 2 / shadow 3 of pal 15).
@@ -220,33 +237,68 @@ def _build_pc(root, out, font, layout):
     win_msg = (11 * 8, 17 * 8, 18 * 8, 2 * 8)  # sWindowTemplates[WIN_MESSAGE]
     party_slots = [[104 - 16, 64 - 16]] + [[152 - 16, 24 * (i - 1) + 16 - 16] for i in range(1, 6)]
     layout["pc"] = {
-        # Wallpaper: BG2 (screenSize 1), wallpaper tilemap 20x18 drawn at tile (11,2)
-        # (DrawWallpaper with x offset 0) -> 160x144 image at (88, 16).
-        "wallpaper": [88, 16],
+        # Wallpaper: DrawWallpaper copies the 20x18 wallpaper tilemap to BG2 at tile
+        # x = bg2_X/8 + 10 (bg2_X = 0 when idle), y = 2 -> 160x144 image at (80, 16).
+        "wallpaper": [80, 16],
         "wallpaper_size": [160, 144],
-        # Box title: 2 sprites of 32x16 (sSpriteTemplate_BoxTitle), y centre 28;
-        # text is centred on the title area by GetBoxTitleBaseX: x = 176 - width/2.
-        "box_name": [176, 28],
+        # Box title (InitBoxTitle): text printed by DrawTextWindowAndBufferTiles with
+        # FONT_NORMAL at (0, 1) into two 32x16 sprites centred at
+        # (GetBoxTitleBaseX + 32*i, 28), GetBoxTitleBaseX = 240 - 64 - width/2.
+        # => text left = 160 - width/2 (integer division), text top = 21, i.e. the
+        # text is centred on x = 160. Colours: sBoxTitleColors (fg = RGB_WHITE,
+        # shadow = RGB(7,7,7) for every wallpaper).
+        "box_name": [160, 28],
+        "box_name_text_left": "160 - width // 2",
+        "box_name_text_top": 21,
         "box_name_font": "normal",
+        "box_name_color": [255, 255, 255],
+        "box_name_shadow": list(gba.gba_rgb(7 << 3, 7 << 3, 7 << 3)),
         "arrows": {"left": [92 - 4, 28 - 8], "right": [228 - 4, 28 - 8]},  # CreateBoxScrollArrows
         "grid": {"x": 84, "y": 28, "dx": 24, "dy": 24, "cols": 6, "rows": 5},
         "icon_size": [32, 32],
-        "party_button": [80, 0, 96, 16],
+        # PARTY POKéMON button = party_menu.bin rows 20-21, cols 0-8 at tile (10, 0);
+        # CLOSE BOX = close_box_button.bin rows 0-1 (9x2) at tile (21, 0).
+        "party_button": [80, 0, 72, 16],
         "close_button": [168, 0, 72, 16],
         "hand_offset": [0, -12],
-        "hand_button_offset": [104 - 80, -2],  # relative to party_button; close: 192-168 = 24 too
+        # GetCursorCoordsByPos(CURSOR_AREA_BUTTONS): centre (120 + 88*pos, 14) (8 while a
+        # mon is held) -> top-left (104 / 192, -2), i.e. +(24, -2) from either button rect.
+        "hand_button_offset": [104 - 80, -2],
+        "hand_box_title": [162 - 16, 12 - 16],  # absolute hand top-left on the box title
         "hand_party_offset": [0, -12],        # hand top-left relative to a party icon top-left
-        "hand_party_cancel": [152 - 16, 132 - 16],
-        "hand_shadow_offset": [8, 28],        # SpriteCB_CursorShadow: (x, y+20), 16x16; box only
+        "hand_party_cancel": [152 - 16, 132 - 16],  # absolute hand top-left on CANCEL
+        # SpriteCB_CursorShadow: centre (x, y+20), 16x16 -> top-left hand + (8, 28).
+        # Visible only in the box (normal move mode), drawn BEHIND the box icons
+        # (subpriority 21 vs icons 19-col) but above the wallpaper.
+        "hand_shadow_offset": [8, 28],
+        # hand.png = [pointing (anim frame tile 0), fist/grabbing (tile 48)].
+        # hand_frames.png = 4 frames: 0 point, 16 point (bounce frame 2; the idle
+        # cursor alternates 0/16 every 30 game frames), 32 open hand, 48 fist.
+        # hand_auto.png = the yellow palette (only with the auto-action option).
         "hand_frames": {"point": 0, "grab": 1},
+        # CreateWaveformSprites: two 16x8 sprites centred (8, 9) / (71, 9) -> top-left
+        # (0, 5) / (63, 5). pc_bg.png has the first "on" frame baked in; pc_waveform.png
+        # holds the 3 "on" frames (row 0 left, row 1 right, 16 px apart, 8 game frames
+        # each). pc_pkmn_data_off.png (80x16 at (0,0)) is the strip when no Pokémon
+        # is displayed (grey PKMN DATA, flat waveforms).
+        "waveform": {"left": [0, 5], "right": [63, 5], "frame_ticks": 8},
+        "pkmn_data_off": [0, 0],
         # CreateDisplayMonSprite: 64x64 sprite centred at (40, 48)
         "mon_sprite": [40, 48],
         # PrintDisplayMonInfo, WIN_DISPLAY_INFO at (0, 88), palette 3: fg colour 2, shadow 3
         "mon_text": [
             {"field": "nickname", "x": 6, "y": 88 + 0, "font": "normal"},
             {"field": "species", "x": 6, "y": 88 + 15, "font": "short", "prefix": "/"},
+            # SetDisplayMonData builds displayMonGenderLvlText as
+            # <gender glyph> " " {LV_2} <level>: the gender glyph is ♂ (fg colour 4 /
+            # shadow 5), ♀ (6 / 7) or, when genderless, CHAR_SPACER (an empty glyph of
+            # the same width); the rest is in the default colours. Drawn from x = 10.
             {"field": "level", "x": 10, "y": 88 + 29, "font": "short",
-             "format": "gender symbol then {LV}<level> (gDisplayMonGenderLvlText)"},
+             "text": "<gender> {LV_2}<level>",
+             "gender_width": font_short.width([0x77])},
+            {"field": "gender", "x": 10, "y": 88 + 29, "font": "short",
+             "male": {"color": _rgb(pals[3][4]), "shadow": _rgb(pals[3][5])},
+             "female": {"color": _rgb(pals[3][6]), "shadow": _rgb(pals[3][7])}},
             {"field": "item", "x": 6, "y": 88 + 43, "font": "small"},
         ],
         "mon_text_color": _rgb(pals[3][2]),
@@ -255,7 +307,8 @@ def _build_pc(root, out, font, layout):
         "party": {
             "x": 80, "y": 0,
             "slots": party_slots,
-            "cancel": [80 + 6 * 8, 17 * 8, 6 * 8, 3 * 8],
+            # CANCEL button tiles: party_menu.bin rows 17-18, cols 7-10
+            "cancel": [80 + 7 * 8, 17 * 8, 4 * 8, 2 * 8],
             "slot_rects": [[80 + 7 * 8, (3 * (p - 1) + 1) * 8, 32, 24] for p in range(1, 6)],
         },
         # AddMenu: window width = (longest item length in chars) + 2 tiles,
@@ -269,6 +322,8 @@ def _build_pc(root, out, font, layout):
         "message": list(win_msg),
         "message_text": [0, 1],
         "window_fill": _rgb(pals[15][1]),
+        "window_frame_type": WINDOW_FRAME_TYPE,
+        "window_frame_note": "frame tiles are drawn one tile (8 px) outside the menu/message rects",
     }
 
 
@@ -412,14 +467,16 @@ def _build_summary(root, out, font, layout):
 
     # Exp bar: DrawExperienceProgressBar writes 8 tiles at skills map 0x255
     # (row 18, col 21) with palette 2: 0x2062 + ticks (0..7), 0x206A = full tile.
+    # Tile 0x62 + n has its first n pixel columns filled (n = 0..8, 0x6A = full).
     t_empty, t_full = tiles[0x62], tiles[0x6A]
     rows = sorted({k // 8 for k in range(64) if t_empty[k] != t_full[k]})
-    fill_idx = [t_full[r * 8 + 4] for r in rows]
     exp_bar = [21 * 8, 18 * 8 + rows[0], 64, len(rows)]
-    exp_cols = [_rgb(pals[2][c]) for c in fill_idx]
-    bar = gba.new_screen(8, 8)
-    gba.draw_tile(bar, t_full, 0, 0, pals[2])
-    bar.save(_p(out, "exp_bar_tile_full.png"))
+    exp_fill_cols = [_rgb(pals[2][t_full[rows[0] * 8 + x]]) for x in range(2)]   # even / odd x
+    exp_empty_cols = [_rgb(pals[2][t_empty[rows[0] * 8 + x]]) for x in range(2)]
+    strip = gba.new_screen(9 * 8, 8)
+    for n in range(9):
+        gba.draw_tile(strip, tiles[0x62 + n], n * 8, 0, pals[2])
+    strip.save(_p(out, "exp_bar_tiles.png"))
 
     # ----- type icons (32x16, OBJ palettes 13-15 = move_types_1..3.pal) -------
     tdir = _p(root, "graphics", "types")
@@ -474,7 +531,10 @@ def _build_summary(root, out, font, layout):
         dict(field="species", x=8, y=14 * 8 + 1, prefix="/", **c(6, 1)),
         dict(field="level", x=8 + 24, y=14 * 8 + 17, prefix="{LV}", **c(6, 1)),
         dict(field="gender", x=8 + 57, y=14 * 8 + 17, male=c(6, 3), female=c(6, 4)),
-        dict(field="dex_number", x=8, y=2 * 8 + 1, prefix="No", note="PORTRAIT_DEX_NUMBER, palette 7", **c(7, 1)),
+        # PrintNotEggInfo: "No" + 3 digits (leading zeros), only when SpeciesToPokedexNum
+        # != 0xFFFF (i.e. the species is in the active Hoenn/National dex); shiny -> colorId 7.
+        dict(field="dex_number", x=8, y=2 * 8 + 1, prefix="{NO}", digits=3, zero_pad=True,
+             shiny=c(7, 7), **c(7, 1)),
         dict(field="ball", x=16 - 8, y=136 - 8, w=16, h=16),          # CreateCaughtBallSprite
         dict(field="markings", x=60 - 16, y=26 - 4, w=32, h=8),       # CreateMonMarkingsSprite
         dict(field="status", x=64 - 16, y=152 - 4, w=32, h=8),        # CreateSetStatusSprite
@@ -502,16 +562,22 @@ def _build_summary(root, out, font, layout):
         dict(field="speed", x=right_x + 3 * digit, y=57 + 32, align="right", **c(6, 0)),
         dict(field="exp_points", x=24 * 8 + 2 + 42, y=14 * 8 + 1, align="right", **c(6, 0)),
         dict(field="next_lv", x=24 * 8 + 2 + 42, y=14 * 8 + 17, align="right", **c(6, 0)),
-        dict(field="exp_bar", rect=exp_bar, colors=exp_cols, ticks=64),
+        # DrawExperienceProgressBar: 8 tiles at tile (21, 18) = (168, 144); ticks =
+        # (exp - exp_this_level) * 64 // (exp_next - exp_this_level), at least 1 if
+        # nonzero, 0 at Lv100. exp_bar_tiles.png = tiles for 0..8 ticks (8x8 each);
+        # or paint `rect` columns [0, ticks) alternating fill colours (even/odd x).
+        dict(field="exp_bar", rect=exp_bar, tiles_origin=[21 * 8, 18 * 8],
+             fill_colors=exp_fill_cols, empty_colors=exp_empty_cols, ticks=64),
     ]
     moves = common + [
         dict(field="moves", row_dy=16,
              type={"x": 85, "y": 32, "w": 32, "h": 16},                          # SetMoveTypeIcons
              name=dict(x=15 * 8, y=4 * 8 + 1, empty="-", **c(6, 1)),             # PrintMoveNameAndPP
              pp=dict(x=24 * 8 + 44, y=4 * 8 + 1, align="right", prefix="{PP}", format="%2d/%2d",
-                     states={"full": c(8, 12), "normal": c(8, 9), "low": c(8, 10), "empty": c(8, 11)},
+                     states={"high": c(8, 12), "half": c(8, 9), "quarter": c(8, 10), "zero": c(8, 11)},
                      empty_text="--", empty_center=24 * 8 + 22, empty_color=c(8, 12))),
-        dict(field="move_description", x=80, y=15 * 8 + 1, width=160, line_height=16, **c(6, 0)),
+        # PrintMoveDetails: window (10, 15) 20x4, text at (6, 1); shown when a move is selected
+        dict(field="move_description", x=80 + 6, y=15 * 8 + 1, width=160 - 6, line_height=16, **c(6, 0)),
     ]
     layout["summary"] = {
         "sprite": [40, 64],  # CreateMonSprite: CreateSprite(&gMultiuseSpriteTemplate, 40, 64)
@@ -519,7 +585,12 @@ def _build_summary(root, out, font, layout):
         "skills": skills,
         "moves": moves,
         "text_font": "normal",
-        "pp_text_note": "PP colour state from GetCurrentPPToMaxPPState: 3=full, 0=normal, 1=low, 2=empty",
+        # GetCurrentPPToMaxPPState (battle_message.c) + 9 = sTextColors id on palette 8
+        "pp_text_note": ("PP colour (GetCurrentPPToMaxPPState): pp == max -> high; max <= 2: pp > 1 -> high, "
+                         "pp 1 -> quarter, 0 -> zero; max <= 7: pp > 2 -> high, pp 2 -> half, 1 -> quarter, "
+                         "0 -> zero; else: 0 -> zero, pp <= max/4 -> quarter, pp > max/2 -> high, "
+                         "otherwise half. Text is '{PP}' + 2-wide right-aligned pp '/' max (padding = "
+                         "CHAR_SPACER, same width as a digit), right-aligned at pp.x."),
     }
 
 

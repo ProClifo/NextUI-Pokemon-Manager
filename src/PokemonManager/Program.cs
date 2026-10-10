@@ -203,6 +203,7 @@ int BoxSceneCommand(List<string> a)
     var assets = a.Count > 2 ? a[2] : AppPaths.FromEnvironment(sd, data).BoxAssetsDir;
     var start = a.Count > 3 ? ParseSlot(a[3]) : new SlotRef(0, 0);
     var font = a.Count > 4 ? new UiFont(a[4]) : null;
+    BoxSummary.LoadAbilityDescriptions(Path.Combine(assets, "abilities.json"));
     File.WriteAllText(output, new BoxScene(assets).Build(entry.Sav, entry.Label, start, font).ToJsonString());
     return 0;
 }

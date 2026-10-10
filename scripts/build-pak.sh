@@ -103,11 +103,16 @@ sparse_clone pokered "$POKERED_COMMIT" "${GB_ART[@]}"
 sparse_clone pokeyellow "$POKEYELLOW_COMMIT" "${GB_ART[@]}"
 sparse_clone pokegold "$POKEGOLD_COMMIT" "${GB_ART[@]}"
 sparse_clone pokecrystal "$POKECRYSTAL_COMMIT" "${GB_ART[@]}"
-sparse_clone pokeruby "$POKERUBY_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c'
+# PC and summary screen skins (scripts/pc_ui) read each GBA game's interface art, fonts and text tables.
+GBA_UI=('/charmap.txt' '/graphics/fonts/' '/graphics/interface/' '/graphics/pokemon_storage/' '/graphics/summary_screen/'
+    '/graphics/text_window/')
+sparse_clone pokeruby "$POKERUBY_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' "${GBA_UI[@]}" '/graphics/misc/' \
+    '/graphics/types/' '/misc.mk' '/src/data/text/font3_widths.h' '/src/data/text/font4_widths.h' '/src/data/text/type1_map.h'
 sparse_clone pokeemerald "$POKEEMERALD_COMMIT" '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk' \
-    '/src/pokemon_icon.c' '/graphics/object_events/pics/people/' '/src/data/text/abilities.h' '/include/constants/abilities.h'
+    '/src/pokemon_icon.c' '/graphics/object_events/pics/people/' '/src/data/text/abilities.h' '/include/constants/abilities.h' \
+    "${GBA_UI[@]}" '/graphics/balls/' '/graphics/battle_interface/' '/graphics/types/' '/src/fonts.c'
 sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' \
-    '/graphics/object_events/pics/people/'
+    '/graphics/object_events/pics/people/' "${GBA_UI[@]}" '/graphics/misc/' '/src/text.c'
 sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \
     '/res/graphics/field_sprites/player/'
 # HeartGold's player sprites (MMODEL_HERO, MMODEL_HEROINE)
@@ -116,6 +121,7 @@ sparse_clone pokeheartgold "$POKEHEARTGOLD_COMMIT" '/files/data/mmodel/mmodel/mm
 echo "==> PC box art"
 python3 "$ROOT/scripts/build-box-assets.py" "$DECOMP/pokeemerald" "$PAK/res/box"
 python3 "$ROOT/scripts/build-box-art.py" "$DECOMP" "$PAK/res/box/art"
+python3 "$ROOT/scripts/pc_ui/build.py" "$DECOMP" "$PAK/res/box/ui"
 
 echo "==> Players' overworld sprites (main menu)"
 python3 "$ROOT/scripts/build-trainers.py" "$DECOMP" "$PAK/res/trainers"
