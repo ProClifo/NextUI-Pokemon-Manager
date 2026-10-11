@@ -690,7 +690,7 @@ public sealed class App
     {
         try
         {
-            var t = GameClock.Read(entry.Sav, RtcPath(entry), DateTime.Now);
+            var t = GameClock.Read(entry.Sav, RtcPath(entry), ClockNow(entry.Sav));
             int h12 = t.Hour % 12 == 0 ? 12 : t.Hour % 12;
             var time = $"{h12:00}:{t.Minute:00} {(t.Hour >= 12 ? "PM" : "AM")}";
             return GameClock.HasWeekdays(entry.Sav) ? $"{GameClock.Weekdays[t.Weekday % 7]} {time}" : time;
@@ -701,11 +701,17 @@ public sealed class App
         }
     }
 
+    /// <summary>
+    /// "Now" for the game's clock: Gen 3's cartridge clock is the device's local time as libc gives it (the
+    /// emulator's view, which .NET's can differ from); Gen 2's counts Unix seconds, which DateTime.Now gives right.
+    /// </summary>
+    private static DateTime ClockNow(SaveFile sav) => sav is SAV3 ? DeviceClock.LocalNow() : DateTime.Now;
+
     private void ClockMenu(SaveEntry entry)
     {
         var sav = entry.Sav;
         var rtcPath = RtcPath(entry);
-        var now = GameClock.Read(sav, rtcPath, DateTime.Now);
+        var now = GameClock.Read(sav, rtcPath, ClockNow(sav));
         bool weekdays = GameClock.HasWeekdays(sav);
         // "Sunday 08:41 PM": Left/Right pick a part, Up/Down change it (the viewer's Clock editor)
         var edited = _boxViewer.EditClock(weekdays ? now.Weekday : -1, now.Hour, now.Minute, _ogFont?.Path, BackgroundFor(entry), out bool unavailable);
@@ -739,7 +745,7 @@ public sealed class App
 
     private void SetClock(SaveEntry entry, string? rtcPath, int weekday, int hour, int minute)
     {
-        var rtc = GameClock.Set(entry.Sav, DateTime.Now, weekday, hour, minute);
+        var rtc = GameClock.Set(entry.Sav, ClockNow(entry.Sav), weekday, hour, minute);
         if (!TryWrite(entry, out _))
             return;
         if (rtc is not null && rtcPath is not null)
