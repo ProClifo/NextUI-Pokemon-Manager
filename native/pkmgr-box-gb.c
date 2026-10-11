@@ -620,7 +620,8 @@ static int gb_run(SDL_Surface *screen, Scene *scene, const char *write_location)
                 gb_change_box(scene, &st, dx ? dx : l1 ? -1 : 1);
             else if (dy)
             {
-                st.cursor += dy;
+                // the Pokémon and CANCEL, wrapping from the bottom to the top and back
+                st.cursor = (st.cursor + dy + count + 1) % (count + 1);
                 gb_fix_scroll(scene, &st);
             }
             else if (a && st.cursor < count)
