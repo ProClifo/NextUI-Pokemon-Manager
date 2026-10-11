@@ -15,14 +15,37 @@ public static class SaveStates
     /// </summary>
     public static int DeleteSelected(string sdRoot, string romsRoot, string romPath)
     {
+        int deleted = 0;
+        foreach (var file in SelectedFiles(sdRoot, romsRoot, romPath).Where(File.Exists))
+        {
+            try
+            {
+                File.Delete(file);
+                deleted++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"Couldn't delete {file}: {ex.Message}");
+            }
+        }
+        return deleted;
+    }
+
+    /// <summary>Whether launching the ROM would resume a save state (its selected slot holds one).</summary>
+    public static bool HasSelected(string sdRoot, string romsRoot, string romPath)
+        => SelectedFiles(sdRoot, romsRoot, romPath).Skip(2).Any(File.Exists); // past the slot file and preview
+
+    /// <summary>The selected slot's file, its preview, then the state files it could be.</summary>
+    private static List<string> SelectedFiles(string sdRoot, string romsRoot, string romPath)
+    {
         var emu = EmuName(romsRoot, romPath);
         if (emu is null)
-            return 0;
+            return [];
         var shared = Path.Combine(sdRoot, ".userdata", "shared");
         var rom = Path.GetFileName(romPath);
         var slotFile = Path.Combine(shared, ".minui", emu, rom + ".txt");
         if (!File.Exists(slotFile))
-            return 0; // nothing to resume
+            return []; // nothing to resume
         int slot = int.TryParse(File.ReadAllText(slotFile).Trim(), out var s) ? s : 0;
 
         var doomed = new List<string> { slotFile, Path.Combine(shared, ".minui", emu, $"{rom}.{slot}.bmp") };
@@ -38,21 +61,7 @@ public static class SaveStates
             foreach (var dir in Directory.EnumerateDirectories(shared, $"{emu}-*"))
                 doomed.AddRange(names.Select(n => Path.Combine(dir, n)));
         }
-
-        int deleted = 0;
-        foreach (var file in doomed.Where(File.Exists))
-        {
-            try
-            {
-                File.Delete(file);
-                deleted++;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                Console.Error.WriteLine($"Couldn't delete {file}: {ex.Message}");
-            }
-        }
-        return deleted;
+        return doomed;
     }
 
     /// <summary>NextUI's emulator tag: the "(GBA)" part of the ROM's top folder under Roms.</summary>

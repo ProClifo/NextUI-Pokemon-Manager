@@ -743,11 +743,36 @@ public sealed class App
         SetClock(entry, rtcPath, weekdays ? result.Values[0] : 0, result.Values[i], result.Values[i + 1]);
     }
 
+    /// <summary>
+    /// Resuming a save state brings back the game's memory as it was, with the old clock in it; the new time
+    /// shows only when the game starts from its save. Offers to delete the state (unless Save State Deletion
+    /// already did on writing).
+    /// </summary>
+    private void OfferResumeStateDeletion(SaveEntry entry)
+    {
+        if (_settings.SaveStateDeletion || _paths.SdRoot is not { } sd)
+            return;
+        var states = RomIndex.FindRoms(entry.Path)
+            .SelectMany(rom => _paths.RomRoots.Select(root => (rom, root)))
+            .Where(r => SaveStates.HasSelected(sd, r.root, r.rom))
+            .ToList();
+        if (states.Count == 0)
+            return;
+        if (_ui.Confirm($"{Names.Game(entry.Sav)} has a save state it would resume from, which keeps the old clock.\n" +
+                "Delete it so the game starts from its save with the new time?", "DELETE", "KEEP"))
+            foreach (var (rom, root) in states)
+                SaveStates.DeleteSelected(sd, root, rom);
+    }
+
     private void SetClock(SaveEntry entry, string? rtcPath, int weekday, int hour, int minute)
     {
-        var rtc = GameClock.Set(entry.Sav, ClockNow(entry.Sav), weekday, hour, minute);
+        var now = ClockNow(entry.Sav);
+        Console.Error.WriteLine($"clock: set {hour:00}:{minute:00} at device {now:yyyy-MM-dd HH:mm:ss} (.NET local {DateTime.Now:HH:mm:ss}, " +
+            $"UTC {DateTime.UtcNow:HH:mm:ss}, TZ={Environment.GetEnvironmentVariable("TZ") ?? "-"})");
+        var rtc = GameClock.Set(entry.Sav, now, weekday, hour, minute);
         if (!TryWrite(entry, out _))
             return;
+        OfferResumeStateDeletion(entry);
         if (rtc is not null && rtcPath is not null)
         {
             try

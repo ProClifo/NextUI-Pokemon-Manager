@@ -44,4 +44,17 @@ public sealed class SaveStatesTests : IDisposable
         Assert.Equal(0, SaveStates.DeleteSelected(_sd, roms, rom));
         Assert.True(File.Exists(state));
     }
+
+    [Fact]
+    public void KnowsWhetherTheGameWouldResumeAState()
+    {
+        var roms = Path.Combine(_sd, "Roms");
+        var rom = Touch("Roms", "Game Boy Advance (GBA)", "Pokemon Sapphire.gba");
+        Assert.False(SaveStates.HasSelected(_sd, roms, rom));
+        var slotFile = Touch(".userdata", "shared", ".minui", "GBA", "Pokemon Sapphire.gba.txt");
+        File.WriteAllText(slotFile, "9");
+        Assert.False(SaveStates.HasSelected(_sd, roms, rom)); // a slot but no state in it
+        Touch(".userdata", "shared", "GBA-gpsp", "Pokemon Sapphire.gba.st9");
+        Assert.True(SaveStates.HasSelected(_sd, roms, rom));
+    }
 }

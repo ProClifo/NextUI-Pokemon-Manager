@@ -25,6 +25,20 @@ public sealed class GameClockTests : IDisposable
     }
 
     [Theory]
+    [InlineData(GameVersion.S, 1, 31)]
+    [InlineData(GameVersion.S, 23, 59)]
+    [InlineData(GameVersion.E, 0, 0)]
+    public void Gen3ClockSurvivesWritingTheSave(GameVersion version, int hour, int minute)
+    {
+        var entry = _saves.Create(version, $"{version}.sav");
+        var now = new DateTime(2026, 10, 11, 1, 5, 0);
+        GameClock.Set(entry.Sav, now, 0, hour, minute);
+        var reloaded = _saves.Roundtrip(entry);
+        var after = GameClock.Read(reloaded.Sav, null, now);
+        Assert.Equal((hour, minute), (after.Hour, after.Minute));
+    }
+
+    [Theory]
     [InlineData(GameVersion.C, LanguageID.English, 0x2044)]
     [InlineData(GameVersion.GD, LanguageID.Japanese, 0x202B)]
     public void Gen2ClockRestartsTheCartridgeClockAndSetsTheStartTime(GameVersion version, LanguageID language, int offset)
