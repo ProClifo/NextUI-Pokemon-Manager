@@ -214,7 +214,8 @@ public sealed class App
             if (sav.Generation >= 3)
                 actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
             actions.Add(("Gallery", null, () => GalleryMenu(entry)));
-            if (Decorations.Supported(sav))
+            // Ruby/Sapphire/Emerald, once Record Mixing (Mauville City) is open
+            if (Decorations.Supported(sav) && Decorations.RecordMixingUnlocked((SAV3)sav))
                 actions.Add(("Decorations", null, () => DecorationsMenu(entry)));
             actions.Add(("Info", null, () => InfoMenu(entry)));
 

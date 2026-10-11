@@ -1247,7 +1247,8 @@ static void write_result(const char *path, Scene *scene, State *st, const char *
     FILE *f = fopen(path, "w");
     if (f == NULL)
         return;
-    bool party = st->menu_from == VIEW_PARTY;
+    // no state: the Game Boy PC, where scene->box/slot are the picked Pokémon (box 0 the party)
+    bool party = st && st->menu_from == VIEW_PARTY;
     fprintf(f, "{\"box\": %d, \"slot\": %d, \"action\": \"%s\"}\n", party ? 0 : scene->box, party ? st->party_slot : scene->slot, action);
     fclose(f);
 }

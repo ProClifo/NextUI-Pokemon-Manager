@@ -35,7 +35,7 @@ public sealed class ActionReasonsTests : IDisposable
         string[] reasons =
         [
             ActionReasons.NoOtherGames, ActionReasons.NoGamesToSendTo, ActionReasons.LastPartyPokemon, ActionReasons.CantBeMoved,
-            "Go to a PokéCenter to evolve!", "Go to a PokéCenter to trade!", "Its HM moves need a PokéCenter!",
+            ActionReasons.MustBeInPokeCenter,
             "An Egg can't evolve!", "It doesn't evolve by trading!", "It's holding an Everstone!",
             "No Karrablast to trade with!", "It needs to hold a Dragon Scale!", "It needs to hold a Deep Sea Scale!",
         ];

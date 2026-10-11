@@ -13,16 +13,14 @@ public static class ActionReasons
     public const string NoGamesToSendTo = "No games to send to!";
     public const string LastPartyPokemon = "It's your last party Pokémon!";
     public const string CantBeMoved = "This Pokémon can't be moved!";
+    public const string MustBeInPokeCenter = "Must be in a PokéCenter!";
 
     /// <summary>Why a party Pokémon can't be traded (or trade-evolved) from where the save was made.</summary>
     public static string? PartyTrade(SaveFile sav, PKM pk, bool evolve)
     {
         if (TradeLocation.PartyTradeBlocked(sav, pk) is null)
             return null;
-        // Gen 5 with the C-Gear trades anywhere, except Pokémon that know an HM move.
-        if (sav is SAV5 s5 && TradeLocation.HasCGear(s5))
-            return "Its HM moves need a PokéCenter!";
-        return evolve ? "Go to a PokéCenter to evolve!" : "Go to a PokéCenter to trade!";
+        return MustBeInPokeCenter;
     }
 
     /// <summary>

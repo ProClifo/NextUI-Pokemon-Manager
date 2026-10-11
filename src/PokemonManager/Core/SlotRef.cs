@@ -25,13 +25,25 @@ public readonly record struct SlotRef(int Box, int Slot)
             sav.SetBoxSlotAtIndex(pk, Box, Slot);
     }
 
-    /// <summary>Empties the slot. Party slots are compacted the way the games do it.</summary>
+    /// <summary>
+    /// Empties the slot. Party slots are compacted the way the games do it, and so are Gen 1/2 boxes: they're
+    /// lists in those games, and their PC screens stop at the first empty slot.
+    /// </summary>
     public void Clear(SaveFile sav)
     {
         if (IsParty)
+        {
             sav.DeletePartySlot(Slot);
-        else
-            sav.SetBoxSlotAtIndex(sav.BlankPKM, Box, Slot);
+            return;
+        }
+        if (sav.Generation <= 2)
+        {
+            for (int i = Slot; i + 1 < sav.BoxSlotCount; i++)
+                sav.SetBoxSlotAtIndex(sav.GetBoxSlotAtIndex(Box, i + 1), Box, i);
+            sav.SetBoxSlotAtIndex(sav.BlankPKM, Box, sav.BoxSlotCount - 1);
+            return;
+        }
+        sav.SetBoxSlotAtIndex(sav.BlankPKM, Box, Slot);
     }
 
     public bool IsLocked(SaveFile sav) => !IsParty && sav.IsBoxSlotOverwriteProtected(Box, Slot);

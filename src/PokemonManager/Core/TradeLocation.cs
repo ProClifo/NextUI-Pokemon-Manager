@@ -20,10 +20,10 @@ public static class TradeLocation
         {
             if (!KnowsHm(pk))
                 return null;
-            return $"{Names.Summary(pk)} knows an HM move, so it can only be traded from a Pokémon Center. Save there in-game first, or put it in a PC box.";
+            return $"Must be in a PokéCenter!\n{Names.Summary(pk)} knows an HM move. Save in a Pokémon Center in-game first, or put it in a PC box.";
         }
-        var how = sav is SAV5 ? " (or anywhere once you have the C-Gear)" : "";
-        return $"{Names.Game(sav)} was saved outside a Pokémon Center. Party Pokémon can only be traded from a Pokémon Center{how}: save there in-game first, or put it in a PC box.";
+        var cgear = sav is SAV5 ? " (with the C-Gear, anywhere)" : "";
+        return $"Must be in a PokéCenter!\n{Names.Game(sav)} was saved outside a Pokémon Center. Save there in-game first{cgear}, or put it in a PC box.";
     }
 
     /// <summary>The C-Gear: FE_CGEAR_GET (Black/White 0x73, Black 2/White 2 0x6A).</summary>
