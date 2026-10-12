@@ -77,7 +77,7 @@ public sealed class App
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
-                items.Add($"{_hidden.Count} Others");
+                items.Add($"{_hidden.Count} others");
             int rescan = items.Count; items.Add("Rescan SD card");
             int settings = items.Count; items.Add("Settings");
             int update = items.Count; items.Add("Update");
