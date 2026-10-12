@@ -702,19 +702,6 @@ public sealed class App
         if (TradeRules.UnlockNationalDexByTrade(source.Sav, dest.Sav) is { } unlocked)
             message += $"\n{Names.Game(unlocked)} received the National Pokédex!";
 
-        // A trade between games of the same era triggers trade evolutions, just like a link cable.
-        var placed = placedAt.Get(dest.Sav);
-        bool sameEra = pk.Format == dest.Sav.Generation || (pk.Format <= 2 && dest.Sav.Generation <= 2);
-        var evo = sameEra && !TradeEvolution.HoldsEverstone(placed)
-            ? TradeEvolution.GetOptions(placed).FirstOrDefault(o => o.ConditionsMet)
-            : null;
-        if (evo is not null && _ui.Confirm($"What? {Names.Species(placed)} is evolving!\nLet it evolve into {Names.Species(evo.Species)}?", "EVOLVE", "STOP"))
-        {
-            var evolved = TradeEvolution.Evolve(dest.Sav, placedAt, evo);
-            if (evolved.Ok)
-                message += "\n" + evolved.Message;
-        }
-
         // Write the destination first: if the source write then fails, nothing is lost (only duplicated).
         if (!TryWrite(dest, out var destBackup))
         {

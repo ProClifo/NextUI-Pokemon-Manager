@@ -2,7 +2,7 @@
 
 A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing Pokémon save files on your handheld:
 
-- **Transfer Pokémon between games.** Transfer (move) a Pokémon from one save to another. PKHeX converts the data between generations (Gen 1↔2, Gen 1/2→7, 3→4→5→6→7→8...). Moving between games of the same era counts as a trade, so trade evolutions trigger.
+- **Transfer Pokémon between games.** Transfer (move) a Pokémon from one save to another. PKHeX converts the data between generations (Gen 1↔2, Gen 1/2→7, 3→4→5→6→7→8...). Trade evolutions are done with *Evolve* in the PC, not on transfer.
 - **Trade evolutions.** Evolve Kadabra, Machoke, Graveler, Haunter, Onix + Metal Coat, Scyther + Metal Coat, Seadra + Dragon Scale, Clamperl, Boldore and the rest without a second console. Pick a Pokémon and choose *Evolve*.
 - **Mystery Gifts, Mystery Events and e-Reader cards**, from the built-in gallery:
   - Gen 3: Wonder Cards (`.wc3`), Wonder News (`.wn3`), Mystery Events (`.me3`, e.g. the Eon Ticket e-Card), e-Card Trainers (`.ect`) and e-Reader Berries (`.ecb`). These are the formats of the PKHeX *WC3 plugin* and suloku's *Gen III Mystery Gift Tool*, and injection produces the same save data as WC3 plugin 2.6.0 (see below).
