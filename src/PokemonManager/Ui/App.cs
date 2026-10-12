@@ -780,7 +780,9 @@ public sealed class App
         }
 
         Console.Error.WriteLine($"transfer: {message}");
-        _ui.Message($"{pk.Nickname} was sent to {dest.Sav.OT}.");
+        // an egg by the game's word for it (Gen 3 stores every egg as "タマゴ")
+        var sent = pk.IsEgg ? (pk.Format <= 3 ? UiStrings.EggName(pk.Format).ToUpperInvariant() : UiStrings.EggName(pk.Format)) : pk.Nickname;
+        _ui.Message($"{sent} was sent to {dest.Sav.OT}.");
         return mode == TransferMode.Move;
     }
 

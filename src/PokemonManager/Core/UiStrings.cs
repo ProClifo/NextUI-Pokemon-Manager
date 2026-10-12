@@ -79,7 +79,9 @@ public static class UiStrings
             "de" => (int)LanguageID.German, "es" => (int)LanguageID.Spanish, "ko" => (int)LanguageID.Korean,
             _ => (int)LanguageID.English,
         };
-        return SpeciesName.GetEggName(language, (byte)Math.Max(generation, 3));
+        // Gen 3 stores every egg's name as "タマゴ" whatever the language (PKHeX's Gen 3 egg name), but shows the
+        // game's own word: Gen 4's names are those words.
+        return SpeciesName.GetEggName(language, (byte)Math.Max(generation, 4));
     }
 
     public static string EggMemo(string code) => For(code).EggMemo;
