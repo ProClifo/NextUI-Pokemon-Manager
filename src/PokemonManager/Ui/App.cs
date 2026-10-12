@@ -746,7 +746,7 @@ public sealed class App
             return false;
         }
 
-        // Picking the game is the confirmation: it's done at once, and the box comes back without a message.
+        // Picking the game is the confirmation: it's done at once, then "<NICKNAME> was sent to <PLAYER>."
         var result = TransferService.Transfer(source, from, dest, mode, _settings.AllowIllegalTransfers, out var placedAt);
         if (!result.Ok)
         {
@@ -776,6 +776,7 @@ public sealed class App
         }
 
         Console.Error.WriteLine($"transfer: {message}");
+        _ui.Message($"{pk.Nickname} was sent to {dest.Sav.OT}.");
         return mode == TransferMode.Move;
     }
 
