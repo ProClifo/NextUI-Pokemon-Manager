@@ -45,6 +45,8 @@ enum
 
 #define GBA_W 240
 #define GBA_H 160
+// The skin's screen: the GBA's 240x160, or the DS's 256x192 ("screen" in layout.json).
+static int logical_w = GBA_W, logical_h = GBA_H;
 #define MAX_SLOTS 36
 
 typedef struct
@@ -194,6 +196,12 @@ static bool load_scene(const char *path, Scene *scene)
         return false;
     }
     load_game_fonts(scene->skin, scene->layout);
+    JSON_Array *size = json_object_get_array(scene->layout, "screen");
+    if (size && json_array_get_count(size) == 2)
+    {
+        logical_w = (int)json_array_get_number(size, 0);
+        logical_h = (int)json_array_get_number(size, 1);
+    }
 
     JSON_Array *boxes = json_object_get_array(obj, "boxes");
     scene->box_count = boxes ? (int)json_array_get_count(boxes) : 0;
@@ -255,12 +263,12 @@ typedef struct
 static Layout make_layout(SDL_Surface *screen)
 {
     Layout l;
-    int sx = screen->w / GBA_W, sy = screen->h / GBA_H;
+    int sx = screen->w / logical_w, sy = screen->h / logical_h;
     l.scale = sx < sy ? sx : sy;
     if (l.scale < 1)
         l.scale = 1;
-    l.origin_x = (screen->w - GBA_W * l.scale) / 2;
-    l.origin_y = (screen->h - GBA_H * l.scale) / 2;
+    l.origin_x = (screen->w - logical_w * l.scale) / 2;
+    l.origin_y = (screen->h - logical_h * l.scale) / 2;
     return l;
 }
 
@@ -337,6 +345,7 @@ static int game_font_count = 0;
 static int active_font = 0;
 static JSON_Value *charmap_root = NULL;
 static JSON_Object *charmap_chars = NULL, *charmap_names = NULL;
+static bool charmap_direct = false; // the charmap gives glyph numbers (DS games), not GBA codes with control bytes
 
 static void load_game_fonts(const char *skin, JSON_Object *layout)
 {
@@ -346,6 +355,7 @@ static void load_game_fonts(const char *skin, JSON_Object *layout)
     charmap_root = names ? json_parse_file(path) : NULL;
     charmap_chars = json_object_get_object(json_value_get_object(charmap_root), "chars");
     charmap_names = json_object_get_object(json_value_get_object(charmap_root), "names");
+    charmap_direct = json_object_get_boolean(json_value_get_object(charmap_root), "direct") == 1;
     if (charmap_chars == NULL)
         return;
     for (size_t i = 0; names && i < json_array_get_count(names) && game_font_count < 6; i++)
@@ -416,6 +426,12 @@ static int encode_glyphs(const char *text, int *glyphs, int max)
         append_codes(found ? found : json_object_get_array(charmap_chars, "?"), codes, &n, 500);
     }
     int count = 0;
+    if (charmap_direct)
+    {
+        for (int i = 0; i < n && count < max; i++)
+            glyphs[count++] = codes[i];
+        return count;
+    }
     for (int i = 0; i < n && count < max; i++)
     {
         if (codes[i] == 0xFF)
