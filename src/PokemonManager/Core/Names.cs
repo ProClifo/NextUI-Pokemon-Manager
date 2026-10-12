@@ -71,6 +71,62 @@ public static class Names
         _ => sav.Version.ToString(),
     };
 
+    // The games' names in their own languages, as their titles say them (short: "Emerald", "Smaragd").
+    // Columns: English, French, Italian, German, Spanish, Japanese, Korean (null where there was no release).
+    private static readonly Dictionary<GameVersion, string?[]> NativeNames = new()
+    {
+        [GameVersion.RD] = ["Red", "Rouge", "Rosso", "Rot", "Rojo", "赤", null],
+        [GameVersion.GN] = ["Green", "Vert", "Verde", "Grün", "Verde", "緑", null],
+        [GameVersion.BU] = ["Blue", "Bleu", "Blu", "Blau", "Azul", "青", null],
+        [GameVersion.YW] = ["Yellow", "Jaune", "Giallo", "Gelb", "Amarillo", "ピカチュウ", null],
+        [GameVersion.GD] = ["Gold", "Or", "Oro", "Gold", "Oro", "金", "금"],
+        [GameVersion.SI] = ["Silver", "Argent", "Argento", "Silber", "Plata", "銀", "은"],
+        [GameVersion.C] = ["Crystal", "Cristal", "Cristallo", "Kristall", "Cristal", "クリスタル", null],
+        [GameVersion.R] = ["Ruby", "Rubis", "Rubino", "Rubin", "Rubí", "ルビー", null],
+        [GameVersion.S] = ["Sapphire", "Saphir", "Zaffiro", "Saphir", "Zafiro", "サファイア", null],
+        [GameVersion.E] = ["Emerald", "Émeraude", "Smeraldo", "Smaragd", "Esmeralda", "エメラルド", null],
+        [GameVersion.FR] = ["FireRed", "Rouge Feu", "Rosso Fuoco", "Feuerrot", "Rojo Fuego", "ファイアレッド", null],
+        [GameVersion.LG] = ["LeafGreen", "Vert Feuille", "Verde Foglia", "Blattgrün", "Verde Hoja", "リーフグリーン", null],
+        [GameVersion.D] = ["Diamond", "Diamant", "Diamante", "Diamant", "Diamante", "ダイヤモンド", "디아루가"],
+        [GameVersion.P] = ["Pearl", "Perle", "Perla", "Perl", "Perla", "パール", "펄기아"],
+        [GameVersion.Pt] = ["Platinum", "Platine", "Platino", "Platin", "Platino", "プラチナ", "기라티나"],
+        [GameVersion.HG] = ["HeartGold", "Or HeartGold", "Oro HeartGold", "Goldene Edition HeartGold", "Oro HeartGold", "ハートゴールド", "하트골드"],
+        [GameVersion.SS] = ["SoulSilver", "Argent SoulSilver", "Argento SoulSilver", "Silberne Edition SoulSilver", "Plata SoulSilver", "ソウルシルバー", "소울실버"],
+        [GameVersion.B] = ["Black", "Noire", "Nera", "Schwarz", "Negra", "ブラック", "블랙"],
+        [GameVersion.W] = ["White", "Blanche", "Bianca", "Weiß", "Blanca", "ホワイト", "화이트"],
+        [GameVersion.B2] = ["Black 2", "Noire 2", "Nera 2", "Schwarz 2", "Negra 2", "ブラック2", "블랙2"],
+        [GameVersion.W2] = ["White 2", "Blanche 2", "Bianca 2", "Weiß 2", "Blanca 2", "ホワイト2", "화이트2"],
+    };
+
+    // The pairs PKHeX reports when a save doesn't say which of the two it is.
+    private static readonly Dictionary<GameVersion, GameVersion[]> Pairs = new()
+    {
+        [GameVersion.RB] = [GameVersion.RD, GameVersion.BU],
+        [GameVersion.RBY] = [GameVersion.RD, GameVersion.BU, GameVersion.YW],
+        [GameVersion.GS] = [GameVersion.GD, GameVersion.SI],
+        [GameVersion.GSC] = [GameVersion.GD, GameVersion.SI, GameVersion.C],
+        [GameVersion.RS] = [GameVersion.R, GameVersion.S],
+        [GameVersion.FRLG] = [GameVersion.FR, GameVersion.LG],
+        [GameVersion.DP] = [GameVersion.D, GameVersion.P],
+        [GameVersion.HGSS] = [GameVersion.HG, GameVersion.SS],
+        [GameVersion.BW] = [GameVersion.B, GameVersion.W],
+        [GameVersion.B2W2] = [GameVersion.B2, GameVersion.W2],
+    };
+
+    /// <summary>
+    /// The game's name in its own language (a gallery language code: ENG, GER, JPN...): "Smaragd" for a German
+    /// Emerald. English for languages the game wasn't released in, or that aren't known.
+    /// </summary>
+    public static string NativeGame(GameVersion version, string? language)
+    {
+        int column = language switch
+        {
+            "FRE" => 1, "ITA" => 2, "GER" => 3, "SPA" => 4, "JPN" => 5, "KOR" => 6, _ => 0,
+        };
+        string One(GameVersion v) => NativeNames.TryGetValue(v, out var names) ? names[column] ?? names[0]! : v.ToString();
+        return Pairs.TryGetValue(version, out var pair) ? string.Join("/", pair.Select(One)) : One(version);
+    }
+
     /// <summary>One-line summary used in box listings, e.g. "Pikachu Lv.25 M *".</summary>
     public static string Summary(PKM pk)
     {

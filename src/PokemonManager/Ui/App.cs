@@ -66,7 +66,7 @@ public sealed class App
         while (true)
         {
             var saves = GetSaves();
-            // "[ENG] Emerald", with "NAME <player sprite> ID" on the right of every save.
+            // The game in its own language ("Emerald", "Smaragd"), with "NAME <player sprite> ID" on the right.
             var items = saves.Select(SaveName).ToList();
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
@@ -959,8 +959,12 @@ public sealed class App
     /// The player's overworld sprite in this save's game, boy or girl (scripts/build-trainers.py), or an empty
     /// path where there's none: Black/White have no decompilation to take it from.
     /// </summary>
-    /// <summary>A save as the main menu names it: "[ENG] Emerald".</summary>
-    private string SaveName(SaveEntry save) => $"[{ProfileFor(save).ShownLanguage ?? ProfileFor(save).Language}] {Names.Game(save.Sav)}";
+    /// <summary>A save as the main menu names it: its game in the game's own language ("Emerald", "Smaragd").</summary>
+    private string SaveName(SaveEntry save)
+    {
+        var profile = ProfileFor(save);
+        return Names.NativeGame(profile.Version(save.Sav), profile.ShownLanguage ?? profile.Language);
+    }
 
     /// <summary>"NAME\tID", the tab marking where the player sprite goes (just spaced without one).</summary>
     private static string TrainerTag(SaveFile sav, bool withSprite) => $"{sav.OT}{(withSprite ? "\t" : "  ")}{sav.DisplayTID:D5}";

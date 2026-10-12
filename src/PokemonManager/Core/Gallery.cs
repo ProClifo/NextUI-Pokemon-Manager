@@ -531,6 +531,17 @@ public sealed record GameProfile(int Generation, IReadOnlyList<string> Games, st
     /// </summary>
     public string? ShownLanguage { get; init; }
 
+    /// <summary>
+    /// The game this is: the ROM's when it said (Ruby rather than Ruby/Sapphire), else the save's.
+    /// </summary>
+    public GameVersion Version(SaveFile sav) => Generation >= 3 && Games.Count == 1 ? Games[0] switch
+    {
+        "R" => GameVersion.R, "S" => GameVersion.S, "E" => GameVersion.E, "FR" => GameVersion.FR, "LG" => GameVersion.LG,
+        "D" => GameVersion.D, "P" => GameVersion.P, "Pt" => GameVersion.Pt, "HG" => GameVersion.HG, "SS" => GameVersion.SS,
+        "B" => GameVersion.B, "W" => GameVersion.W, "B2" => GameVersion.B2, "W2" => GameVersion.W2,
+        _ => sav.Version,
+    } : sav.Version;
+
     private static int GameGeneration(string game) => game switch
     {
         "R" or "S" or "E" or "FR" or "LG" => 3,
