@@ -22,6 +22,6 @@ public sealed class EggNameTests
         Assert.Equal("EGG", (string?)slot["name"]);
         Assert.Equal("EGG", (string?)slot["summary"]!["nickname"]);
         var german = new BoxScene(Path.GetTempPath()).Build(e.Sav, "", new SlotRef(0, 0), language: "GER");
-        Assert.Equal("EI", (string?)german["boxes"]![1]!["slots"]![0]!["name"]);
+        Assert.Equal("EGG", (string?)german["boxes"]![1]!["slots"]![0]!["name"]); // the screens are English
     }
 }

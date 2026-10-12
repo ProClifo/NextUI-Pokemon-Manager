@@ -34,7 +34,7 @@ public sealed class BoxScene(string assetDir)
         using var scope = UiStrings.Scope(code);
         var scene = BuildScene(sav, title, start, font, fallbackFont, actions);
         scene["language"] = code;
-        scene["strings"] = UiStrings.Json(code);
+        scene["strings"] = UiStrings.Json("en");
         return scene;
     }
 

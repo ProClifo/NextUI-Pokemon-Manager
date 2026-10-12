@@ -946,7 +946,7 @@ public sealed class App
             option = options[pick.Value];
         }
 
-        if (!confirmed && !_ui.Confirm(UiStrings.EvolveQuestion(UiStrings.Code(ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, entry.Sav), pk.Nickname), "YES", "NO"))
+        if (!confirmed && !_ui.Confirm(UiStrings.EvolveQuestion("en", pk.Nickname), "YES", "NO"))
             return false;
 
         var nickname = pk.Nickname;
@@ -963,9 +963,8 @@ public sealed class App
         // the species as the game writes it (KADABRA in Gen 1-4, Kadabra in Gen 5)
         var evolvedPk = slot.Get(entry.Sav);
         var species = SpeciesName.GetSpeciesNameGeneration(evolvedPk.Species, evolvedPk.Language, entry.Sav.Generation);
-        // each game's own words and line breaks, in the save's language ("\f" a new page)
-        var code = UiStrings.Code(ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, entry.Sav);
-        evolvedText = UiStrings.Evolved(code, entry.Sav.Generation, nickname, species);
+        // each game's own words and line breaks ("\f" a new page); the species in the game's language
+        evolvedText = UiStrings.Evolved("en", entry.Sav.Generation, nickname, species);
         if (!confirmed)
             _ui.Message(evolvedText.Replace("\f", "\n"));
         return false;

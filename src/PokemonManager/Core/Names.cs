@@ -9,8 +9,14 @@ public static class Names
 {
     private static GameStrings Strings => GameInfo.Strings;
 
+    /// <summary>Species names in the game's language while a PC scene is built (UiStrings.Scope), else PKHeX's.</summary>
+    internal static string[]? SpeciesNames { get; set; }
+
     public static string Species(ushort species)
-        => species < Strings.specieslist.Length ? Strings.specieslist[species] : $"#{species}";
+    {
+        var list = SpeciesNames ?? Strings.specieslist;
+        return species < list.Length ? list[species] : $"#{species}";
+    }
 
     public static string Species(PKM pk) => pk.IsEgg ? "Egg" : Species(pk.Species);
 
