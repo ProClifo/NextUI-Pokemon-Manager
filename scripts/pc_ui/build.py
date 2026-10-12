@@ -397,6 +397,9 @@ def main():
     # Diamond/Pearl and Platinum (after Emerald, whose summary screen they borrow)
     from pc_ui import ds
     ds.build(decomp, out)
+    # The screens after an evolution (after ds, whose skins they add to)
+    from pc_ui import evolution
+    evolution.build(decomp, out)
     # Ruby/Sapphire's ball icons are Emerald's.
     rs_balls, e_balls = os.path.join(out, "rs", "balls"), os.path.join(out, "e", "balls")
     if os.path.isdir(e_balls) and os.path.isdir(os.path.join(out, "rs")) and not os.path.isdir(rs_balls):

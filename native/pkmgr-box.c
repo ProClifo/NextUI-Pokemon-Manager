@@ -825,6 +825,7 @@ typedef struct
     const char *message; // an explanation in the message box, until a button is pressed
     int yes_no;          // VIEW_CONFIRM: 0 YES, 1 NO
     const char *evolved; // VIEW_EVOLVED's text
+    int evolved_page;    // its page, when the game's text box shows fewer lines than it needs
 } State;
 
 static const char *MENU_ITEMS[] = {"TRANSFER", "SUMMARY", "EVOLVE", "CANCEL"};
@@ -1205,10 +1206,52 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         draw_message(screen, scene, l, st->message);
 }
 
-// After an evolution: the evolved Pokémon in the middle of a dark screen, the message box under it.
+// The skin's own screen after an evolution (scripts/pc_ui/evolution.py): its background, the Pokémon where the
+// game puts it, and the message in the game's text box, a page of "lines" lines at a time.
+static int evolved_lines(Scene *scene, State *st, const Layout *l, char lines[8][160])
+{
+    JSON_Object *ev = json_object_get_object(scene->layout, "evolution");
+    int font_before = use_font(json_object_get_string(ev, "font") ? json_object_get_string(ev, "font") : json_object_dotget_string(scene->layout, "pc.message_font"));
+    int n = wrap_lines(st->evolved, get_int(ev, "width", 200), measure_text, l, lines, 8);
+    active_font = font_before;
+    return n;
+}
+
+static void draw_evolved_screen(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, JSON_Object *ev)
+{
+    JSON_Object *lo = scene->layout;
+    blit_scaled(skin_image(scene, json_object_get_string(ev, "image")), NULL, screen, l, 0, 0);
+    JSON_Array *window = json_object_get_array(ev, "window");
+    if (window)
+        draw_window(screen, scene, l, message_frame(scene), (int)json_array_get_number(window, 0), (int)json_array_get_number(window, 1),
+                    (int)json_array_get_number(window, 2), (int)json_array_get_number(window, 3));
+    JSON_Array *sp = json_object_get_array(ev, "sprite");
+    Slot *cur = hovered(scene, st);
+    if (cur && cur->filled && sp)
+        draw_sprite(screen, l, cur, (int)json_array_get_number(sp, 0), (int)json_array_get_number(sp, 1), false, get_int(lo, "sprite_size", 64));
+    char lines[8][160];
+    int n = evolved_lines(scene, st, l, lines), per = get_int(ev, "lines", 2), lh = get_int(ev, "line_height", 16);
+    JSON_Array *at = json_object_get_array(ev, "text");
+    int tx = at ? (int)json_array_get_number(at, 0) : 16, ty = at ? (int)json_array_get_number(at, 1) : 120;
+    SDL_Color color = get_color(ev, "color", get_color(lo, "pc.menu.color", text_color));
+    SDL_Color shadow = get_color(ev, "shadow", get_color(lo, "pc.menu.shadow", text_shadow));
+    int font_before = use_font(json_object_get_string(ev, "font") ? json_object_get_string(ev, "font") : json_object_dotget_string(lo, "pc.message_font"));
+    for (int i = 0; i < per && st->evolved_page * per + i < n; i++)
+        draw_text_c(screen, l, lines[st->evolved_page * per + i], tx, ty + i * lh, 0, color, shadow);
+    active_font = font_before;
+}
+
+// After an evolution: the game's own screen when the skin has it, else the evolved Pokémon in the middle of a
+// dark screen with the message box under it.
 static void draw_evolved(SDL_Surface *screen, Scene *scene, State *st, const Layout *l)
 {
     JSON_Object *lo = scene->layout;
+    JSON_Object *ev = json_object_get_object(lo, "evolution");
+    if (ev && json_object_get_string(ev, "image"))
+    {
+        draw_evolved_screen(screen, scene, st, l, ev);
+        return;
+    }
     // the evolution scene's dark blue, lighter towards the middle
     for (int y = 0; y < logical_h; y += 8)
     {
@@ -1600,7 +1643,7 @@ int main(int argc, char *argv[])
     Layout layout = make_layout(screen);
     open_text_font(&scene, &layout);
 
-    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0, NULL, 1, NULL};
+    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0, NULL, 1, NULL, 0};
     if (scene.box == 0)
     {
         // Back from a party Pokémon: the party is open again.
@@ -1717,7 +1760,18 @@ int main(int argc, char *argv[])
         }
         else if (st.mode == VIEW_EVOLVED)
         {
-            if (a || b)
+            // A shows the message's next page, if the text box needs more than one
+            JSON_Object *ev = json_object_get_object(scene.layout, "evolution");
+            char lines[8][160];
+            int pages = 1;
+            if (ev && json_object_get_string(ev, "image"))
+            {
+                int per = get_int(ev, "lines", 2);
+                pages = (evolved_lines(&scene, &st, &layout, lines) + per - 1) / per;
+            }
+            if (a && st.evolved_page + 1 < pages)
+                st.evolved_page++;
+            else if (a || b)
                 st.mode = st.menu_from;
         }
         else if (st.mode == VIEW_CONFIRM)

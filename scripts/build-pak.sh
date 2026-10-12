@@ -131,13 +131,13 @@ sparse_clone pokeemerald "$POKEEMERALD_COMMIT" '/graphics/pokemon_storage/' '/gr
     '/graphics/trainer_card/' '/graphics/trainers/front_pics/brendan.png' '/graphics/trainers/front_pics/may.png' \
     '/graphics/trainers/palettes/brendan.pal' '/graphics/trainers/palettes/may.pal'
 sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' \
-    '/graphics/object_events/pics/people/' "${GBA_UI[@]}" '/graphics/misc/' '/src/text.c' \
+    '/graphics/object_events/pics/people/' "${GBA_UI[@]}" '/graphics/misc/' '/src/text.c' '/graphics/battle_interface/' \
     '/graphics/trainer_card/' '/graphics/trainers/front_pics/red_front_pic.png' '/graphics/trainers/front_pics/leaf_front_pic.png' \
     '/graphics/trainers/palettes/red.pal' '/graphics/trainers/palettes/leaf.pal'
 sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \
     '/res/graphics/field_sprites/player/' \
     '/res/prebuilt/graphic/box.narc' '/res/prebuilt/graphic/winframe.narc' '/res/fonts/' '/res/graphics/windows/' \
-    '/res/graphics/pokemon_summary_screen/' '/res/graphics/battle/type_icons/' \
+    '/res/graphics/pokemon_summary_screen/' '/res/graphics/battle/type_icons/' '/res/graphics/egg_hatch/' \
     '/tools/msgenc/charmap.txt'
 # Diamond/Pearl's PC art (scripts/pc_ui/ds.py; the rest of its skin comes from Platinum's)
 sparse_clone pokediamond "$POKEDIAMOND_COMMIT" '/files/graphic/box/'
