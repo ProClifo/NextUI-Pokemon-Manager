@@ -163,6 +163,7 @@ def build_skin(fs, target, wallpapers, e_skin, platinum_repo):
             {"field": "level", "x": 16, "y": 144, "prefix": "Lv", "prefix_x": 2, "font": "normal", "color": name_text, "shadow": name_shadow},
             {"field": "item", "x": 10, "y": 168, "font": "normal", "color": white_text, "shadow": white_shadow},
         ],
+        "remember_column": True,
         "party": {"x": 112, "y": 0, "grid": True,
                   "slots": [[128, 12], [176, 20], [128, 52], [176, 60], [128, 92], [176, 100]],
                   "cancel": [176, 168, 32, 16]},
@@ -356,6 +357,7 @@ def build_hgss(hg_repo, target, e_skin, platinum_repo):
              "female": {"color": [246, 131, 131], "shadow": [197, 41, 41]}},
             {"field": "level", "x": 196, "y": 122, "prefix": "Lv", "prefix_x": 180, "font": "normal", "color": white, "shadow": white_shadow},
         ],
+        "remember_column": True,
         "party": {"x": px0, "y": py0, "grid": True,
                   # the slots' centres in the panel: (24, 20/52/84) and (64, 28/60/92)
                   "slots": [[px0 + 24 - 16, py0 + 20 - 20], [px0 + 64 - 16, py0 + 28 - 20], [px0 + 24 - 16, py0 + 52 - 20],

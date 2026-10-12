@@ -826,6 +826,7 @@ typedef struct
     int yes_no;          // VIEW_CONFIRM: 0 YES, 1 NO
     const char *evolved; // VIEW_EVOLVED's text
     int evolved_page;    // its page, when the game's text box shows fewer lines than it needs
+    int last_col;        // the box column the hand was last in (Gen 4 brings it back there from the buttons)
 } State;
 
 static const char *MENU_ITEMS[] = {"TRANSFER", "SUMMARY", "EVOLVE", "CANCEL"};
@@ -1497,7 +1498,9 @@ static void box_move(Scene *scene, State *st, int dx, int dy)
         {
             // up from PARTY POKéMON wraps to the bottom row's first column; down from the box name goes to the
             // top row's third column
-            if (st->target == TARGET_PARTY_BUTTON)
+            if (json_object_dotget_boolean(scene->layout, "pc.remember_column") == 1)
+                col = st->last_col < box->columns ? st->last_col : 0; // Gen 4: the column the hand was last in
+            else if (st->target == TARGET_PARTY_BUTTON)
                 col = 0;
             else if (st->target == TARGET_CLOSE_BUTTON)
                 col = box->columns >= 2 ? box->columns - 2 : 0;
@@ -1505,6 +1508,7 @@ static void box_move(Scene *scene, State *st, int dx, int dy)
                 col = box->columns > 2 ? 2 : 0;
             st->target = TARGET_SLOT;
             scene->slot = (row - 2) * box->columns + col;
+            st->last_col = col;
         }
         return;
     }
@@ -1513,6 +1517,7 @@ static void box_move(Scene *scene, State *st, int dx, int dy)
         int col = scene->slot % box->columns, row = scene->slot / box->columns;
         col = (col + dx + box->columns) % box->columns;
         scene->slot = row * box->columns + col;
+        st->last_col = col;
     }
     else if (st->target == TARGET_PARTY_BUTTON || st->target == TARGET_CLOSE_BUTTON)
         st->target = st->target == TARGET_PARTY_BUTTON ? TARGET_CLOSE_BUTTON : TARGET_PARTY_BUTTON;
@@ -1678,7 +1683,7 @@ int main(int argc, char *argv[])
     Layout layout = make_layout(screen);
     open_text_font(&scene, &layout);
 
-    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0, NULL, 1, NULL, 0};
+    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0, NULL, 1, NULL, 0, 0};
     if (scene.box == 0)
     {
         // Back from a party Pokémon: the party is open again.
@@ -1688,6 +1693,8 @@ int main(int argc, char *argv[])
         scene.slot = 0;
     }
     bool l_is_a = json_object_get_boolean(json_value_get_object(scene.root), "l_is_a") == 1;
+    if (scene.boxes[scene.box].columns > 0)
+        st.last_col = scene.slot % scene.boxes[scene.box].columns;
     // Back from an evolution: its screen first, then the box (or party) as it was
     const char *evolved = json_object_get_string(json_value_get_object(scene.root), "evolved");
     if (evolved && evolved[0])
@@ -1786,6 +1793,7 @@ int main(int argc, char *argv[])
                 st.mode = st.menu_from = VIEW_BOX;
                 st.target = TARGET_SLOT;
                 scene.slot = 0;
+                st.last_col = 0;
             }
             else if (dx || dy)
                 party_move(&st, dx, dy, grid);
@@ -1798,7 +1806,15 @@ int main(int argc, char *argv[])
             else if ((a && st.party_slot == 6) || b)
             {
                 st.mode = st.menu_from = VIEW_BOX;
-                st.target = TARGET_PARTY_BUTTON;
+                if (grid)
+                {
+                    // Gen 4: leaving the party puts the hand on the box's first Pokémon
+                    st.target = TARGET_SLOT;
+                    scene.slot = 0;
+                    st.last_col = 0;
+                }
+                else
+                    st.target = TARGET_PARTY_BUTTON;
             }
         }
         else if (st.mode == VIEW_EVOLVED)
