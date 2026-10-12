@@ -104,6 +104,8 @@ def moves(m, color, shadow):
         "states": {rename.get(k, k): v for k, v in states.items()},
         "empty": {"text": pp.get("empty_text", "--"), "x": pp.get("empty_x", pp.get("empty_center", pp.get("x", 0)))},
     }
+    if "type_key" in m:  # the contest moves page shows the moves' contest categories
+        out["type_key"] = m["type_key"]
     if "pp_label" in m:  # FireRed/LeafGreen, Ruby/Sapphire: "PP" then "cur/max" right-aligned
         label = m["pp_label"]
         out["pp_label"] = {**xy(label), "text": text(label.get("text", "PP") if isinstance(label, dict) else "PP")}
@@ -213,6 +215,10 @@ def normalize(full):
             "moves": summary_fields(summary.get("common", []) + summary["moves"], color, shadow),
         },
     }
+    if "contest" in summary:  # Ruby/Sapphire/Emerald's fourth page
+        out["summary"]["contest"] = summary_fields(summary.get("common", []) + summary["contest"], color, shadow)
+        out["summary"]["pages"] = [{"image": f"sum_{name}.png", "list": f"summary.{key}"} for name, key in
+                                   (("info", "info"), ("skills", "skills"), ("moves", "moves"), ("contest", "contest"))]
     if "mon_text_rect" in pc:
         out["pc"]["mon_text_bg"] = {"rect": pc["mon_text_rect"], "color": pc.get("mon_text_bg", [148, 148, 172])}
     return out

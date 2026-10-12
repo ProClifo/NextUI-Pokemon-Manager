@@ -662,6 +662,7 @@ def build_summary(root, out, font, font4):
     moves_panel = [g.get_map(0x5B40 + 64 * i, 10) for i in range(7)]
     for i in range(7):
         g.put_map(0x5B40 + 64 * i, [0] * 10)
+        g.put_map(0x6B40 + 64 * i, [0] * 10)  # the contest moves page's APPEAL/JAM panel, likewise
     # DrawExperienceProgressBar: 8 tiles at 0x4CAA (skills map row 18, col 21): 0x2062 + ticks.
     g.put_map(0x4CAA, [0x2062] * 8)
 
@@ -689,9 +690,9 @@ def build_summary(root, out, font, font4):
         g.put_map(0xE016, arr)
         g.put_map(0xE056, [a + 0x10 for a in arr])
 
-    titles = {0: 'POKéMON INFO', 1: 'POKéMON SKILLS', 2: 'BATTLE MOVES'}
+    titles = {0: 'POKéMON INFO', 1: 'POKéMON SKILLS', 2: 'BATTLE MOVES', 3: 'CONTEST MOVES'}
     # sub_809EC38 case 2 / ShowPokemonSummaryScreen: header action text id per page (normal / PC mode)
-    actions = {0: 'CANCEL', 1: None, 2: 'INFO'}
+    actions = {0: 'CANCEL', 1: None, 2: 'INFO', 3: 'INFO'}
 
     def page_image(page):
         nav_dots(page)
@@ -699,6 +700,8 @@ def build_summary(root, out, font, font4):
         img.alpha_composite(g.render_bg(0x0000, 0xE000, size=1, hofs=0))  # BG3 (non-egg: X = 0)
         if page == 1:   # sub_809EBC4: BG1CNT screen base 8, X = 0x100 -> 0x4800
             img.alpha_composite(g.render_bg(0x0000, 0x4000, size=1, hofs=0x100))
+        elif page == 3:  # screen base 0xC, X = 0x100 -> 0x6800
+            img.alpha_composite(g.render_bg(0x0000, 0x6000, size=1, hofs=0x100))
         elif page == 2:  # screen base 0xA, X = 0x100 -> 0x5800
             img.alpha_composite(g.render_bg(0x0000, 0x5000, size=1, hofs=0x100))
         # BG0 static text (gWindowTemplate_81E6E6C: tile (x, y) -> px (8x, 8y), font 3)
@@ -727,7 +730,7 @@ def build_summary(root, out, font, font4):
                 font.draw(img, left * 8 + (width // 2 - font.width(label) // 2), top * 8, label, *WHITE)
         return img
 
-    for page, name in ((0, 'sum_info'), (1, 'sum_skills'), (2, 'sum_moves')):
+    for page, name in ((0, 'sum_info'), (1, 'sum_skills'), (2, 'sum_moves'), (3, 'sum_contest')):
         page_image(page).save(_p(out, name + '.png'))
 
     # PP label tile (SummaryScreen_PlaceTextTile_White(1, 24, row)), drawn per known move.
@@ -844,6 +847,12 @@ def build_summary(root, out, font, font4):
             dict(field='move_detail', panel=[0, 104, 80, 56], power=dict(x=56, y=120, right=77, **col(D)),
                  accuracy=dict(x=56, y=136, right=77, **col(D)), description=dict(x=88, y=120, width=152, **col(D)),
                  note='only after selecting a move with A (sub_80A1334 / sub_80A04CC)'),
+        ],
+        # sub_80A1950 / sub_809F43C: the contest moves page lists the same rows with the contest categories' icons
+        'contest': [
+            dict(field='moves', row_dy=16, type=[87, 32], type_key='contest_type', name=dict(x=120, y=32, **col(W)),
+                 pp_label=[192, 32], pp=dict(x=200, y=32, cur_right=214, slash=True, max_right=232, **col(D)),
+                 empty=dict(name='-', name_x=120, pp='--', pp_x=208)),
         ],
         'page_dots': {'rect': [88, 0, 64, 16], 'note': 'baked per page into sum_*.png (DrawSummaryScreenNavigationDots)'},
     }

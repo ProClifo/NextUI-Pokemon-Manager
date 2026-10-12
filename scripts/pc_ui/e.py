@@ -26,6 +26,9 @@ TYPES = [  # TYPE_* order (include/constants/pokemon.h), file name in graphics/t
     ("steel", "steel"), ("mystery", "mystery"), ("fire", "fire"), ("water", "water"),
     ("grass", "grass"), ("electric", "electric"), ("psychic", "psychic"), ("ice", "ice"),
     ("dragon", "dragon"), ("dark", "dark"),
+    # the contest categories (CONTEST_CATEGORY_* + NUMBER_OF_MON_TYPES), for the contest moves page
+    ("contest_cool", "contest_cool"), ("contest_beauty", "contest_beauty"), ("contest_cute", "contest_cute"),
+    ("contest_smart", "contest_smart"), ("contest_tough", "contest_tough"),
 ]
 # sMoveTypeToOamPaletteNum (pokemon_summary_screen.c): OBJ palette 13/14/15 =
 # move_types_1/2/3.pal (gMoveTypes_Pal loaded at OBJ_PLTT_ID(13), 3 palettes)
@@ -33,6 +36,7 @@ TYPE_PAL = {
     "normal": 13, "fighting": 13, "flying": 14, "poison": 14, "ground": 13, "rock": 13,
     "bug": 15, "ghost": 14, "steel": 13, "mystery": 15, "fire": 13, "water": 14,
     "grass": 15, "electric": 13, "psychic": 14, "ice": 14, "dragon": 15, "dark": 13,
+    "contest_cool": 13, "contest_beauty": 14, "contest_cute": 14, "contest_smart": 15, "contest_tough": 13,
 }
 BALLS = ["poke", "great", "ultra", "master", "safari", "net", "dive", "nest",
          "repeat", "timer", "luxury", "premier"]
@@ -395,6 +399,7 @@ def _build_summary(root, out, font, layout):
             info_map[y * 32 + x] &= 0x0FFF
     skills_map = gba.read_tilemap(_p(s, "page_skills.bin"))
     moves_map = gba.read_tilemap(_p(s, "page_battle_moves.bin"))
+    contest_map = gba.read_tilemap(_p(s, "page_contest_moves.bin"))
     # PositionPowerAccSlidingWindow(0, 0xFF) (SetDefaultTilemaps): sPowerAccSlidingWindow
     # (left 0, top 45 of the 64x32 buffer = row 13 of the right screen block, 10x7)
     # filled with defaultTile 0 -> the POWER/ACCURACY "EFFECT" box is hidden until a
@@ -402,6 +407,7 @@ def _build_summary(root, out, font, layout):
     for y in range(13, 20):
         for x in range(0, 10):
             moves_map[y * 32 + x] = 0
+            contest_map[y * 32 + x] = 0  # its APPEAL/JAM box, likewise
 
     a_btn = gba.load_tiles(_p(s, "a_button.png"))
 
@@ -423,6 +429,8 @@ def _build_summary(root, out, font, layout):
             gba.draw_tilemap(img, skills_map, 32, tiles, pals, w=30, h=20)
         if page >= 2:
             gba.draw_tilemap(img, moves_map, 32, tiles, pals, w=30, h=20)
+        if page >= 3:
+            gba.draw_tilemap(img, contest_map, 32, tiles, pals, w=30, h=20)
         return img
 
     def title(img, s_):
@@ -464,6 +472,12 @@ def _build_summary(root, out, font, layout):
     title(img, "BATTLE MOVES")
     prompt(img, "INFO")
     img.save(_p(out, "sum_moves.png"))
+
+    # ----- CONTEST MOVES page -------------------------------------------------
+    img = base(3)
+    title(img, "CONTEST MOVES")
+    prompt(img, "INFO")
+    img.save(_p(out, "sum_contest.png"))
 
     # Exp bar: DrawExperienceProgressBar writes 8 tiles at skills map 0x255
     # (row 18, col 21) with palette 2: 0x2062 + ticks (0..7), 0x206A = full tile.
@@ -579,11 +593,15 @@ def _build_summary(root, out, font, layout):
         # PrintMoveDetails: window (10, 15) 20x4, text at (6, 1); shown when a move is selected
         dict(field="move_description", x=80 + 6, y=15 * 8 + 1, width=160 - 6, line_height=16, **c(6, 0)),
     ]
+    # SetContestMoveTypeIcons / PrintContestMoves: the same rows, with the moves' contest categories
+    contest = [dict(f, type_key="contest_type") if f["field"] == "moves" else f
+               for f in moves if f["field"] != "move_description"]
     layout["summary"] = {
         "sprite": [40, 64],  # CreateMonSprite: CreateSprite(&gMultiuseSpriteTemplate, 40, 64)
         "info": info,
         "skills": skills,
         "moves": moves,
+        "contest": contest,
         "text_font": "normal",
         # GetCurrentPPToMaxPPState (battle_message.c) + 9 = sTextColors id on palette 8
         "pp_text_note": ("PP colour (GetCurrentPPToMaxPPState): pp == max -> high; max <= 2: pp > 1 -> high, "

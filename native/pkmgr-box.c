@@ -1107,6 +1107,24 @@ static const char *pp_state(int pp, int max)
     return pp > max / 2 ? "high" : "half";
 }
 
+// The summary's pages: the layout's "summary.pages" ([{"image": "sum_info.png", "list": "summary.info"}, ...]), or
+// the Gen 3 three (info, skills, battle moves).
+static int summary_page_count(JSON_Object *lo)
+{
+    JSON_Array *pages = json_object_dotget_array(lo, "summary.pages");
+    return pages && json_array_get_count(pages) > 0 ? (int)json_array_get_count(pages) : 3;
+}
+
+static void summary_page(JSON_Object *lo, int page, const char **image, const char **list)
+{
+    static const char *PAGES[] = {"sum_info.png", "sum_skills.png", "sum_moves.png"};
+    static const char *LISTS[] = {"summary.info", "summary.skills", "summary.moves"};
+    JSON_Array *pages = json_object_dotget_array(lo, "summary.pages");
+    JSON_Object *p = pages ? json_array_get_object(pages, page) : NULL;
+    *image = p && json_object_get_string(p, "image") ? json_object_get_string(p, "image") : PAGES[page % 3];
+    *list = p && json_object_get_string(p, "list") ? json_object_get_string(p, "list") : LISTS[page % 3];
+}
+
 static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Layout *l)
 {
     JSON_Object *lo = scene->layout;
@@ -1115,11 +1133,10 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
         return;
     JSON_Object *s = cur->summary;
     bool egg = json_object_get_boolean(s, "egg") == 1;
-    int page = egg ? 0 : st->page;
-    static const char *PAGES[] = {"sum_info.png", "sum_skills.png", "sum_moves.png"};
-    static const char *LISTS[] = {"summary.info", "summary.skills", "summary.moves"};
-    blit_scaled(skin_image(scene, PAGES[page]), NULL, screen, l, 0, 0);
-    const char *list = LISTS[page];
+    int page = egg ? 0 : st->page % summary_page_count(lo);
+    const char *image, *list;
+    summary_page(lo, page, &image, &list);
+    blit_scaled(skin_image(scene, image), NULL, screen, l, 0, 0);
 
     // The Pokémon's picture, name, species, level, gender and ball (on every page where the layout has them).
     SDL_Rect sp = get_rect(lo, "summary.sprite");
@@ -1178,11 +1195,13 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
     JSON_Object *m = find_field(lo, list, "moves");
     JSON_Array *moves = json_object_get_array(s, "moves");
     int row_dy = get_int(m, "row_dy", 16);
+    // "type_key": the move's icon ("type", or "contest_type" on the contest moves page)
+    const char *type_key = m && json_object_get_string(m, "type_key") ? json_object_get_string(m, "type_key") : "type";
     for (int i = 0; m && moves && i < 4 && i < (int)json_array_get_count(moves); i++)
     {
         JSON_Object *mv = json_array_get_object(moves, i);
         int y = i * row_dy;
-        draw_type(screen, scene, l, json_object_get_string(mv, "type"), get_int(m, "type.x", 0), get_int(m, "type.y", 0) + y);
+        draw_type(screen, scene, l, json_object_get_string(mv, type_key), get_int(m, "type.x", 0), get_int(m, "type.y", 0) + y);
         draw_text_c(screen, l, json_object_get_string(mv, "name"), get_int(m, "name.x", 0), get_int(m, "name.y", 0) + y, 0,
                     get_color(m, "name.color", text_color), get_color(m, "name.shadow", text_shadow));
         if (!json_object_has_value(mv, "max_pp"))
@@ -1526,7 +1545,10 @@ int main(int argc, char *argv[])
         else if (st.mode == VIEW_SUMMARY)
         {
             if (dx || l1 || r1)
-                st.page = (st.page + (dx ? dx : l1 ? -1 : 1) + 3) % 3;
+            {
+                int pages = summary_page_count(scene.layout);
+                st.page = (st.page + (dx ? dx : l1 ? -1 : 1) + pages) % pages;
+            }
             else if (dy)
                 summary_step(&scene, &st, dy);
             else if (b)

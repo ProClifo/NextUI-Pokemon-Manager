@@ -160,6 +160,7 @@ public static class BoxSummary
                 ["type"] = TypeName(MoveInfo.GetType(move, pk.Context)),
                 ["pp"] = pp,
                 ["max_pp"] = pk.GetMovePP(move, ppUps),
+                ["contest_type"] = pk.Format == 3 ? ContestMoves.Category(move) : null,
             });
         }
         summary["moves"] = moves;
