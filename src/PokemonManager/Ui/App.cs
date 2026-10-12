@@ -26,8 +26,9 @@ public sealed class App
     private List<(SaveEntry Save, string Reason)> _hidden = [];
     private SaveNames? _saveNames;
     private SaveNames SavedNames => _saveNames ??= new SaveNames(_paths.SaveNamesFile, _paths.SdRoot);
-    private OfficialSaves? _officialSaves;
-    private OfficialSaves MarkedOfficial => _officialSaves ??= new OfficialSaves(_paths.OfficialSavesFile, _paths.SdRoot);
+    private SavePlacement? _placement;
+    private int _mainSelected;
+    private SavePlacement Placement => _placement ??= new SavePlacement(_paths.SaveListsFile, _paths.OfficialSavesFile, _paths.SdRoot);
     private VanillaRoms.Index? _romIndex;
     private readonly GameBackgrounds _backgrounds;
     private readonly (int Width, int Height)? _screen =
@@ -76,16 +77,22 @@ public sealed class App
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
-                items.Add($"{_hidden.Count} {(_hidden.Count == 1 ? "ROM hack" : "ROM hacks")}");
+                items.Add($"{_hidden.Count} Others");
             int rescan = items.Count; items.Add("Rescan SD card");
             int settings = items.Count; items.Add("Settings");
             int update = items.Count; items.Add("Update");
             int help = items.Count; items.Add("Help");
 
             var icons = saves.Select(CartridgeIcon).ToList();
-            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags, images: sprites, icons: icons);
+            // Y renames the highlighted save, SELECT moves it to Others (not on the menu's own rows)
+            var noActions = items.Select((_, i) => i >= saves.Count).ToList();
+            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, _mainSelected, tags: tags, images: sprites, icons: icons,
+                actionText: "RENAME", secondaryText: "MOVE", noActions: noActions);
             if (choice is null)
                 return 0;
+            _mainSelected = choice.Value;
+            if (choice < saves.Count && _ui.ActionPressed) { RenameSave(saves[choice.Value]); continue; }
+            if (choice < saves.Count && _ui.SecondaryPressed) { MoveSave(saves[choice.Value], toMain: false); continue; }
             if (choice == hidden) { ShowHidden(); continue; }
             if (choice == rescan) { _saves = null; continue; }
             if (choice == settings) { SettingsMenu(); continue; }
@@ -170,9 +177,16 @@ public sealed class App
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
             List<OfficialRomFilter.Hidden> unofficial;
             (all, unofficial) = OfficialRomFilter.Apply(all, RomIndex);
-            // ...unless the player has moved them to the main list (a retail dump No-Intro doesn't list)
-            all.AddRange(unofficial.Where(h => MarkedOfficial.Contains(h.Save.Path)).Select(h => h.Save));
-            _hidden.AddRange(unofficial.Where(h => !MarkedOfficial.Contains(h.Save.Path)).Select(h => (h.Save, h.Check.Describe())));
+            _hidden.AddRange(unofficial.Select(h => (h.Save, h.Check.Describe())));
+        }
+        // ...unless the player has moved them between the lists with SELECT
+        var toMain = _hidden.Where(h => Placement.OnMainList(h.Save.Path) == true).ToList();
+        _hidden.RemoveAll(h => Placement.OnMainList(h.Save.Path) == true);
+        all.AddRange(toMain.Select(h => h.Save));
+        foreach (var s in all.Where(s => Placement.OnMainList(s.Path) == false).ToList())
+        {
+            all.Remove(s);
+            _hidden.Add((s, "moved to Others"));
         }
         _saves = SaveOrder.ByLastPlayed(all, RomIndex.FindRoms, SaveOrder.ReadRecents(_paths.RecentFile, _paths.SdRoot));
         return _saves;
@@ -212,26 +226,19 @@ public sealed class App
             var saves = _hidden.Select(h => h.Save).ToList();
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-            var choice = _ui.Choose("ROM hacks", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
-                icons: saves.Select(CartridgeIcon).ToList(), actionText: "RENAME");
+            var choice = _ui.Choose("Others", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
+                icons: saves.Select(CartridgeIcon).ToList(), actionText: "RENAME", secondaryText: "MOVE");
             if (choice is not { } c)
                 return;
             selected = c;
             if (_ui.ActionPressed)
             {
-                // Y: a name of the player's own (an empty one brings back the game's name)
-                if (_ui.Keyboard("Rename save", SaveName(saves[c])) is { } name)
-                {
-                    try
-                    {
-                        SavedNames.Set(saves[c].Path, name == GameName(saves[c]) ? null : name);
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        Console.Error.WriteLine($"couldn't save the name: {ex}");
-                        _ui.Message($"Couldn't save the name.\n{ex.Message}");
-                    }
-                }
+                RenameSave(saves[c]);
+                continue;
+            }
+            if (_ui.SecondaryPressed)
+            {
+                MoveSave(saves[c], toMain: true);
                 continue;
             }
             Console.Error.WriteLine($"opening {_hidden[c].Save.FileName}, not listed: {_hidden[c].Reason}");
@@ -290,8 +297,6 @@ public sealed class App
             if (Decorations.Supported(sav) && Decorations.RecordMixingUnlocked((SAV3)sav))
                 actions.Add(("Decorations", null, () => DecorationsMenu(entry)));
             actions.Add(("Info", null, () => InfoMenu(entry)));
-            if (_hidden.Any(h => h.Save == entry))
-                actions.Add(("Move to main list", null, () => MoveToMainList(entry)));
 
             // Headed like the save on the main menu: "[ENG] Emerald   NAME <player sprite> ID".
             var choice = _ui.Choose($"{SaveName(entry)}\t{sav.OT}\t{sav.DisplayTID:D5}", actions.Select(a => a.Label).ToList(), selected,
@@ -303,28 +308,46 @@ public sealed class App
         }
     }
 
-    /// <summary>
-    /// For a save on the ROM hacks list whose ROM is really a retail game (a dump No-Intro doesn't list, like an
-    /// old scene release): it's listed with the official games from now on.
-    /// </summary>
-    private void MoveToMainList(SaveEntry entry)
+    /// <summary>Y on a saves list: a name of the player's own (an empty one brings back the game's name).</summary>
+    private void RenameSave(SaveEntry save)
     {
-        if (!_ui.Confirm($"Move {SaveName(entry)} to the main list?\n\nOnly do this if its ROM is an unmodified game: a ROM hack's " +
-                         "Pokémon may not work in the official games.", "MOVE", "CANCEL"))
+        if (_ui.Keyboard("Rename save", SaveName(save)) is not { } name)
             return;
         try
         {
-            MarkedOfficial.Add(entry.Path);
+            SavedNames.Set(save.Path, name == GameName(save) ? null : name);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _ui.Message($"Couldn't save the change.\n{ex.Message}");
+            Console.Error.WriteLine($"couldn't save the name: {ex}");
+            _ui.Message($"Couldn't save the name.\n{ex.Message}");
+        }
+    }
+
+    /// <summary>SELECT on a saves list: moves the save between the main list and Others, remembered from now on.</summary>
+    private void MoveSave(SaveEntry save, bool toMain)
+    {
+        try
+        {
+            Placement.Set(save.Path, toMain);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"couldn't save the move: {ex}");
+            _ui.Message($"Couldn't move the save.\n{ex.Message}");
             return;
         }
-        _hidden.RemoveAll(h => h.Save == entry);
-        if (_saves is not null)
-            _saves = SaveOrder.ByLastPlayed([.. _saves, entry], RomIndex.FindRoms, SaveOrder.ReadRecents(_paths.RecentFile, _paths.SdRoot));
-        _ui.Message($"{SaveName(entry)} is on the main list now.");
+        var saves = GetSaves();
+        if (toMain)
+        {
+            _hidden.RemoveAll(h => h.Save == save);
+            _saves = SaveOrder.ByLastPlayed([.. saves, save], RomIndex.FindRoms, SaveOrder.ReadRecents(_paths.RecentFile, _paths.SdRoot));
+        }
+        else
+        {
+            _saves = saves.Where(s => s != save).ToList();
+            _hidden.Add((save, "moved to Others"));
+        }
     }
 
     /// <summary>

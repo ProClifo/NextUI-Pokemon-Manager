@@ -23,8 +23,10 @@ public interface IUi
     /// <paramref name="icons"/> are images drawn in front of the items' names. <paramref name="titleImageRect"/> picks
     /// a part of <paramref name="titleImage"/> (one frame of an icon sheet). With <paramref name="actionText"/>, Y is
     /// shown with that label; pressing it returns the highlighted index with <see cref="ActionPressed"/> set.
+    /// <paramref name="secondaryText"/> does the same for SELECT (<see cref="SecondaryPressed"/>); rows marked in
+    /// <paramref name="noActions"/> offer neither.
     /// </summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null);
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null);
 
     /// <summary>
     /// A settings list like NextUI's: each row's name on the left and its value on the right, changed with
@@ -35,6 +37,9 @@ public interface IUi
 
     /// <summary>Whether the last <see cref="Choose"/> ended with Y (its action) rather than A.</summary>
     bool ActionPressed { get; }
+
+    /// <summary>Whether the last <see cref="Choose"/> ended with SELECT (its secondary action).</summary>
+    bool SecondaryPressed { get; }
 
     /// <summary>An on-screen keyboard; returns the text entered, or null when the user backs out.</summary>
     string? Keyboard(string title, string initial);
