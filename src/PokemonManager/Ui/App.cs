@@ -773,9 +773,16 @@ public sealed class App
 
     /// <summary>The game's clock: the time of day, and in Gen 2 the day of the week (left/right to change).</summary>
     /// <summary>The cartridge clock file NextUI's gambatte core keeps next to the save (Gold/Silver/Crystal).</summary>
-    private string? RtcPath(SaveEntry entry) => RomIndex.FindRoms(entry.Path).FirstOrDefault() is { } rom
-        ? Path.Combine(Path.GetDirectoryName(entry.Path)!, Path.GetFileName(rom) + ".rtc")
-        : null;
+    private string? RtcPath(SaveEntry entry)
+    {
+        // minarch names it like the save, after the ROM file ("Crystal.gbc.rtc"; for a zip, the file inside it)
+        var name = Path.GetFileNameWithoutExtension(entry.Path);
+        if (Path.GetExtension(name).ToLowerInvariant() is ".gb" or ".gbc")
+            return Path.ChangeExtension(entry.Path, ".rtc");
+        return RomIndex.FindRoms(entry.Path).FirstOrDefault() is { } rom
+            ? Path.Combine(Path.GetDirectoryName(entry.Path)!, Path.GetFileName(rom) + ".rtc")
+            : null;
+    }
 
     /// <summary>The game's time as the Clock editor shows it: "08:41 PM", or "Sunday 08:41 PM" with weekdays.</summary>
     private string? ClockText(SaveEntry entry)

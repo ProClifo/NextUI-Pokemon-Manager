@@ -37,9 +37,12 @@ public sealed class Updater(string pakDir, string tempDir)
     /// <summary>The newest published release with a zip for <paramref name="platform"/>.</summary>
     public Release Latest(string platform)
     {
-        var json = DownloadText($"https://api.github.com/repos/{Repository}/releases?per_page=10");
+        var json = DownloadText($"https://api.github.com/repos/{Repository}/releases?per_page=100");
         using var doc = JsonDocument.Parse(json);
-        foreach (var r in doc.RootElement.EnumerateArray())
+        // GitHub lists releases by tag name as text (alpha.9 before alpha.14): newest published first instead
+        var releases = doc.RootElement.EnumerateArray()
+            .OrderByDescending(r => r.TryGetProperty("published_at", out var p) && p.ValueKind == JsonValueKind.String ? p.GetDateTimeOffset() : DateTimeOffset.MinValue);
+        foreach (var r in releases)
         {
             if (r.TryGetProperty("draft", out var draft) && draft.GetBoolean())
                 continue;
