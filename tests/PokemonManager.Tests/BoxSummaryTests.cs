@@ -34,6 +34,25 @@ public sealed class BoxSummaryTests : IDisposable
     }
 
     [Fact]
+    public void PlatinumMemoGivesTheDateThePlaceAndTheCharacteristic()
+    {
+        var sav = BlankSaveFile.Get(GameVersion.Pt, "LUCAS", LanguageID.English);
+        var pk = new PK4
+        {
+            Species = (ushort)Species.Shinx, CurrentLevel = 5, Version = GameVersion.Pt, MetLocation = 16, MetLevel = 4,
+            MetDate = new DateOnly(2009, 3, 22), OriginalTrainerName = sav.OT, TID16 = sav.TID16, OriginalTrainerGender = sav.Gender,
+            PID = 15, // Modest (raises Sp. Atk: likes dry food)
+        };
+        var lines = BoxSummary.Memo(pk, sav).Split('\n');
+        Assert.Equal(["{Modest} nature.", "Mar. 22, 2009", "{Route 201}", "Met at Lv. 4.", ""], lines[..5]);
+        Assert.Equal(GameInfo.Strings.characteristics[pk.Characteristic], lines[5]);
+        Assert.Equal("Likes {dry} food.", lines[6]);
+
+        pk.OriginalTrainerName = "BARRY";
+        Assert.Equal(["Apparently met at", "Lv. 4."], BoxSummary.Memo(pk, sav).Split('\n')[3..5]);
+    }
+
+    [Fact]
     public void SummaryHasStatsAndMovesForABoxedPokemon()
     {
         var sav = _saves.Create(GameVersion.E, "E.sav").Sav;

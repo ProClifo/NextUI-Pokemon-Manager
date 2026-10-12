@@ -131,6 +131,7 @@ sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemo
 sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \
     '/res/graphics/field_sprites/player/' \
     '/res/prebuilt/graphic/box.narc' '/res/prebuilt/graphic/winframe.narc' '/res/fonts/' '/res/graphics/windows/' \
+    '/res/graphics/pokemon_summary_screen/' '/res/graphics/battle/type_icons/' \
     '/tools/msgenc/charmap.txt'
 # Diamond/Pearl's PC art (scripts/pc_ui/ds.py; the rest of its skin comes from Platinum's)
 sparse_clone pokediamond "$POKEDIAMOND_COMMIT" '/files/graphic/box/'

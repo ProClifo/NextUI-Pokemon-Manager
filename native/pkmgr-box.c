@@ -628,6 +628,26 @@ static int field_align(JSON_Object *f)
     return a == NULL ? 0 : strcmp(a, "center") == 0 ? 1 : strcmp(a, "right") == 0 ? 2 : 0;
 }
 
+// "cur/max" as the DS games print it (PrintCurrentAndMaxInfo): the slash centred on x, the numbers either side.
+static void draw_slashed(SDL_Surface *dst, const Layout *l, const char *text, int x, int y, SDL_Color color, SDL_Color shadow)
+{
+    char cur[32], max[32];
+    const char *slash = strchr(text, '/');
+    int n = (int)(slash - text);
+    while (n > 0 && text[0] == ' ')
+        text++, n--;
+    snprintf(cur, sizeof(cur), "%.*s", n < 0 ? 0 : n, text);
+    const char *m = slash + 1;
+    while (*m == ' ')
+        m++;
+    snprintf(max, sizeof(max), "%s", m);
+    int sw = text_width("/", l);
+    int left = x - sw / 2;
+    draw_text_c(dst, l, cur, left, y, 2, color, shadow);
+    draw_text_c(dst, l, "/", left, y, 0, color, shadow);
+    draw_text_c(dst, l, max, left + sw, y, 0, color, shadow);
+}
+
 // A text field: its prefix ("/", "Lv") and value. A prefix_x draws the prefix there and the value on its own.
 static void draw_field(SDL_Surface *dst, const Layout *l, JSON_Object *layout, const char *list, const char *name, const char *value)
 {
@@ -645,7 +665,10 @@ static void draw_field(SDL_Surface *dst, const Layout *l, JSON_Object *layout, c
     }
     else
         snprintf(buf, sizeof(buf), "%s%s", prefix ? prefix : "", value);
-    draw_text_c(dst, l, buf, get_int(f, "x", 0), get_int(f, "y", 0), field_align(f), color, shadow);
+    if (json_object_has_value(f, "slash_center") && strchr(buf, '/'))
+        draw_slashed(dst, l, buf, get_int(f, "slash_center", 0), get_int(f, "y", 0), color, shadow);
+    else
+        draw_text_c(dst, l, buf, get_int(f, "x", 0), get_int(f, "y", 0), field_align(f), color, shadow);
     active_font = previous_font;
 }
 
@@ -657,7 +680,7 @@ static void draw_gender(SDL_Surface *dst, const Layout *l, JSON_Object *layout, 
         return;
     bool male = strcmp(gender, "male") == 0;
     SDL_Color fallback = male ? (SDL_Color){66, 206, 255, 255} : (SDL_Color){255, 156, 148, 255};
-    draw_text_c(dst, l, male ? "♂" : "♀", get_int(f, "x", 0), get_int(f, "y", 0), 0,
+    draw_text_c(dst, l, male ? "♂" : "♀", get_int(f, "x", 0), get_int(f, "y", 0), field_align(f),
                 get_color(f, male ? "male.color" : "female.color", fallback), get_color(f, male ? "male.shadow" : "female.shadow", text_shadow));
 }
 
@@ -1160,6 +1183,24 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
         draw_field(screen, l, lo, list, TEXT[i], json_object_get_string(s, TEXT[i]));
     }
     draw_gender(screen, l, lo, list, json_object_get_string(s, "gender"));
+    // The page's own words and pictures: {"field": "label", "text" or "image", "x", "y", ...}.
+    JSON_Array *fields = json_object_dotget_array(lo, list);
+    for (size_t i = 0; fields && i < json_array_get_count(fields); i++)
+    {
+        JSON_Object *f = json_array_get_object(fields, i);
+        const char *n = json_object_get_string(f, "field");
+        if (n == NULL || strcmp(n, "label") != 0)
+            continue;
+        if (json_object_get_string(f, "image"))
+            blit_scaled(skin_image(scene, json_object_get_string(f, "image")), NULL, screen, l, get_int(f, "x", 0), get_int(f, "y", 0));
+        else if (json_object_get_string(f, "text"))
+        {
+            int previous_font = use_font(json_object_get_string(f, "font"));
+            draw_text_c(screen, l, json_object_get_string(f, "text"), get_int(f, "x", 0), get_int(f, "y", 0), field_align(f),
+                        get_color(f, "color", text_color), get_color(f, "shadow", text_shadow));
+            active_font = previous_font;
+        }
+    }
     JSON_Object *ball = find_field(lo, list, "ball");
     if (ball && json_object_get_string(s, "ball"))
     {
@@ -1170,7 +1211,13 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
     JSON_Array *types = json_object_get_array(s, "types");
     JSON_Object *t1 = find_field(lo, list, "type1"), *t2 = find_field(lo, list, "type2");
     if (types && t1)
-        draw_type(screen, scene, l, json_array_get_string(types, 0), get_int(t1, "x", 0), get_int(t1, "y", 0));
+    {
+        // a single type may sit elsewhere ("solo": [x, y]: Platinum centres it)
+        bool solo = json_array_get_count(types) == 1 && json_object_has_value(t1, "solo");
+        JSON_Array *sp = solo ? json_object_get_array(t1, "solo") : NULL;
+        draw_type(screen, scene, l, json_array_get_string(types, 0), sp ? (int)json_array_get_number(sp, 0) : get_int(t1, "x", 0),
+                  sp ? (int)json_array_get_number(sp, 1) : get_int(t1, "y", 0));
+    }
     if (types && t2 && json_array_get_count(types) > 1)
         draw_type(screen, scene, l, json_array_get_string(types, 1), get_int(t2, "x", 0), get_int(t2, "y", 0));
     draw_lines(screen, l, find_field(lo, list, "ability_desc"), json_object_get_string(s, "ability_desc"));
@@ -1222,6 +1269,12 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
             draw_text_c(screen, l, json_object_dotget_string(m, "pp_label.text"), get_int(m, "pp_label.x", 0), get_int(m, "pp_label.y", 0) + y, 0, c, sh);
         const char *prefix = json_object_dotget_string(m, "pp.prefix");
         char text[48];
+        if (json_object_dothas_value(m, "pp.slash_center"))
+        {
+            snprintf(text, sizeof(text), "%d/%d", pp, max);
+            draw_slashed(screen, l, text, get_int(m, "pp.slash_center", 0), get_int(m, "pp.y", 0) + y, c, sh);
+            continue;
+        }
         snprintf(text, sizeof(text), "%s%2d/%2d", prefix ? prefix : "", pp, max);
         draw_text_c(screen, l, text, get_int(m, "pp.x", 0), get_int(m, "pp.y", 0) + y, 2, c, sh);
     }

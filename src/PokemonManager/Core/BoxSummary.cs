@@ -177,6 +177,8 @@ public static class BoxSummary
             return MemoRS(pk, sav);
         if (sav is SAV3FRLG)
             return MemoFRLG(pk, sav);
+        if (sav is SAV4 or SAV5)
+            return Memo4(pk, sav);
         var nature = $"{{{Up(GameInfo.Strings.natures[(int)pk.Nature])}}} nature";
         bool hatched = pk.MetLevel == 0 || pk.WasEgg && pk.EggLocation != 0 && pk.Generation >= 4;
         int level = pk.MetLevel == 0 ? (pk.Generation >= 4 ? 1 : 5) : pk.MetLevel;
@@ -196,6 +198,66 @@ public static class BoxSummary
         if (place is not null && pk.MetLocation != 254)
             return $"{nature},\nprobably met at Lv{{{level}}},\n{{{place}}}.";
         return $"{nature},\nobtained in a trade.";
+    }
+
+    private static readonly string[] Months = ["Jan.", "Feb.", "Mar.", "Apr.", "May", "June", "July", "Aug.", "Sept.", "Oct.", "Nov.", "Dec."];
+
+    /// <summary>
+    /// Platinum's trainer memo (unk_02092494.c, PrintTrainerMemo): the nature; when and where it was met (or the Egg
+    /// obtained and hatched) and at what level, "apparently" for someone else's; then its characteristic and the
+    /// flavour it likes, each line 16 pixels apart and places in red.
+    /// </summary>
+    private static string Memo4(PKM pk, SaveFile sav)
+    {
+        var lines = new List<string> { $"{{{GameInfo.Strings.natures[(int)pk.Nature]}}} nature." };
+        bool own = pk.OriginalTrainerName == sav.OT && pk.TID16 == sav.TID16 && pk.OriginalTrainerGender == sav.Gender;
+        string Date(DateOnly? d) => d is { } x ? $"{Months[x.Month - 1]} {x.Day}, {x.Year}" : "";
+        string Place(bool egg, int location) => GameInfo.GetLocationName(egg, (ushort)location, pk.Format, pk.Generation, pk.Version) is { Length: > 0 } n ? n : "";
+        int level = pk.MetLevel;
+        if (pk.EggLocation == 0)
+        {
+            lines.Add(Date(pk.MetDate));
+            if (pk.MetLocation == 55) // Pal Park: the region it came from (InitializeAlternateMetInfoString)
+            {
+                lines.Add("{" + (pk.Version is GameVersion.FR or GameVersion.LG ? "Kanto" : pk.Version is GameVersion.CXD ? "Distant land" : "Hoenn") + "}");
+                lines.Add($"Arrived at Lv. {level}.");
+            }
+            else
+            {
+                lines.Add("{" + Place(false, pk.MetLocation) + "}");
+                if (pk.FatefulEncounter)
+                    lines.AddRange(own ? [$"Had a fateful encounter", $"at Lv. {level}."] : ["Apparently had a", "fateful encounter at", $"Lv. {level}."]);
+                else if (pk.MetLocation == Locations.LinkTrade4NPC)
+                    lines.Add($"Arrived at Lv. {level}.");
+                else
+                    lines.AddRange(own ? [$"Met at Lv. {level}."] : ["Apparently met at", $"Lv. {level}."]);
+            }
+            while (lines.Count < 5)
+                lines.Add("");
+        }
+        else
+        {
+            bool received = pk.EggLocation is Locations.LinkTrade4NPC or Locations.Daycare4 or Locations.LinkTrade4;
+            lines.Add(Date(pk.EggMetDate));
+            lines.Add("{" + Place(true, pk.EggLocation) + "}");
+            lines.Add(received ? "Egg received." : "Egg obtained.");
+            lines.Add(Date(pk.MetDate));
+            lines.Add("{" + Place(false, pk.MetLocation) + "}");
+            lines.Add(own ? "Egg hatched." : "Egg apparently hatched.");
+            if (pk.FatefulEncounter)
+                lines.Add("Fateful encounter.");
+            while (lines.Count < 7)
+                lines.Add("");
+        }
+        if (pk.Characteristic is >= 0 and var c && c < GameInfo.Strings.characteristics.Length)
+            lines.Add(GameInfo.Strings.characteristics[c]);
+        // Pokemon_GetFlavorAffinity: the flavour of the stat its nature raises; neutral natures like them all
+        int nature = (int)pk.Nature;
+        lines.Add(nature % 6 == 0 ? "Happily eats anything." : "Likes {" + (nature / 5) switch
+        {
+            0 => "spicy", 1 => "sour", 2 => "sweet", 3 => "dry", _ => "bitter",
+        } + "} food.");
+        return string.Join("\n", lines);
     }
 
     /// <summary>
@@ -327,7 +389,8 @@ public static class BoxSummary
     {
         Ball.Master => "master", Ball.Ultra => "ultra", Ball.Great => "great", Ball.Safari => "safari", Ball.Net => "net",
         Ball.Dive => "dive", Ball.Nest => "nest", Ball.Repeat => "repeat", Ball.Timer => "timer", Ball.Luxury => "luxury",
-        Ball.Premier => "premier", _ => "poke",
+        Ball.Premier => "premier", Ball.Dusk => "dusk", Ball.Heal => "heal", Ball.Quick => "quick", Ball.Cherish => "cherish",
+        _ => "poke",
     };
 
     /// <summary>The type icon's file name: "psychic", "mystery" (???) ...</summary>

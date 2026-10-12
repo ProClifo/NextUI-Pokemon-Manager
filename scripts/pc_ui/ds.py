@@ -10,7 +10,7 @@ are the games' top screen (256x192), from src/applications/pc_boxes (ov19_*):
   members 15/16                     the plate behind the info line, centred at (56,176)
   wallpaper k                       palette 28+3k, tiles 29+3k, screen 30+3k: 168x160 at (88,0), title banner included
 Platinum's message and menu frames come from its window graphics (winframe.narc, res/graphics/windows).
-The summary screen is still Emerald's (copied from the e skin), drawn in the middle of the DS screen.
+The summary screen is Platinum's (pc_ui.ds_summary).
 """
 import glob
 import json
@@ -19,7 +19,7 @@ import shutil
 
 from PIL import Image
 
-from pc_ui import nds, pt
+from pc_ui import ds_summary, nds, pt
 
 SCREEN = (256, 192)
 
@@ -61,6 +61,17 @@ def _frame_3x3(tiles, colors, order):
     for k, t in enumerate(order):
         nds.draw_tile(img, tiles[t], (k % 3) * 8, (k // 3) * 8, colors)
     return img
+
+
+def _text_width(platinum_repo):
+    """The width of a text in Platinum's system font (font_system.json's glyph widths)."""
+    chars = pt.load_charmap(platinum_repo)
+    meta = os.path.join(platinum_repo, "res", "fonts", "font_system.json")
+    widths = json.load(open(meta, encoding="utf-8"))["glyphWidths"] if os.path.exists(meta) else []
+
+    def width(text):
+        return sum(widths[chars[c]] if c in chars and chars[c] < len(widths) else 6 for c in text)
+    return width
 
 
 def build_skin(fs, target, wallpapers, e_skin, platinum_repo):
@@ -148,6 +159,10 @@ def build_skin(fs, target, wallpapers, e_skin, platinum_repo):
         "font": {"color": [106, 106, 98], "shadow": [197, 205, 205], "height": 12, "cap_top": 3},
         "summary_origin": [8, 16],
     })
+    summary = ds_summary.build(platinum_repo, target, _text_width(platinum_repo))
+    if summary:
+        layout["summary"] = summary
+        del layout["summary_origin"]
     layout["pc"] = {
         "wallpaper": [88, 0],
         "box_name": [172, 13],
