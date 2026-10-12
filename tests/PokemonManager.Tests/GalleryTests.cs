@@ -225,6 +225,9 @@ public sealed class GalleryTests : IDisposable
         Assert.True(tickets[1].Legal);
         Assert.False(tickets[2].Legal);
         Assert.Empty(Tickets.For(gallery, profile with { Games = ["R"] }, sav)); // no Eon Ticket file in this gallery
+        // English Gen 3 Wonder Cards work in every non-Japanese game, and count as official there.
+        Assert.True(Tickets.For(gallery, profile with { Language = "GER" }, sav)[1].Legal);
+        Assert.False(Tickets.For(gallery, profile with { Language = "JPN" }, sav)[1].Legal);
 
         var distributions = GalleryLists.Distributions(gallery, profile);
         Assert.Equal("WISHMKR Jirachi", Assert.Single(distributions).Title);

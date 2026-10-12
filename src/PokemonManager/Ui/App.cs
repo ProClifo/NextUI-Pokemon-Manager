@@ -1156,12 +1156,13 @@ public sealed class App
 
     /// <summary>
     /// Released Pokémon are legal (they're regenerated for the save and checked before being added); cards are
-    /// legal when officially distributed for this game and language; unreleased files go by PKHeX's verdict
+    /// legal when officially distributed for this game and language (English Gen 3 Wonder Cards count for every
+    /// non-Japanese game); unreleased files go by PKHeX's verdict
     /// on the file, and unreleased cards were never distributed at all.
     /// </summary>
     private static bool IsLegalFor(GalleryEntry e, GameProfile profile) => e.Kind == GalleryKind.Pokemon
         ? e.IsFileLegal
-        : e.Released && (e.Language is null || e.Language == profile.Language);
+        : e.Released && e.ForLanguage(profile.Language);
 
     /// <summary>One of an item's copies at random, a legal one when there is one (the copies differ only in
     /// IDs and the like, and Pokémon are regenerated for the save anyway).</summary>

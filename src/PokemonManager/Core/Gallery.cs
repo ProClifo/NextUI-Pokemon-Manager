@@ -93,6 +93,20 @@ public sealed record GalleryEntry(
 {
     public bool IsEventItem => Flags.HasFlag(GalleryFlags.EventItem);
     public bool IsFileLegal => Flags.HasFlag(GalleryFlags.FileLegal);
+
+    /// <summary>
+    /// Whether this file was given out for games in <paramref name="language"/>: its own language, and also
+    /// English Gen 3 Wonder Cards (FireRed/LeafGreen/Emerald) for every non-Japanese game, which accept the
+    /// English cards (and PKHeX accepts what they lead to, e.g. a German Emerald's Navel Rock Ho-Oh).
+    /// </summary>
+    public bool ForLanguage(string language)
+    {
+        if (Language is null || Language == language)
+            return true;
+        return Generation == 3 && Kind != GalleryKind.Pokemon && Language == GalleryLanguage.English
+            && language is GalleryLanguage.French or GalleryLanguage.Italian or GalleryLanguage.German or GalleryLanguage.Spanish
+            && Games.Any(g => g is "FR" or "LG" or "E");
+    }
     public bool IsAlwaysShiny => Flags.HasFlag(GalleryFlags.AlwaysShiny);
 
     /// <summary>Folder path shown in the gallery: the gallery's own folders without "Released/Gen N".</summary>

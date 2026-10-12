@@ -48,8 +48,8 @@ public static class Tickets
 
     /// <summary>Whether a ticket was officially distributed in this generation and language (any game).</summary>
     public static bool IsDistributed(GalleryArchive gallery, int generation, string language, string key)
-        => gallery.Entries.Any(e => e.IsEventItem && e.Released && e.Generation == generation && e.Language == language
-                                    && Letters(e.Title).Contains(key));
+        => gallery.Entries.Any(e => e.IsEventItem && e.Released && e.Generation == generation && e.Language is not null
+                                    && e.ForLanguage(language) && Letters(e.Title).Contains(key));
 
     /// <summary>Ticket-only Pokémon whose ticket wasn't distributed in this generation and language.</summary>
     public static IEnumerable<ushort> Unreachable(GalleryArchive gallery, int generation, string language)
@@ -118,7 +118,7 @@ public static class Tickets
     /// <summary>0 = an official distribution for this game and language; higher = less legitimate.</summary>
     private static int Rank(GalleryEntry e, GameProfile profile)
     {
-        bool language = e.Language == profile.Language;
+        bool language = e.Language is not null && e.ForLanguage(profile.Language);
         return (e.Released, language) switch
         {
             (true, true) => 0,
