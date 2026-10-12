@@ -203,7 +203,7 @@ public sealed class App
 
     /// <summary>
     /// The saves that aren't listed (no ROM, no Pokédex yet, an unofficial ROM), shown like the main menu's;
-    /// picking one says why it isn't listed.
+    /// picking one opens its menu, as on the main menu.
     /// </summary>
     private void ShowHidden()
     {
@@ -217,11 +217,8 @@ public sealed class App
             if (choice is not { } c)
                 return;
             selected = c;
-            var (save, reason) = _hidden[c];
-            var hint = reason.Contains("official", StringComparison.OrdinalIgnoreCase) || reason.Contains("hack", StringComparison.OrdinalIgnoreCase)
-                ? "\n\nTo manage saves from unofficial ROMs anyway, turn off Settings > Official ROMs Only."
-                : "";
-            _ui.Message($"{save.FileName} isn't listed: {reason}.{hint}");
+            Console.Error.WriteLine($"opening {_hidden[c].Save.FileName}, not listed: {_hidden[c].Reason}");
+            SaveMenu(_hidden[c].Save);
         }
     }
 
