@@ -483,6 +483,12 @@ def build_pc(root, out, font, font4):
     frame_png = _p(root, 'graphics', 'text_window', '1.png')
     window_frame = render_sprite_png(frame_png, read_pal(frame_png))
     window_frame.save(_p(out, 'window_frame.png'))
+    # all 20 frame types (OPTION > FRAME), drawn in the save's own one
+    os.makedirs(_p(out, 'window_frames'), exist_ok=True)
+    for n in range(1, 21):
+        f = _p(root, 'graphics', 'text_window', '%d.png' % n)
+        if os.path.exists(f):
+            render_sprite_png(f, read_pal(f)).save(_p(out, 'window_frames', '%d.png' % n))
 
     # Menu cursor: R/S has no triangle; InitMenu -> sub_8072D18 -> MenuCursor_Create814A5C0
     # (menu_cursor.c) builds an outline box from graphics/interface/outline_cursor_12 tiles,

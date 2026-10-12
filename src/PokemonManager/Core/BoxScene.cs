@@ -68,12 +68,12 @@ public sealed class BoxScene(string assetDir)
             ["boxes"] = boxes,
             ["skin"] = Skin(sav),
         };
-        // The PC's windows in the frame type picked in the game's OPTION menu
-        if (WindowFrame(sav) is { } frame)
-        {
-            scene["menu_frame"] = frame;
-            scene["message_frame"] = frame;
-        }
+        // The PC's windows in the frame picked in the game's options
+        var (menuFrame, messageFrame) = WindowFrames(sav);
+        if (menuFrame is not null)
+            scene["menu_frame"] = menuFrame;
+        if (messageFrame is not null)
+            scene["message_frame"] = messageFrame;
         // The font to draw in, unless it lacks some of the text (OG has no Japanese): then the fallback.
         var chosen = font is not null && font.Covers(Strings(scene)) ? font : fallbackFont;
         if (chosen is not null)
@@ -150,17 +150,39 @@ public sealed class BoxScene(string assetDir)
     /// and Emerald's for Emerald (scripts/pc_ui).
     /// </summary>
     /// <summary>
-    /// The game's window frame (OPTION > FRAME), from SaveBlock2's options (pokeemerald/pokefirered
-    /// include/global.h: optionsWindowFrameType, bits 3-7 of byte 0x14), as the skin's window_frames image.
-    /// Emerald's 20 frames are "N.png", FireRed/LeafGreen's 10 "typeN.png".
+    /// The frame picked in the game's options, as the skin's image: (menu frame, message box frame), either null
+    /// when the game has no such option or the skin lacks the image.
+    /// Gen 2: wTextboxFrame (PKHeX's TextBoxFrame), all text boxes, frames/N.png.
+    /// Gen 3: optionsWindowFrameType, the PC's menus and messages; Emerald and Ruby/Sapphire's 20 frames are
+    /// window_frames/N.png, FireRed/LeafGreen's 10 window_frames/typeN.png.
+    /// Gen 4: Options.frame (pokeplatinum include/game_options.h: bits 10-14 of the u16 just before the
+    /// trainer's name in the general block), the message box (message_box_00..19 = message_frames/N.png).
     /// </summary>
-    public string? WindowFrame(SaveFile sav)
+    public (string? Menu, string? Message) WindowFrames(SaveFile sav)
     {
-        if (sav is not SAV3 s3 || s3.Small.Length <= 0x14)
-            return null;
-        int type = (s3.Small[0x14] >> 3) & 0x1F;
-        var name = sav is SAV3FRLG ? $"window_frames/type{type + 1}.png" : $"window_frames/{type + 1}.png";
-        return File.Exists(Path.Combine(Skin(sav), name)) ? name : null;
+        string? Existing(string name) => File.Exists(Path.Combine(Skin(sav), name)) ? name : null;
+        switch (sav)
+        {
+            case SAV2 s2:
+                var gb = Existing($"frames/{s2.TextBoxFrame + 1}.png");
+                return (gb, gb);
+            case SAV3 s3:
+                int type = s3.SmallBlock.OptionWindowFrame;
+                var gba = Existing(sav is SAV3FRLG ? $"window_frames/type{type + 1}.png" : $"window_frames/{type + 1}.png");
+                return (gba, gba);
+            case SAV4 s4 when Options4(s4) is { } options:
+                return (null, Existing($"message_frames/{((options >> 10) & 0x1F) + 1}.png"));
+            default:
+                return (null, null);
+        }
+    }
+
+    /// <summary>The Gen 4 Options u16 (PlayerSave.options, 4 bytes before the trainer's name).</summary>
+    internal static int? Options4(SAV4 sav)
+    {
+        int offset = sav switch { SAV4Pt => 0x64, SAV4DP or SAV4HGSS => 0x60, _ => -1 };
+        var general = sav.General;
+        return offset >= 0 && offset + 2 <= general.Length ? general[offset] | (general[offset + 1] << 8) : null;
     }
 
     public string Skin(SaveFile sav)

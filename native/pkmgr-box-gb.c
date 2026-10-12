@@ -79,7 +79,9 @@ static void gb_image(SDL_Surface *dst, Scene *scene, const Layout *l, const char
 // One of frame.png's six tiles (┌ ─ ┐ │ └ ┘) at a tile position.
 static void gb_frame_tile(SDL_Surface *dst, Scene *scene, const Layout *l, int piece, int col, int row)
 {
-    SDL_Surface *frame = skin_image(scene, "frame.png");
+    // the save's own FRAME option (the scene's), else the skin's first
+    const char *own = json_object_get_string(json_value_get_object(scene->root), "menu_frame");
+    SDL_Surface *frame = skin_image(scene, own ? own : "frame.png");
     if (frame == NULL)
         return;
     SDL_Rect src = {piece * 8, 0, 8, 8};

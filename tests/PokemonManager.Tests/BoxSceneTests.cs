@@ -209,17 +209,51 @@ public sealed class BoxSceneTests : IDisposable
     [Fact]
     public void ThePcWindowsUseTheGamesFrameType()
     {
-        foreach (var (version, file) in new[] { (GameVersion.FR, "type3.png"), (GameVersion.E, "3.png") })
+        foreach (var (version, file) in new[] { (GameVersion.FR, "window_frames/type3.png"), (GameVersion.E, "window_frames/3.png"), (GameVersion.R, "window_frames/3.png") })
         {
             var sav = _saves.Create(version, $"{version}.sav").Sav;
-            var frames = Path.Combine(_scene.Skin(sav), "window_frames");
-            Directory.CreateDirectory(frames);
-            File.WriteAllText(Path.Combine(frames, file), "");
+            Touch(sav, file);
             var small = ((SAV3)sav).Small;
             small[0x14] = (byte)((small[0x14] & 0x07) | (2 << 3)); // OPTION > FRAME: TYPE 3
             var scene = _scene.Build(sav, "", new SlotRef(0, 0));
-            Assert.Equal($"window_frames/{file}", (string?)scene["menu_frame"]);
-            Assert.Equal($"window_frames/{file}", (string?)scene["message_frame"]);
+            Assert.Equal(file, (string?)scene["menu_frame"]);
+            Assert.Equal(file, (string?)scene["message_frame"]);
         }
+
+        var crystal = (SAV2)_saves.Create(GameVersion.C, "C.sav").Sav;
+        Touch(crystal, "frames/5.png");
+        crystal.TextBoxFrame = 4;
+        Assert.Equal("frames/5.png", (string?)_scene.Build(crystal, "", new SlotRef(0, 0))["menu_frame"]);
+    }
+
+    [Theory]
+    [InlineData(GameVersion.D)]
+    [InlineData(GameVersion.Pt)]
+    [InlineData(GameVersion.HG)]
+    public void TheDsMessageBoxUsesTheGamesFrame(GameVersion version)
+    {
+        var sav = (SAV4)_saves.Create(version, $"{version}.sav").Sav;
+        // the options sit 4 bytes before the trainer's name: find the name by changing it
+        var before = sav.General.ToArray();
+        sav.OT = "ZZZZ";
+        int name = Enumerable.Range(0, before.Length).First(i => before[i] != sav.General[i]);
+        int options = name - 4;
+        Assert.Equal(options, version switch { GameVersion.Pt => 0x64, _ => 0x60 });
+
+        Touch(sav, "message_frames/7.png");
+        int value = sav.General[options] | (sav.General[options + 1] << 8);
+        value = (value & ~(0x1F << 10)) | (6 << 10); // FRAME: TYPE 7
+        sav.General[options] = (byte)value;
+        sav.General[options + 1] = (byte)(value >> 8);
+        var scene = _scene.Build(sav, "", new SlotRef(0, 0));
+        Assert.Equal("message_frames/7.png", (string?)scene["message_frame"]);
+        Assert.Null(scene["menu_frame"]);
+    }
+
+    private void Touch(SaveFile sav, string name)
+    {
+        var path = Path.Combine(_scene.Skin(sav), name);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "");
     }
 }

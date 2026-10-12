@@ -186,6 +186,16 @@ def _finish(target, e_skin, platinum_repo, pc):
         for k, col in enumerate((0, 2, 5)):  # the left edge, the white middle, the right edge
             out.alpha_composite(m.crop((col * 8, 0, col * 8 + 8, 24)), (k * 8, 0))
         out.save(os.path.join(target, "message_frame.png"))
+    # the 20 message box frames of OPTIONS > FRAME (message_box_00..19), drawn in the save's own one
+    os.makedirs(os.path.join(target, "message_frames"), exist_ok=True)
+    for n in range(20):
+        f = os.path.join(platinum_repo, "res", "graphics", "windows", "message_box_%02d.png" % n)
+        if os.path.exists(f):
+            m = Image.open(f).convert("RGBA")
+            out = Image.new("RGBA", (24, 24), (0, 0, 0, 0))
+            for k, col in enumerate((0, 2, 5)):
+                out.alpha_composite(m.crop((col * 8, 0, col * 8 + 8, 24)), (k * 8, 0))
+            out.save(os.path.join(target, "message_frames", "%d.png" % (n + 1)))
     cursor = os.path.join(platinum_repo, "res", "fonts", "arrow_cursor.png")
     if os.path.exists(cursor):
         Image.open(cursor).convert("RGBA").save(os.path.join(target, "cursor_menu.png"))

@@ -236,6 +236,12 @@ def gen2(repo, out, crystal):
     os.makedirs(out, exist_ok=True)
     frame = os.path.join(gfx, "frames", "1.png")  # ┌ ─ ┐ / │ └ ┘ (3x2)
     save(tiles(frame, [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)], TEXT), out, "frame.png")
+    # the eight FRAME options (wTextboxFrame), drawn in the save's own one
+    os.makedirs(os.path.join(out, "frames"), exist_ok=True)
+    for n in range(1, 9):
+        f = os.path.join(gfx, "frames", "%d.png" % n)
+        if os.path.exists(f):
+            save(tiles(f, [(0, 0), (1, 0), (2, 0), (0, 1), (1, 1), (2, 1)], TEXT), os.path.join(out, "frames"), "%d.png" % n)
     font_glyphs(os.path.join(gfx, "font", "font.png"), out)
     game_font(repo, os.path.join(gfx, "font", "font.png"), out)
     battle = os.path.join(gfx, "font", "font_battle_extra.png")  # $60-$78, 16 tiles a row
