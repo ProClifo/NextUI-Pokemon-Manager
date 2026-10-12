@@ -591,8 +591,10 @@ public sealed class App
         }
         var sprites = targets.Select(s => TrainerSprite(s.Sav)).ToList();
         var tags = targets.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-        var choice = _ui.Choose(title, targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites,
-            icons: targets.Select(CartridgeIcon).ToList());
+        // the Pokémon's box icon after the question
+        var icon = _boxViewer.Icon(source.Sav, from.Get(source.Sav));
+        var choice = _ui.Choose(icon is null ? title : title + "\t", targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites,
+            icons: targets.Select(CartridgeIcon).ToList(), titleImage: icon?.Sheet, titleImageRect: icon is null ? null : (icon.X, icon.Y, icon.W, icon.H));
         return choice is { } c ? targets[c] : null;
     }
 

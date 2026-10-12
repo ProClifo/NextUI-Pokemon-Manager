@@ -6,7 +6,7 @@ Usage: scripts/build-carts.py <output dir>
 Pixel art, 16 pixels high (minui-list scales it by a whole number to its text height): a Game Boy cartridge for
 Red/Blue/Green/Yellow, a Game Boy Color one for Gold/Silver/Crystal, a Game Boy Advance one for Ruby to
 LeafGreen and a DS card for Diamond to White 2, each in its game's colours: the shell where the real
-cartridge's is coloured (Yellow, Gold, Silver, Crystal and the Advance games), the label otherwise.
+cartridge's is coloured (Red to Yellow, Gold, Silver, Crystal and the Advance games), the label otherwise.
 Writes cart-<game>.png. Requires Pillow.
 """
 import os
@@ -96,9 +96,9 @@ GREY = (170, 170, 178)
 
 # game: (shape, shell, label, second label colour or None, clear shell)
 GAMES = {
-    "red": ("gb", GREY, (214, 44, 44), (150, 24, 30), False),
-    "blue": ("gb", GREY, (44, 92, 214), (24, 52, 150), False),
-    "green": ("gb", GREY, (48, 166, 72), (24, 110, 44), False),
+    "red": ("gb", (208, 40, 40), (252, 120, 96), (130, 16, 22), False),
+    "blue": ("gb", (40, 84, 208), (112, 160, 252), (20, 44, 130), False),
+    "green": ("gb", (44, 156, 68), (128, 220, 128), (20, 96, 40), False),
     "yellow": ("gb", (240, 196, 36), (255, 232, 110), (226, 120, 40), False),
     "gold": ("gbc", (208, 162, 44), (236, 128, 44), (176, 64, 36), False),
     "silver": ("gbc", (186, 192, 204), (96, 112, 156), (60, 70, 110), False),

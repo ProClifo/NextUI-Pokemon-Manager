@@ -147,6 +147,11 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
     }
 
     /// <summary>Whether <see cref="ShowCard"/> can show this game's Trainer Card.</summary>
+    /// <summary>A Pokémon's box icon as its game draws it (the first of the sheet's two 32x32 frames), if the pak has it.</summary>
+    public BoxScene.ArtImage? Icon(SaveFile sav, PKM pk)
+        => scene.Icon(pk, BoxScene.ArtSets(sav), sav is SAV3FRLG { Version: GameVersion.LG }) is { } icon && File.Exists(icon.Sheet)
+            ? icon with { H = 32 } : null;
+
     public bool HasCard(SaveFile sav) => FindOnPath(Tool) is not null && TrainerCard.Available(sav, scene.Skin(sav));
 
     /// <summary>

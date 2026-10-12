@@ -20,9 +20,10 @@ public interface IUi
     /// (e.g. "Legal") are shown at the right of the highlighted item. With <paramref name="images"/> every
     /// item shows its tag, and a tag written "LEFT\tRIGHT" has the item's image between the two parts.
     /// <paramref name="disabled"/> items are greyed out; picking one returns its index, which callers ignore.
-    /// <paramref name="icons"/> are images drawn in front of the items' names.
+    /// <paramref name="icons"/> are images drawn in front of the items' names. <paramref name="titleImageRect"/> picks
+    /// a part of <paramref name="titleImage"/> (one frame of an icon sheet).
     /// </summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null);
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null);
 
     /// <summary>
     /// A settings list like NextUI's: each row's name on the left and its value on the right, changed with
