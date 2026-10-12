@@ -144,10 +144,19 @@ public sealed class BoxSceneTests : IDisposable
     [Fact]
     public void OtherGenerationsCycleThroughTheWallpapers()
     {
-        var sav = _saves.Create(GameVersion.Pt, "Platinum.sav").Sav;
-        var boxes = _scene.Build(sav, "Platinum", new SlotRef(0, 0))["boxes"]!.AsArray();
+        var sav = _saves.Create(GameVersion.B, "Black.sav").Sav;
+        var boxes = _scene.Build(sav, "Black", new SlotRef(0, 0))["boxes"]!.AsArray();
         Assert.EndsWith("wallpapers/00.png", (string?)boxes[1]!["wallpaper"]);
         Assert.EndsWith("wallpapers/01.png", (string?)boxes[2]!["wallpaper"]);
+    }
+
+    [Fact]
+    public void PlatinumBoxesUseTheirOwnWallpaper()
+    {
+        var sav = _saves.Create(GameVersion.Pt, "Platinum.sav").Sav;
+        ((IBoxDetailWallpaper)sav).SetBoxWallpaper(1, 27); // one of Platinum's own
+        var boxes = _scene.Build(sav, "Platinum", new SlotRef(0, 0))["boxes"]!.AsArray();
+        Assert.EndsWith("wallpapers/27.png", (string?)boxes[2]!["wallpaper"]);
     }
 
     [Theory]
