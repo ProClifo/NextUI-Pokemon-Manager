@@ -1,8 +1,22 @@
 diff --git a/minui-list.c b/minui-list.c
-index 4639bb1..ce82482 100644
+index 4639bb1..6a84fd6 100644
 --- a/minui-list.c
 +++ b/minui-list.c
-@@ -418,6 +418,8 @@ struct AppState
+@@ -332,6 +332,13 @@ struct ListItem
+     char image_active_path[1024];
+     // the cached, pre-scaled image surface (NULL when nothing is loaded)
+     SDL_Surface *image_surface;
++
++    // the image drawn in front of the name (features.icon; empty for none)
++    char icon_path[1024];
++    // the icon scaled to the row (NULL until first drawn, or when it can't load)
++    SDL_Surface *icon_surface;
++    // whether loading icon_path was tried
++    bool icon_loaded;
+ };
+ 
+ // ListState holds the state of the list
+@@ -418,6 +425,8 @@ struct AppState
      bool always_show_confirm;
      // whether to disable sleep
      bool disable_auto_sleep;
@@ -11,7 +25,7 @@ index 4639bb1..ce82482 100644
      // whether alphabetic scroll (L1/R1 letter jumping) is enabled
      bool alphabetic_scroll;
      // whether the inline filter keyboard feature is allowed at all
-@@ -462,6 +464,9 @@ struct AppState
+@@ -462,6 +471,9 @@ struct AppState
      char title[1024];
      // the title alignment ('left', 'center', 'right')
      char title_alignment[1024];
@@ -21,7 +35,30 @@ index 4639bb1..ce82482 100644
      // the location to write the value to
      char write_location[1024];
      // the value to write (selected, state)
-@@ -2070,13 +2075,7 @@ void handle_input(struct AppState *state)
+@@ -635,6 +647,9 @@ static void ListItem_InitImage(struct ListItem *item)
+     item->resolved_path[0] = '\0';
+     item->image_active_path[0] = '\0';
+     item->image_surface = NULL;
++    item->icon_path[0] = '\0';
++    item->icon_surface = NULL;
++    item->icon_loaded = false;
+ }
+ 
+ // ListItem_UpsertVariant sets or replaces the path for a resolution key in the
+@@ -1469,6 +1484,12 @@ struct ListState *ListState_New(const char *filename, const char *format, const
+             // build the right-hand-side image variants for this item from
+             // features.images
+             ListItem_ReadImages(&state->items[i], json_object_get_object(item, "features"));
++            const char *icon = json_object_get_string(json_object_get_object(item, "features"), "icon");
++            if (icon != NULL)
++            {
++                strncpy(state->items[i].icon_path, icon, sizeof(state->items[i].icon_path) - 1);
++                state->items[i].icon_path[sizeof(state->items[i].icon_path) - 1] = '\0';
++            }
+             state->items[i].has_image = state->items[i].image_variant_count > 0;
+         }
+     }
+@@ -2070,13 +2091,7 @@ void handle_input(struct AppState *state)
          return;
      }
  
@@ -36,7 +73,7 @@ index 4639bb1..ce82482 100644
  
      if (PAD_justRepeated(BTN_UP))
      {
-@@ -2087,7 +2086,8 @@ void handle_input(struct AppState *state)
+@@ -2087,7 +2102,8 @@ void handle_input(struct AppState *state)
          else
          {
              state->list_state->selected -= 1;
@@ -46,7 +83,7 @@ index 4639bb1..ce82482 100644
              {
                  state->list_state->selected -= 1;
                  if (state->list_state->selected < 0)
-@@ -2125,7 +2125,9 @@ void handle_input(struct AppState *state)
+@@ -2125,7 +2141,9 @@ void handle_input(struct AppState *state)
          else
          {
              state->list_state->selected += 1;
@@ -57,10 +94,45 @@ index 4639bb1..ce82482 100644
              {
                  state->list_state->selected += 1;
                  if (state->list_state->selected >= state->list_state->visible_count)
-@@ -2471,6 +2473,45 @@ void ensure_item_image(struct ListItem *item, const char *effective, int max_w,
+@@ -2471,6 +2489,80 @@ void ensure_item_image(struct ListItem *item, const char *effective, int max_w,
      item->image_surface = scaled;
  }
  
++// ensure_item_icon loads an item's leading icon once, scaled by a whole number (pixel art stays sharp) to
++// fit max_h, or a fraction of it when it is taller.
++static void ensure_item_icon(struct ListItem *item, int max_h)
++{
++    if (item->icon_loaded || item->icon_path[0] == '\0')
++        return;
++    item->icon_loaded = true;
++    SDL_Surface *surface = IMG_Load(item->icon_path);
++    if (surface == NULL || surface->h <= 0)
++        return;
++    int dst_h = surface->h <= max_h ? (max_h / surface->h) * surface->h : max_h;
++    int dst_w = surface->w * dst_h / surface->h;
++    SDL_Surface *scaled = surface;
++    if (dst_h != surface->h)
++    {
++#ifdef USE_SDL2
++        scaled = SDL_CreateRGBSurfaceWithFormat(0, dst_w, dst_h, 32, SDL_PIXELFORMAT_RGBA32);
++        if (scaled != NULL)
++        {
++            SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_NONE);
++            SDL_BlitScaled(surface, NULL, scaled, NULL);
++        }
++#else
++        scaled = scale_surface(surface, dst_w, dst_h);
++#endif
++        SDL_FreeSurface(surface);
++    }
++    if (scaled == NULL)
++        return;
++#ifdef USE_SDL2
++    SDL_SetSurfaceBlendMode(scaled, SDL_BLENDMODE_BLEND);
++#endif
++    item->icon_surface = scaled;
++}
++
 +// walk_strip_for returns the walking animation for a row image "<name>.png": "<name>.walk.png", a strip of
 +// frames each the size of the still image, scaled like it (cached for one image at a time), or NULL.
 +static SDL_Surface *walk_strip = NULL;
@@ -103,7 +175,7 @@ index 4639bb1..ce82482 100644
  // draw_background draws the background of the list
  bool draw_background(SDL_Surface *screen, struct AppState *state)
  {
-@@ -2755,6 +2796,55 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2755,6 +2847,55 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          char truncated_title_text[256];
          int title_width = GFX_truncateText(state->fonts.medium, state->title, truncated_title_text, title_available_width, SCALE1(BUTTON_PADDING * 2));
  
@@ -159,7 +231,7 @@ index 4639bb1..ce82482 100644
          // compute the x position of the title based on the alignment
          int title_x_pos;
          const char *title_alignment = state->title_alignment[0] != '\0' ? state->title_alignment : "left";
-@@ -2801,15 +2891,40 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2801,15 +2942,40 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          }
  
          // draw the title
@@ -209,7 +281,7 @@ index 4639bb1..ce82482 100644
      }
  
      // the rest of the function is just for drawing your app to the screen
-@@ -2888,6 +3003,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2888,6 +3054,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          // resolve the row text color from its state (selected/disabled/muted).
          // ListTheme_RowTextRole captures the precedence; theme_row_text_color maps
          // the role to the greyscale palette or, on -nextui builds, the theme colors.
@@ -221,7 +293,7 @@ index 4639bb1..ce82482 100644
          SDL_Color text_color = theme_row_text_color(ListTheme_RowTextRole(
              j == selected_row,
              state->list_state->items[i].features.disabled,
-@@ -2911,7 +3031,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2911,13 +3082,27 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              char image_effective[1024];
              image_effective_path(image_item, state->fallback_image, image_effective, sizeof(image_effective));
              ensure_item_image(image_item, image_effective, screen->w / IMAGE_MAX_WIDTH_DIVISOR, SCALE1(PILL_SIZE - 4));
@@ -230,7 +302,70 @@ index 4639bb1..ce82482 100644
              {
                  image_col_space = image_item->image_surface->w + SCALE1(PADDING);
                  available_width -= image_col_space;
-@@ -3146,6 +3266,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+             }
+         }
+ 
++        // the leading icon (features.icon) goes in front of the name, inside the pill
++        int icon_space = 0;
++        SDL_Surface *row_icon = NULL;
++        {
++            struct ListItem *icon_item = &state->list_state->items[i];
++            ensure_item_icon(icon_item, SCALE1(16)); // about the names' height
++            row_icon = icon_item->icon_surface;
++            if (row_icon != NULL)
++            {
++                icon_space = row_icon->w + SCALE1(BUTTON_PADDING) / 2;
++                available_width -= icon_space;
++            }
++        }
++
+         char truncated_display_text[256];
+         int text_width = GFX_truncateText(state->fonts.large, display_text, truncated_display_text, available_width, SCALE1(BUTTON_PADDING * 2));
+ 
+@@ -2942,7 +3127,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+                 int value_width = 0;
+                 TTF_SizeUTF8(state->fonts.large, display_selected_text, &value_width, NULL);
+                 int value_left = screen->w - value_width - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
+-                int value_viewport = value_left - SCALE1(PADDING + BUTTON_PADDING) - SCALE1(PADDING);
++                int value_viewport = value_left - SCALE1(PADDING + BUTTON_PADDING) - SCALE1(PADDING) - icon_space;
+                 if (value_viewport < scroll_viewport)
+                 {
+                     scroll_viewport = value_viewport;
+@@ -2965,11 +3150,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+             }
+         }
+ 
+-        int pill_width = MIN(available_width, text_width) + color_box_space;
++        int pill_width = MIN(available_width, text_width) + color_box_space + icon_space;
+         if (row_scrolls)
+         {
+             // pin the pill to the full available width so the marquee frame is stable
+-            pill_width = available_width + color_box_space;
++            pill_width = available_width + color_box_space + icon_space;
+         }
+ 
+         if (j == selected_row)
+@@ -3086,6 +3271,19 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+             text_x_pos = SCALE1(PADDING + BUTTON_PADDING);
+         }
+ 
++        if (row_icon != NULL)
++        {
++            if (strcmp(alignment, "left") == 0 || row_scrolls)
++            {
++                text_x_pos += icon_space;
++                shadow_x_pos += icon_space;
++            }
++            SDL_Rect icon_pos = {text_x_pos - icon_space,
++                                 SCALE1(PADDING + (j * PILL_SIZE) + initial_list_y_padding) + (SCALE1(PILL_SIZE) - row_icon->h) / 2,
++                                 row_icon->w, row_icon->h};
++            SDL_BlitSurface(row_icon, NULL, screen, &icon_pos);
++        }
++
+         int text_y_pos = SCALE1(PADDING + (j * PILL_SIZE) + initial_list_y_padding + 4);
+         SDL_Rect pos = {
+             text_x_pos,
+@@ -3146,6 +3344,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          int initial_cube_x_pos = text_x_pos + text_surface_width;
  
          // draw the selected option text
@@ -239,7 +374,7 @@ index 4639bb1..ce82482 100644
          if (strcmp(display_selected_text, "") != 0)
          {
              initial_cube_x_pos = screen->w - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
-@@ -3155,11 +3277,57 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3155,11 +3355,57 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
                      (state->list_state->items[i].features.disabled || state->list_state->items[i].features.unselectable)
                          ? LIST_TEXT_MUTED
                          : LIST_TEXT_NORMAL);
@@ -302,7 +437,7 @@ index 4639bb1..ce82482 100644
              }
          }
  
-@@ -3188,10 +3356,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3188,10 +3434,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
  
          // draw the per-item right-hand image, vertically centered in the row and
          // anchored to the right edge (left of the hardware group on the top row)
@@ -316,7 +451,7 @@ index 4639bb1..ce82482 100644
              if (in_top_row_no_title)
              {
                  image_right_edge -= (ow + SCALE1(PADDING));
-@@ -3485,6 +3655,8 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3485,6 +3733,8 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
      {
          OPT_SCREEN_RESOLUTION = 1000,
          OPT_FALLBACK_IMAGE,
@@ -325,7 +460,7 @@ index 4639bb1..ce82482 100644
          OPT_ALLOW_FILTER,
          OPT_FILTER_BUTTON,
          OPT_DISPLAY_FILTER_KEYBOARD,
-@@ -3519,6 +3691,8 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3519,6 +3769,8 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          {"alphabetic-scroll", no_argument, 0, 'S'},
          {"screen-resolution", required_argument, 0, OPT_SCREEN_RESOLUTION},
          {"fallback-image", required_argument, 0, OPT_FALLBACK_IMAGE},
@@ -334,7 +469,7 @@ index 4639bb1..ce82482 100644
          {"allow-filter", required_argument, 0, OPT_ALLOW_FILTER},
          {"filter-button", required_argument, 0, OPT_FILTER_BUTTON},
          {"display-filter-keyboard", required_argument, 0, OPT_DISPLAY_FILTER_KEYBOARD},
-@@ -3571,13 +3745,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3571,13 +3823,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
              state->show_hardware_group = 0;
              break;
          case 'l':
@@ -351,7 +486,7 @@ index 4639bb1..ce82482 100644
              break;
          case 'K':
              strncpy(state->item_key, optarg, sizeof(state->item_key) - 1);
-@@ -3615,6 +3789,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3615,6 +3867,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          case OPT_FALLBACK_IMAGE:
              strncpy(state->fallback_image, optarg, sizeof(state->fallback_image) - 1);
              break;
@@ -364,7 +499,7 @@ index 4639bb1..ce82482 100644
          case OPT_ALLOW_FILTER:
              if (strcmp(optarg, "true") == 0)
              {
-@@ -4090,6 +4270,7 @@ int main(int argc, char *argv[])
+@@ -4090,6 +4348,7 @@ int main(int argc, char *argv[])
          .show_brightness_setting = 0,
          .always_show_confirm = false,
          .disable_auto_sleep = false,

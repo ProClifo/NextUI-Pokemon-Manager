@@ -67,7 +67,7 @@ public sealed class MinUi : IUi
     private string[] MessageFont(params string[] texts)
         => FontFor(texts) is { } path ? ["--font-default", path] : [];
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -78,14 +78,14 @@ public sealed class MinUi : IUi
         // Should a list still crash, reopen it at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
-            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, out bool crashed);
+            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, icons, out bool crashed);
             if (!crashed || attempt == MaxCrashRetries)
                 return result;
             selected = 0;
         }
     }
 
-    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, IReadOnlyList<bool>? disabled, out bool crashed)
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, IReadOnlyList<bool>? disabled, IReadOnlyList<string?>? icons, out bool crashed)
     {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
@@ -108,6 +108,12 @@ public sealed class MinUi : IUi
             {
                 var features = row["features"] as JsonObject ?? new JsonObject();
                 features["disabled"] = true;
+                row["features"] = features;
+            }
+            if (icons is not null && i < icons.Count && icons[i] is { } icon && File.Exists(icon))
+            {
+                var features = row["features"] as JsonObject ?? new JsonObject();
+                features["icon"] = icon;
                 row["features"] = features;
             }
             array.Add((JsonNode)row);
@@ -342,7 +348,7 @@ public sealed class ConsoleUi : IUi
     public UiFont? Font { get; set; }
     public string? Background { get; set; }
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null)
     {
         if (items.Count == 0)
             return null;

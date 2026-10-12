@@ -78,7 +78,8 @@ public sealed class App
             int update = items.Count; items.Add("[Update]");
             int help = items.Count; items.Add("[Help]");
 
-            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags, images: sprites);
+            var icons = saves.Select(CartridgeIcon).ToList();
+            var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags, images: sprites, icons: icons);
             if (choice is null)
                 return 0;
             if (choice == hidden) { ShowHidden(); continue; }
@@ -213,7 +214,8 @@ public sealed class App
             var saves = _hidden.Select(h => h.Save).ToList();
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-            var choice = _ui.Choose("Other saves", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites);
+            var choice = _ui.Choose("Other saves", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
+                icons: saves.Select(CartridgeIcon).ToList());
             if (choice is not { } c)
                 return;
             selected = c;
@@ -393,7 +395,8 @@ public sealed class App
         }
         var sprites = targets.Select(s => TrainerSprite(s.Sav)).ToList();
         var tags = targets.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-        var choice = _ui.Choose($"Send the {decoration.Name} to which game?", targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites);
+        var choice = _ui.Choose($"Send the {decoration.Name} to which game?", targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites,
+            icons: targets.Select(CartridgeIcon).ToList());
         if (choice is not { } c)
             return;
         var dest = targets[c];
@@ -588,7 +591,8 @@ public sealed class App
         }
         var sprites = targets.Select(s => TrainerSprite(s.Sav)).ToList();
         var tags = targets.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-        var choice = _ui.Choose(title, targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites);
+        var choice = _ui.Choose(title, targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites,
+            icons: targets.Select(CartridgeIcon).ToList());
         return choice is { } c ? targets[c] : null;
     }
 
@@ -1020,6 +1024,30 @@ public sealed class App
     {
         var profile = ProfileFor(save);
         return Names.NativeGame(profile.Version(save.Sav), profile.ShownLanguage ?? profile.Language);
+    }
+
+    /// <summary>The cartridge drawn in front of a save's name, in its game's colours (scripts/build-carts.py).</summary>
+    private string? CartridgeIcon(SaveEntry save)
+    {
+        var name = ProfileFor(save).Version(save.Sav) switch
+        {
+            GameVersion.RD => "red", GameVersion.GN => "green", GameVersion.BU => "blue", GameVersion.YW => "yellow",
+            GameVersion.GD => "gold", GameVersion.SI => "silver", GameVersion.C => "crystal",
+            GameVersion.R => "ruby", GameVersion.S => "sapphire", GameVersion.E => "emerald",
+            GameVersion.FR => "firered", GameVersion.LG => "leafgreen",
+            GameVersion.D => "diamond", GameVersion.P => "pearl", GameVersion.Pt => "platinum",
+            GameVersion.HG => "heartgold", GameVersion.SS => "soulsilver",
+            GameVersion.B => "black", GameVersion.W => "white", GameVersion.B2 => "black2", GameVersion.W2 => "white2",
+            // a save that doesn't say which of the pair it is gets the first's
+            GameVersion.RB or GameVersion.RBY => "red", GameVersion.GS or GameVersion.GSC => "gold",
+            GameVersion.RS or GameVersion.RSE => "ruby", GameVersion.FRLG => "firered", GameVersion.DP => "diamond",
+            GameVersion.HGSS => "heartgold", GameVersion.BW => "black", GameVersion.B2W2 => "black2",
+            _ => null,
+        };
+        if (name is null)
+            return null;
+        var path = Path.Combine(_paths.IconsDir, $"cart-{name}.png");
+        return File.Exists(path) ? path : null;
     }
 
     /// <summary>"NAME\tID", the tab marking where the player sprite goes (just spaced without one).</summary>

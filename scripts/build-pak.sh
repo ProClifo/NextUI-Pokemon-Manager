@@ -152,6 +152,7 @@ git clone -q --filter=blob:none --sparse https://github.com/googlefonts/noto-emo
 git -C "$NOTO" checkout -q "$NOTO_EMOJI_COMMIT"
 git -C "$NOTO" sparse-checkout set --no-cone '/2D/png/128/emoji_u2705.png' '/2D/png/128/emoji_u2620.png'
 python3 "$ROOT/scripts/build-icons.py" "$NOTO" "$PAK/res/icons"
+python3 "$ROOT/scripts/build-carts.py" "$PAK/res/icons"
 
 echo "==> Per-game menu backgrounds"
 python3 "$ROOT/scripts/build-backgrounds.py" "$ROOT/assets/backgrounds" "$PAK/res/backgrounds"
