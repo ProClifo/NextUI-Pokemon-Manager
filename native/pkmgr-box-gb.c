@@ -314,7 +314,7 @@ static void gb_list_entry_name(Box *box, int index, int count, char *out, size_t
         snprintf(out, size, "%s", nick[0] ? nick : (box->slots[index].name ? box->slots[index].name : ""));
     }
     else if (index == count)
-        snprintf(out, size, "CANCEL");
+        snprintf(out, size, "%s", ui_string("cancel", -1, "CANCEL"));
     else
         out[0] = '\0';
 }
@@ -382,7 +382,7 @@ static void gb_draw_menu(SDL_Surface *dst, Scene *scene, const Layout *l, GbStat
     for (int i = 0; i < 4; i++)
     {
         bool enabled = menu_enabled(slot, i == 1 ? 1 : i);
-        gb_print_c(dst, scene, l, GB_MENU_ITEMS[i], col + 2, row + 2 + i * 2, enabled ? gb_fg : gb_grey);
+        gb_print_c(dst, scene, l, ui_string("gb_menu", i, GB_MENU_ITEMS[i]), col + 2, row + 2 + i * 2, enabled ? gb_fg : gb_grey);
     }
     gb_print(dst, scene, l, "▶", col + 1, row + 2 + st->menu_item * 2);
 }

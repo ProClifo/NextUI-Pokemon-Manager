@@ -47,6 +47,10 @@ enum
 #define GBA_H 160
 // The skin's screen: the GBA's 240x160, or the DS's 256x192 ("screen" in layout.json).
 static int logical_w = GBA_W, logical_h = GBA_H;
+// The game's language (PKHeX code: en, de, ja...) and the screens' own words in it (the scene's "strings").
+static char scene_language[8] = "en";
+static JSON_Object *scene_strings = NULL;
+static int use_font(const char *name);
 #define MAX_SLOTS 36
 
 typedef struct
@@ -196,6 +200,9 @@ static bool load_scene(const char *path, Scene *scene)
         return false;
     }
     load_game_fonts(scene->skin, scene->layout);
+    scene_strings = json_object_get_object(obj, "strings");
+    snprintf(scene_language, sizeof(scene_language), "%s", json_object_get_string(obj, "language") ? json_object_get_string(obj, "language") : "en");
+    use_font("normal"); // the Japanese font for Japanese games
     JSON_Array *size = json_object_get_array(scene->layout, "screen");
     if (size && json_array_get_count(size) == 2)
     {
@@ -387,13 +394,24 @@ static void load_game_fonts(const char *skin, JSON_Object *layout)
     }
 }
 
-// Selects the font a layout names ("normal", "short", "small", "copy1"); returns the previous one.
+// Selects the font a layout names ("normal", "short", "small", "copy1"); returns the previous one. Japanese games
+// use the skin's Japanese version ("jp_normal") where it has one.
 static int use_font(const char *name)
 {
     int previous = active_font;
-    for (int i = 0; name && i < game_font_count; i++)
-        if (strcmp(game_fonts[i].name, name) == 0)
-            active_font = i;
+    char jp[40];
+    snprintf(jp, sizeof(jp), "jp_%s", name ? name : "");
+    bool japanese = strcmp(scene_language, "ja") == 0;
+    for (int pass = japanese ? 0 : 1; pass < 2; pass++)
+    {
+        const char *want = pass == 0 ? jp : name;
+        for (int i = 0; want && i < game_font_count; i++)
+            if (strcmp(game_fonts[i].name, want) == 0)
+            {
+                active_font = i;
+                return previous;
+            }
+    }
     return previous;
 }
 
@@ -761,6 +779,14 @@ typedef struct
 } State;
 
 static const char *MENU_ITEMS[] = {"TRANSFER", "SUMMARY", "EVOLVE", "CANCEL"};
+
+
+static const char *ui_string(const char *key, int index, const char *fallback)
+{
+    JSON_Array *a = json_object_get_array(scene_strings, key);
+    const char *v = a ? json_array_get_string(a, (size_t)index) : (index < 0 ? json_object_get_string(scene_strings, key) : NULL);
+    return v ? v : fallback;
+}
 #define MENU_COUNT 4
 
 // Transfer and Evolve are greyed out when the Pokémon can't be transferred or evolved; picking them explains why.
@@ -979,7 +1005,7 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         draw_field(screen, l, lo, "pc.mon_text", "level", json_object_get_string(s, "level"));
         draw_gender(screen, l, lo, "pc.mon_text", json_object_get_string(s, "gender"));
         const char *item = json_object_get_string(s, "item");
-        if (item && strcmp(item, "NONE") != 0)
+        if (item && json_object_has_value(s, "item_icon")) // item_icon: it holds one ("NONE" is in the game's language)
             draw_field(screen, l, lo, "pc.mon_text", "item", item);
     }
 
@@ -1014,7 +1040,7 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         int widest = 0;
         for (int i = 0; i < MENU_COUNT; i++)
         {
-            int tw = text_width(MENU_ITEMS[i], l);
+            int tw = text_width(ui_string("menu", i, MENU_ITEMS[i]), l);
             if (tw > widest)
                 widest = tw;
         }
@@ -1025,9 +1051,9 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         {
             int ty = y + text_y + i * line;
             if (menu_enabled(cur, i))
-                draw_text_c(screen, l, MENU_ITEMS[i], x + text_x, ty, 0, color, shadow);
+                draw_text_c(screen, l, ui_string("menu", i, MENU_ITEMS[i]), x + text_x, ty, 0, color, shadow);
             else
-                draw_text_c(screen, l, MENU_ITEMS[i], x + text_x, ty, 0, (SDL_Color){176, 176, 176, 255}, (SDL_Color){224, 224, 224, 255});
+                draw_text_c(screen, l, ui_string("menu", i, MENU_ITEMS[i]), x + text_x, ty, 0, (SDL_Color){176, 176, 176, 255}, (SDL_Color){224, 224, 224, 255});
             if (i != st->menu_item)
                 continue;
             SDL_Surface *arrow = skin_image(scene, "cursor_menu.png");
@@ -1042,7 +1068,12 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         active_font = menu_font_before;
         char msg[160];
         const char *nick = json_object_get_string(cur->summary, "nickname");
-        snprintf(msg, sizeof(msg), "%s is selected.", nick ? nick : cur->name);
+        const char *format = ui_string("selected", -1, "%s is selected.");
+        const char *mark = strstr(format, "%s");
+        if (mark)
+            snprintf(msg, sizeof(msg), "%.*s%s%s", (int)(mark - format), format, nick ? nick : cur->name, mark + 2);
+        else
+            snprintf(msg, sizeof(msg), "%s", format);
         draw_message(screen, scene, l, msg);
     }
     else if (st->message)

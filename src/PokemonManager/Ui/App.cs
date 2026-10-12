@@ -461,7 +461,8 @@ public sealed class App
             var position = _boxPositions.GetValueOrDefault(entry.Path, new SlotRef(0, 0));
             while (true)
             {
-                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ogFont, _nextFont, ActionsFor(entry));
+                var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ogFont, _nextFont, ActionsFor(entry),
+                    ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language);
                 _boxPositions[entry.Path] = position;
                 if (outcome == BoxViewer.Outcome.Back)
                     return;

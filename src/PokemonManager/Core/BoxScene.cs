@@ -25,7 +25,21 @@ public sealed class BoxScene(string assetDir)
     /// <summary>The box art and at least Emerald's PC/summary skin (res/box/ui/e) are in the pak.</summary>
     public bool AssetsPresent => File.Exists(Path.Combine(AssetDir, "cursor.png")) && File.Exists(Path.Combine(AssetDir, "ui", "e", "layout.json"));
 
-    public JsonObject Build(SaveFile sav, string title, SlotRef start, UiFont? font = null, UiFont? fallbackFont = null, Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null)
+    /// <param name="language">The game's language as the gallery names it (ENG, GER, JPN...; null: the save's).</param>
+    public JsonObject Build(SaveFile sav, string title, SlotRef start, UiFont? font = null, UiFont? fallbackFont = null,
+        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null, string? language = null)
+    {
+        // Names of Pokémon, moves, items and so on, and the screens' own words, in the game's language.
+        var code = UiStrings.Code(language, sav);
+        using var scope = UiStrings.Scope(code);
+        var scene = BuildScene(sav, title, start, font, fallbackFont, actions);
+        scene["language"] = code;
+        scene["strings"] = UiStrings.Json(code);
+        return scene;
+    }
+
+    private JsonObject BuildScene(SaveFile sav, string title, SlotRef start, UiFont? font, UiFont? fallbackFont,
+        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions)
     {
         var sets = ArtSets(sav);
         // Gen 3 Deoxys looks the way the game showing it draws it; LeafGreen's differs from FireRed's.
@@ -215,7 +229,7 @@ public sealed class BoxScene(string assetDir)
                 lines.Add((JsonNode)"Shiny");
         }
 
-        var name = pk.IsEgg ? "EGG" : pk.IsNicknamed ? pk.Nickname : Names.Species(pk.Species).ToUpperInvariant();
+        var name = pk.IsEgg ? UiStrings.EggName(pk.Format).ToUpperInvariant() : pk.IsNicknamed ? pk.Nickname : Names.Species(pk.Species).ToUpperInvariant();
         var slot = new JsonObject { ["name"] = name, ["lines"] = lines };
         if (Icon(pk, sets, leafGreen) is { } icon)
         {

@@ -333,8 +333,32 @@ def game_fonts(game, repo, target):
                     return [[0] * 8 for _ in range(16)]
             _font_sheet(target, name, count, 8, font.widths, rows)
             names.append(name)
+    names += japanese_fonts(repo, target)
     with open(os.path.join(target, "charmap.json"), "w", encoding="utf-8") as f:
         json.dump({"chars": cm.chars, "names": cm.names}, f, ensure_ascii=False)
+    return names
+
+
+def japanese_fonts(repo, target):
+    """The Japanese fonts Japanese games print with (jp_normal, jp_short, jp_small): 8x16 glyphs, 16 to a row, in
+    character-code order, each 8 pixels wide (GetGlyphWidth_* for isJapanese). The Latin and Japanese fonts share
+    the charmap: the same codes are accented letters in one and kana in the other. Short uses the normal glyphs."""
+    from pc_ui import gba
+    names = []
+    for name, png in (("jp_normal", "japanese_normal.png"), ("jp_short", "japanese_normal.png"), ("jp_small", "japanese_small.png")):
+        path = os.path.join(repo, "graphics", "fonts", png)
+        if not os.path.exists(path):  # Ruby/Sapphire's are named otherwise: Emerald's are the same glyphs
+            path = os.path.join(os.path.dirname(repo), "pokeemerald", "graphics", "fonts", png)
+        if not os.path.exists(path):
+            continue
+        w, h, data = gba.png_indices(path, 2)
+        count = (w // 8) * (h // 16)
+
+        def rows(g, data=data, w=w):
+            gx, gy = (g % (w // 8)) * 8, (g // (w // 8)) * 16
+            return [[data[(gy + y) * w + gx + x] for x in range(8)] for y in range(16)]
+        _font_sheet(target, name, count, 8, [8] * count, rows)
+        names.append(name)
     return names
 
 

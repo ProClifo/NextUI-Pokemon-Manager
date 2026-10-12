@@ -151,6 +151,19 @@ public sealed class BoxSceneTests : IDisposable
     }
 
     [Fact]
+    public void ScenesAreInTheGamesLanguage()
+    {
+        var sav = _saves.Create(GameVersion.E, "German.sav", language: LanguageID.German).Sav;
+        sav.SetBoxSlotAtIndex(TestSaves.Make(sav, Species.Treecko, 5), 0, 0);
+        var scene = _scene.Build(sav, "Smaragd", new SlotRef(0, 0), language: "GER");
+        Assert.Equal("de", (string?)scene["language"]);
+        Assert.Equal("BERICHT", (string?)scene["strings"]!["menu"]![1]);
+        Assert.Equal("GECKARBOR", (string?)scene["boxes"]![1]!["slots"]![0]!["summary"]!["species"]);
+        // and back to English afterwards
+        Assert.Equal("Treecko", Names.Species((ushort)Species.Treecko));
+    }
+
+    [Fact]
     public void PlatinumBoxesUseTheirOwnWallpaper()
     {
         var sav = _saves.Create(GameVersion.Pt, "Platinum.sav").Sav;

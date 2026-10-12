@@ -84,7 +84,7 @@ public static class BoxSummary
             summary["gender"] = pk.Gender == 0 ? "male" : "female";
         if (pk.IsEgg)
         {
-            summary["memo"] = "The EGG Watch\nIt looks like this EGG will\ntake a long time to hatch.";
+            summary["memo"] = UiStrings.EggMemo(UiStrings.Current);
             return summary;
         }
 
@@ -110,9 +110,9 @@ public static class BoxSummary
         summary["ability"] = gameBoy ? "" : Up(strings.abilitylist[pk.Ability]);
         summary["ability_desc"] = gameBoy ? "" : AbilityDescriptions.GetValueOrDefault(pk.Ability, "");
         summary["memo"] = gameBoy ? MemoGameBoy(pk) : Memo(pk, sav);
-        summary["item"] = pk.HeldItem > 0 ? Up(Names.Item(pk.HeldItem, pk.Context)) : "NONE";
+        summary["item"] = pk.HeldItem > 0 ? Up(Names.Item(pk.HeldItem, pk.Context)) : UiStrings.None(UiStrings.Current);
         int ribbons = RibbonCount(pk);
-        summary["ribbon"] = ribbons == 0 ? "NONE" : ribbons.ToString();
+        summary["ribbon"] = ribbons == 0 ? UiStrings.None(UiStrings.Current) : ribbons.ToString();
 
         // Box Pokémon keep no stats (and are healed): work them out as the game does when it shows them.
         var stats = pk.Clone();
@@ -283,7 +283,7 @@ public static class BoxSummary
         return place is null ? $"Met at Lv{{{crystal.MetLevel}}}." : $"Met at Lv{{{crystal.MetLevel}}},\n{{{place}}}.";
     }
 
-    private static string Name(PKM pk) => pk.IsEgg ? "EGG" : pk.IsNicknamed ? pk.Nickname : Up(Names.Species(pk.Species));
+    private static string Name(PKM pk) => pk.IsEgg ? Up(UiStrings.EggName(pk.Format)) : pk.IsNicknamed ? pk.Nickname : Up(Names.Species(pk.Species));
 
     private static string Up(string text) => text.ToUpperInvariant();
 
@@ -330,7 +330,10 @@ public static class BoxSummary
     };
 
     /// <summary>The type icon's file name: "psychic", "mystery" (???) ...</summary>
-    private static string TypeName(int type) => type < GameInfo.Strings.types.Length && GameInfo.Strings.types[type] is { } name
+    /// <summary>The type icon's file name (types/&lt;name&gt;.png): the English name, whatever the game's language.</summary>
+    private static string TypeName(int type) => type < English.types.Length && English.types[type] is { } name
         ? name is "???" ? "mystery" : name.ToLowerInvariant()
         : "mystery";
+
+    private static readonly GameStrings English = GameInfo.GetStrings("en");
 }

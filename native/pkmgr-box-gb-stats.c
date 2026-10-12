@@ -267,7 +267,7 @@ static void gb_stats_gen2(SDL_Surface *dst, Scene *scene, const Layout *l, GbSta
         // green: item and moves
         gb_print(dst, scene, l, "ITEM", 0, 8);
         const char *item = gb_str(s, "item");
-        gb_print(dst, scene, l, item[0] && strcmp(item, "NONE") != 0 ? item : "---", crystal ? 8 : 6, 8);
+        gb_print(dst, scene, l, item[0] && json_object_has_value(s, "item_icon") ? item : "---", crystal ? 8 : 6, 8);
         gb_print(dst, scene, l, "MOVE", 0, 10);
         for (int i = 0; i < 4; i++)
         {
