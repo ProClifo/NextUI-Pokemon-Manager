@@ -145,7 +145,8 @@ public sealed class MinUi : IUi
             "--title", title,
             "--write-location", output,
             "--write-value", "state",
-            "--confirm-text", "SELECT",
+            // with a second action button there's only room for "OPEN" (as on NextUI's main menu)
+            "--confirm-text", secondaryText is null ? "SELECT" : "OPEN",
             "--cancel-text", "BACK",
         ];
         background ??= Background;
@@ -161,7 +162,7 @@ public sealed class MinUi : IUi
             args = [.. args, "--action-button", "Y", "--action-text", actionText];
         if (actionText is not null && secondaryText is not null)
             args = [.. args, "--secondary-button", "SELECT", "--secondary-text", secondaryText];
-        args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK", actionText, secondaryText])];
+        args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "OPEN", "BACK", actionText, secondaryText])];
         int code = Run("minui-list", args);
         ActionPressed = code == ExitAction;
         SecondaryPressed = code == ExitSecondary;
