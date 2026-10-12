@@ -34,7 +34,7 @@ public sealed class Updater(string pakDir, string tempDir)
         }
     }
 
-    /// <summary>The newest published release and its zip for <paramref name="platform"/>.</summary>
+    /// <summary>The newest published release with a zip for <paramref name="platform"/>.</summary>
     public Release Latest(string platform)
     {
         var json = DownloadText($"https://api.github.com/repos/{Repository}/releases?per_page=10");
@@ -55,9 +55,11 @@ public sealed class Updater(string pakDir, string tempDir)
                     size = a.GetProperty("size").GetInt64();
                 }
             }
-            return new Release(tag, name, url, size);
+            // a release still being built (or one without this device's zip) isn't offered
+            if (url is not null)
+                return new Release(tag, name, url, size);
         }
-        throw new InvalidDataException("There are no releases yet.");
+        throw new InvalidDataException($"There are no releases for this device ({platform}) yet.");
     }
 
     /// <summary>
@@ -71,6 +73,7 @@ public sealed class Updater(string pakDir, string tempDir)
             throw new InvalidDataException($"{release.Tag} has no download for this device ({platform}).");
         Directory.CreateDirectory(tempDir);
         var zipPath = Path.Combine(tempDir, "update.zip");
+        var staging = Path.Combine(tempDir, "staging");
         try
         {
             Download(release.AssetUrl, zipPath);
@@ -81,7 +84,6 @@ public sealed class Updater(string pakDir, string tempDir)
                 throw new InvalidDataException("The download doesn't contain the pak.");
             // Everything is unpacked first (a full SD card or a bad zip stops here, changing nothing), then moved in.
             var root = Path.GetFullPath(pakDir);
-            var staging = Path.Combine(tempDir, "staging");
             if (Directory.Exists(staging))
                 Directory.Delete(staging, true);
             var moves = new List<(string From, string To)>();
@@ -99,12 +101,10 @@ public sealed class Updater(string pakDir, string tempDir)
             foreach (var (from, to) in moves)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(to)!);
-                // copy next to the old file, then rename over it: the running program's file can be replaced
-                var partial = to + ".new";
-                File.Copy(from, partial, overwrite: true);
-                File.Move(partial, to, overwrite: true);
+                // renamed over the old file (the staging folder is on the same card), so the running program's
+                // file can be replaced
+                File.Move(from, to, overwrite: true);
             }
-            Directory.Delete(staging, true);
             // Releases record their tag, but older ones didn't: noted here so the same update isn't offered again.
             File.WriteAllText(Path.Combine(root, "res", "release.txt"), release.Tag + "\n");
             return moves.Count;
@@ -114,8 +114,10 @@ public sealed class Updater(string pakDir, string tempDir)
             try
             {
                 File.Delete(zipPath);
+                if (Directory.Exists(staging))
+                    Directory.Delete(staging, true);
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
             }
         }

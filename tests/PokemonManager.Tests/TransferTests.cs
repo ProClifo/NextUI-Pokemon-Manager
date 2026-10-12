@@ -122,4 +122,29 @@ public sealed class TransferTests : IDisposable
         Assert.NotEqual(before, File.ReadAllBytes(em.Path));
         Assert.Equal(0x20000, new FileInfo(em.Path).Length);
     }
+
+    [Fact]
+    public void PruningKeepsOtherSavesBackups()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pkmgr-prune-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var library = new SaveLibrary(dir, backupsToKeep: 1);
+            Directory.CreateDirectory(dir);
+            var other = Path.Combine(dir, "X.gba.20240101-000000.sav");
+            File.WriteAllText(other, "other");
+            var save = Path.Combine(Path.GetTempPath(), $"pkmgr-{Guid.NewGuid():N}", "X.sav");
+            Directory.CreateDirectory(Path.GetDirectoryName(save)!);
+            File.WriteAllText(save, "x");
+            library.Backup(save);
+            library.Backup(save);
+            Assert.True(File.Exists(other));
+            Assert.Single(Directory.GetFiles(dir, "X.2*.sav"));
+            Directory.Delete(Path.GetDirectoryName(save)!, true);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
 }

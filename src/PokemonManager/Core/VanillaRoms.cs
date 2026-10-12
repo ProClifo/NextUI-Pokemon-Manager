@@ -110,7 +110,16 @@ internal static partial class VanillaRoms
             var key = $"{rom}|{info.Length}|{info.LastWriteTimeUtc.Ticks}";
             if (!_cache.TryGetValue(key, out var hit))
             {
-                hit = Hash(rom);
+                try
+                {
+                    hit = Hash(rom);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // a read error (the card busy, a file being copied) isn't remembered as "not official"
+                    Console.Error.WriteLine($"couldn't read {rom}: {ex.Message}");
+                    return null;
+                }
                 _cache[key] = hit;
                 SaveCache();
             }
@@ -144,8 +153,9 @@ internal static partial class VanillaRoms
                 using var file = File.OpenRead(rom);
                 return HashStream(file, file.Length, padDs: rom.EndsWith(".nds", StringComparison.OrdinalIgnoreCase));
             }
-            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+            catch (InvalidDataException)
             {
+                // a broken zip: not an official ROM
                 return null;
             }
         }

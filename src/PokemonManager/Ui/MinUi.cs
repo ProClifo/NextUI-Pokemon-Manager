@@ -155,8 +155,9 @@ public sealed class MinUi : IUi
         args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK", actionText])];
         int code = Run("minui-list", args);
         ActionPressed = code == ExitAction;
-        // Killed by a signal: .NET reports 128 + the signal number (139 = SIGSEGV).
-        crashed = code > 128;
+        // Killed by a signal: .NET reports 128 + the signal number (139 = SIGSEGV). SIGINT and SIGTERM (130, 143)
+        // are the device shutting down or the launcher closing the pak, not a crash.
+        crashed = code > 128 && code is not (130 or 143);
         if (crashed)
             Console.Error.WriteLine($"minui-list crashed (exit {code}); reopening the list.");
         if ((code != ExitSelected && !ActionPressed) || !File.Exists(output))

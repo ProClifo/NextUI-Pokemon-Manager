@@ -25,7 +25,7 @@ public sealed class App
     /// <summary>Saves left off the main menu, and why.</summary>
     private List<(SaveEntry Save, string Reason)> _hidden = [];
     private SaveNames? _saveNames;
-    private SaveNames SavedNames => _saveNames ??= new SaveNames(_paths.SaveNamesFile);
+    private SaveNames SavedNames => _saveNames ??= new SaveNames(_paths.SaveNamesFile, _paths.SdRoot);
     private VanillaRoms.Index? _romIndex;
     private readonly GameBackgrounds _backgrounds;
     private readonly (int Width, int Height)? _screen =
@@ -216,7 +216,17 @@ public sealed class App
             {
                 // Y: a name of the player's own (an empty one brings back the game's name)
                 if (_ui.Keyboard("Rename save", SaveName(saves[c])) is { } name)
-                    SavedNames.Set(saves[c].Path, name == GameName(saves[c]) ? null : name);
+                {
+                    try
+                    {
+                        SavedNames.Set(saves[c].Path, name == GameName(saves[c]) ? null : name);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        Console.Error.WriteLine($"couldn't save the name: {ex}");
+                        _ui.Message($"Couldn't save the name.\n{ex.Message}");
+                    }
+                }
                 continue;
             }
             Console.Error.WriteLine($"opening {_hidden[c].Save.FileName}, not listed: {_hidden[c].Reason}");

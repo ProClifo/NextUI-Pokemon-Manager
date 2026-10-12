@@ -112,8 +112,11 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 20)
     {
         if (backupsToKeep <= 0)
             return;
+        // only this save's own backups: "X.sav" mustn't take "X.gba.<stamp>.sav"'s
+        var own = new System.Text.RegularExpressions.Regex(
+            $@"^{System.Text.RegularExpressions.Regex.Escape(name)}\.\d{{8}}-\d{{6}}(-\d+)?{System.Text.RegularExpressions.Regex.Escape(ext)}$");
         var old = Directory.GetFiles(BackupDir, $"{name}.*{ext}")
-            .Where(f => System.IO.Path.GetFileName(f).Length > name.Length + 1)
+            .Where(f => own.IsMatch(System.IO.Path.GetFileName(f)))
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .Skip(backupsToKeep);
         foreach (var f in old)
