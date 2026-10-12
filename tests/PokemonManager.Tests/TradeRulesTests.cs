@@ -104,6 +104,19 @@ public sealed class TradeRulesTests : IDisposable
     }
 
     [Fact]
+    public void TheTimeCapsuleWontSendGen2Moves()
+    {
+        var red = (SAV1)Save(GameVersion.RD);
+        var crystal = (SAV2)Save(GameVersion.C);
+        red.SetEventFlag(37, true);
+        var pk = TestSaves.Make(crystal, Species.Pikachu, 10);
+        pk.SetMove(0, (ushort)Move.ThunderShock);
+        Assert.True(TradeRules.CheckTransfer(pk, crystal, red).Ok);
+        pk.SetMove(1, (ushort)Move.MudSlap);
+        Assert.Contains("Mud-Slap", TradeRules.CheckTransfer(pk, crystal, red).Message);
+    }
+
+    [Fact]
     public void GameBoyLinkRoomsOpenWithTheStory()
     {
         var red = (SAV1)Save(GameVersion.RD);

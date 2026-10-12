@@ -64,7 +64,7 @@ public static class TradeRules
             return route;
         return (source.Generation, dest.Generation) switch
         {
-            ( <= 2, <= 2) => GameBoyLink(source, dest),
+            ( <= 2, <= 2) => GameBoyLink(pk, source, dest),
             (3, 3) => Gen3Trade(pk, source, dest),
             (3, 4) => PalPark(dest, sourceLanguage, destLanguage),
             (_, 5) when source.Generation < 5 => PokeTransfer(dest),
@@ -151,8 +151,17 @@ public static class TradeRules
     }
 
     /// <summary>Gen 1/2 trades (Cable Club / Trade Center) and Gen 1 &lt;-&gt; Gen 2 (Time Capsule).</summary>
-    private static OpResult GameBoyLink(SaveFile source, SaveFile dest)
+    private static OpResult GameBoyLink(PKM pk, SaveFile source, SaveFile dest)
     {
+        // The Time Capsule won't send a Pokémon knowing a move Gen 1 doesn't have (past Struggle, 165).
+        if (dest.Generation == 1 && source.Generation == 2)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                if (pk.GetMove(i) is var move and > 165)
+                    return OpResult.Fail($"{Names.Species(pk)} knows {Names.Move(move)}, which {Names.Game(dest)} doesn't have: the Time Capsule won't send it.");
+            }
+        }
         bool timeCapsule = source.Generation != dest.Generation;
         foreach (var sav in new[] { source, dest })
         {

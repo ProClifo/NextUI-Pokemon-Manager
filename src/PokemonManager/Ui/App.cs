@@ -615,12 +615,13 @@ public sealed class App
     private Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)> ActionsFor(SaveEntry entry)
     {
         var others = GetSaves().Where(s => s.Path != entry.Path).ToList();
-        var accepted = new Dictionary<(ushort, byte, bool, bool, int, GameVersion), bool>();
+        var accepted = new Dictionary<(ushort, byte, bool, bool, int, GameVersion, (ushort, ushort, ushort, ushort)), bool>();
         var partners = new Dictionary<ushort, bool>(); // Karrablast/Shelmet: is the other one in some save?
         return slot =>
         {
             var pk = slot.Get(entry.Sav);
-            var key = (pk.Species, pk.Form, pk.IsEgg, pk.FatefulEncounter, pk.HeldItem, pk.Version);
+            // moves too: HMs block Pal Park and Poké Transfer, Gen 2 moves the Time Capsule
+            var key = (pk.Species, pk.Form, pk.IsEgg, pk.FatefulEncounter, pk.HeldItem, pk.Version, (pk.Move1, pk.Move2, pk.Move3, pk.Move4));
             if (!accepted.TryGetValue(key, out bool anywhere))
                 accepted[key] = anywhere = others.Any(s => CanTransferTo(entry, slot, s));
             var move = TransferService.CanMove(entry.Sav, slot);
@@ -923,16 +924,26 @@ public sealed class App
             _ui.Message(result.Message);
             return false;
         }
-        // Write the partner's save first: if this one then fails, the two Pokémon are duplicated, not lost.
-        if (!TryWrite(partner.Save, out _))
+        // A swap: if the second write fails, the partner's save is put back from its backup, or its Pokémon is lost.
+        if (!TryWrite(partner.Save, out var partnerBackup))
         {
             entry.Reload();
             return false;
         }
         if (!TryWrite(entry, out _))
         {
-            _ui.Message("The trade was saved in the other game, but this save couldn't be updated.");
-            return true;
+            try
+            {
+                File.Copy(partnerBackup, partner.Save.Path, overwrite: true);
+                partner.Save.Reload();
+                _ui.Message($"The trade was undone: {SaveName(partner.Save)} was put back as it was.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"couldn't restore {partner.Save.Path}: {ex}");
+                _ui.Message($"The trade was saved in {SaveName(partner.Save)} but not in this game.\nRestore {partner.Save.FileName} from PokemonManager/Backups/{Path.GetFileName(partnerBackup)}.");
+            }
+            return false;
         }
         _ui.Message($"{result.Message}\n\nBackups were saved to PokemonManager/Backups.\n{SaveStateWarning}");
         return true;
@@ -1458,14 +1469,6 @@ public sealed class App
         try
         {
             backup = _library.Write(entry);
-            if (_settings.SaveStateDeletion && _paths.SdRoot is { } sd)
-            {
-                // Resuming the game would load a state from before this change and undo it.
-                foreach (var rom in RomIndex.FindRoms(entry.Path))
-                    foreach (var root in _paths.RomRoots)
-                        SaveStates.DeleteSelected(sd, root, rom);
-            }
-            return true;
         }
         catch (Exception ex)
         {
@@ -1473,6 +1476,23 @@ public sealed class App
             _ui.Message($"Couldn't write {entry.FileName}: {ex.Message}\nNothing was changed.");
             return false;
         }
+        // The save is written now: a failure past here mustn't report it as unchanged.
+        if (_settings.SaveStateDeletion && _paths.SdRoot is { } sd)
+        {
+            try
+            {
+                // Resuming the game would load a state from before this change and undo it.
+                foreach (var rom in RomIndex.FindRoms(entry.Path))
+                    foreach (var root in _paths.RomRoots)
+                        SaveStates.DeleteSelected(sd, root, rom);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"couldn't delete the save state for {entry.FileName}: {ex}");
+                _ui.Message($"{entry.FileName} was saved, but its save state couldn't be deleted: don't resume it, or the change is undone.");
+            }
+        }
+        return true;
     }
 
     private const string HelpText =
