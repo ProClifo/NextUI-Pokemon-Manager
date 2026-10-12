@@ -156,6 +156,45 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         => scene.Icon(pk, BoxScene.ArtSets(sav), sav is SAV3FRLG { Version: GameVersion.LG }) is { } icon && File.Exists(icon.Sheet)
             ? icon with { H = 32 } : null;
 
+    /// <summary>
+    /// <paramref name="background"/> (or black) with the Pokémon's front sprite above the middle, for a message
+    /// screen's background ("Inject …?"); null when the viewer or the sprite isn't there.
+    /// </summary>
+    public string? SpriteBackground(SaveFile sav, PKM pk, string? background)
+    {
+        if (FindOnPath(Tool) is null || scene.Sprite(pk, BoxScene.ArtSets(sav), sav is SAV3FRLG { Version: GameVersion.LG }) is not { } sprite
+            || !File.Exists(sprite.Sheet))
+            return null;
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            var output = Path.Combine(tempDir, "sprite-background.bmp");
+            File.Delete(output);
+            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var arg in new[] { "--compose", output, "--sprite", sprite.Sheet, "--sprite-rect", $"{sprite.X},{sprite.Y},{sprite.W},{sprite.H}" })
+                psi.ArgumentList.Add(arg);
+            if (background is not null && File.Exists(background))
+            {
+                psi.ArgumentList.Add("--background");
+                psi.ArgumentList.Add(background);
+            }
+            using var p = Process.Start(psi);
+            if (p is null)
+                return null;
+            p.StandardOutput.ReadToEnd();
+            var error = p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            if (p.ExitCode == 0 && File.Exists(output))
+                return output;
+            Console.Error.WriteLine($"pkmgr-box --compose failed ({p.ExitCode}): {error.Trim()}");
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
+        {
+            Console.Error.WriteLine($"pkmgr-box --compose failed: {ex.Message}");
+        }
+        return null;
+    }
+
     public bool HasCard(SaveFile sav) => FindOnPath(Tool) is not null && TrainerCard.Available(sav, scene.Skin(sav));
 
     /// <summary>

@@ -1434,7 +1434,19 @@ public sealed class App
             _ui.Message(target.Message);
             return;
         }
-        if (!_ui.Confirm(Names.InjectQuestion(pk, sav)))
+        // the Pokémon's sprite above the question, over the game's background
+        var background = _ui.Background;
+        _ui.Background = _boxViewer.SpriteBackground(sav, pk, background) ?? background;
+        bool inject;
+        try
+        {
+            inject = _ui.Confirm(Names.InjectQuestion(pk, sav));
+        }
+        finally
+        {
+            _ui.Background = background;
+        }
+        if (!inject)
             return;
         slot.Set(sav, pk);
         if (TryWrite(entry, out _))

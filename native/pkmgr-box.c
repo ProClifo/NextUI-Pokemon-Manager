@@ -1611,6 +1611,43 @@ static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, 
 #include "pkmgr-box-clock.c"
 #include "pkmgr-box-card.c"
 
+// --compose out.bmp [--background bg.png] --sprite sheet.png --sprite-rect x,y,w,h: the menu background with the
+// Pokémon's sprite (a whole number of times its size) above the middle, where a message is printed under it, for
+// minui-presenter's background (the "Inject ...?" question). BMP, which every SDL can write and read.
+static int compose_run(const char *out, const char *background, const char *sprite_path, const char *rect_text)
+{
+    SDL_Surface *bg = background ? IMG_Load(background) : NULL;
+    int w = bg ? bg->w : 640, h = bg ? bg->h : 480;
+    SDL_Surface *canvas = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_RGBA32);
+    if (canvas == NULL)
+        return EXIT_ERROR;
+    SDL_FillRect(canvas, NULL, SDL_MapRGBA(canvas->format, 0, 0, 0, 255));
+    if (bg)
+    {
+        SDL_SetSurfaceBlendMode(bg, SDL_BLENDMODE_NONE);
+        SDL_BlitSurface(bg, NULL, canvas, NULL);
+        SDL_FreeSurface(bg);
+    }
+    SDL_Surface *sheet = sprite_path ? IMG_Load(sprite_path) : NULL;
+    SDL_Rect r = {0, 0, 0, 0};
+    if (sheet && rect_text && sscanf(rect_text, "%d,%d,%d,%d", &r.x, &r.y, &r.w, &r.h) == 4 && r.w > 0 && r.h > 0)
+    {
+        int k = h / 3 / r.h;
+        if (k < 1)
+            k = 1;
+        SDL_Rect d = {(w - r.w * k) / 2, h * 9 / 20 - r.h * k, r.w * k, r.h * k};
+        if (d.y < 0)
+            d.y = 0;
+        SDL_SetSurfaceBlendMode(sheet, SDL_BLENDMODE_BLEND);
+        SDL_BlitScaled(sheet, &r, canvas, &d);
+    }
+    if (sheet)
+        SDL_FreeSurface(sheet);
+    int ok = SDL_SaveBMP(canvas, out) == 0;
+    SDL_FreeSurface(canvas);
+    return ok ? EXIT_PICKED : EXIT_ERROR;
+}
+
 int main(int argc, char *argv[])
 {
     const char *scene_path = NULL;
@@ -1618,6 +1655,7 @@ int main(int argc, char *argv[])
     const char *screenshot = NULL;
     const char *state_name = "box";
     const char *clock = NULL, *font_path = NULL, *background = NULL, *card = NULL;
+    const char *compose = NULL, *sprite = NULL, *sprite_rect = NULL;
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "--clock") == 0 && i + 1 < argc)
@@ -1636,7 +1674,15 @@ int main(int argc, char *argv[])
             screenshot = argv[++i];
         else if (strcmp(argv[i], "--state") == 0 && i + 1 < argc)
             state_name = argv[++i];
+        else if (strcmp(argv[i], "--compose") == 0 && i + 1 < argc)
+            compose = argv[++i];
+        else if (strcmp(argv[i], "--sprite") == 0 && i + 1 < argc)
+            sprite = argv[++i];
+        else if (strcmp(argv[i], "--sprite-rect") == 0 && i + 1 < argc)
+            sprite_rect = argv[++i];
     }
+    if (compose)
+        return compose_run(compose, background, sprite, sprite_rect);
     if (clock)
         return clock_run(clock, font_path, background, write_location, screenshot);
     if (card)
