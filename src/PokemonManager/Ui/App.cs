@@ -256,6 +256,8 @@ public sealed class App
         // ...over the game's title art, which stays behind its sub-menus and messages (not Pokémon storage).
         var previousBackground = _ui.Background;
         _ui.Background = BackgroundFor(entry);
+        // ...and with the game's BUTTON MODE: L=A, L works as A in them
+        _ui.LIsA = BoxScene.LIsA(entry.Sav);
         try
         {
             SaveMenuLoop(entry);
@@ -264,6 +266,7 @@ public sealed class App
         {
             _ui.Font = previousFont;
             _ui.Background = previousBackground;
+            _ui.LIsA = false;
         }
     }
 
@@ -943,7 +946,7 @@ public sealed class App
             option = options[pick.Value];
         }
 
-        if (!confirmed && !_ui.Confirm($"Evolve {pk.Nickname}?", "YES", "NO"))
+        if (!confirmed && !_ui.Confirm(UiStrings.EvolveQuestion(UiStrings.Code(ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, entry.Sav), pk.Nickname), "YES", "NO"))
             return false;
 
         var nickname = pk.Nickname;
@@ -960,14 +963,9 @@ public sealed class App
         // the species as the game writes it (KADABRA in Gen 1-4, Kadabra in Gen 5)
         var evolvedPk = slot.Get(entry.Sav);
         var species = SpeciesName.GetSpeciesNameGeneration(evolvedPk.Species, evolvedPk.Language, entry.Sav.Generation);
-        // each game's own words and line breaks ("\f" a new page): pokered _EvolvedText/_IntoText, pokecrystal
-        // _CongratulationsYourPokemonText/_EvolvedIntoText, pokeemerald/pokeplatinum gText_CongratsPkmnEvolved
-        evolvedText = entry.Sav.Generation switch
-        {
-            1 => $"{nickname} evolved\ninto {species}!",
-            2 => $"Congratulations!\nYour {nickname}\fevolved into\n{species}!",
-            _ => $"Congratulations! Your {nickname}\nevolved into {species}!",
-        };
+        // each game's own words and line breaks, in the save's language ("\f" a new page)
+        var code = UiStrings.Code(ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, entry.Sav);
+        evolvedText = UiStrings.Evolved(code, entry.Sav.Generation, nickname, species);
         if (!confirmed)
             _ui.Message(evolvedText.Replace("\f", "\n"));
         return false;

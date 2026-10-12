@@ -54,6 +54,8 @@ public sealed class MinUi : IUi
 
     public string? Background { get; set; }
 
+    public bool LIsA { get; set; }
+
     /// <summary>minui-presenter's background option, when a background is set.</summary>
     private string[] MessageBackground() => Background is { } b && File.Exists(b) ? ["--background-image", b] : [];
 
@@ -160,6 +162,8 @@ public sealed class MinUi : IUi
             args = [.. args, "--title-image-rect", $"{r.X},{r.Y},{r.W},{r.H}"];
         if (actionText is not null)
             args = [.. args, "--action-button", "Y", "--action-text", actionText];
+        if (LIsA)
+            args = [.. args, "--l-is-a"];
         if (actionText is not null && secondaryText is not null)
             args = [.. args, "--secondary-button", "SELECT", "--secondary-text", secondaryText];
         args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "OPEN", "BACK", actionText, secondaryText, confirmText])];
@@ -380,6 +384,8 @@ public sealed class ConsoleUi : IUi
 {
     public UiFont? Font { get; set; }
     public string? Background { get; set; }
+
+    public bool LIsA { get; set; }
 
     public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null, string? confirmText = null)
     {

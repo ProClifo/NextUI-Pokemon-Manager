@@ -14,6 +14,9 @@ public interface IUi
     /// <summary>The background drawn behind lists and messages that don't name their own (a game's title art in its menus).</summary>
     string? Background { get; set; }
 
+    /// <summary>L works as A in lists (the game's BUTTON MODE: L=A, while its menus are open).</summary>
+    bool LIsA { get; set; }
+
     /// <summary>
     /// Shows a list and returns the chosen index, or null when the user backs out. The optional
     /// background image is drawn behind the list where the UI supports it, and <paramref name="tags"/>

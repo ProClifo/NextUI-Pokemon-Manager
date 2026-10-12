@@ -256,4 +256,19 @@ public sealed class BoxSceneTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, "");
     }
+
+    [Fact]
+    public void ButtonModeLIsAIsReadFromTheSave()
+    {
+        var sav = (SAV3)_saves.Create(GameVersion.E, "lisa.sav").Sav;
+        Assert.False(BoxScene.LIsA(sav));
+        sav.Small[0x13] = 2; // OPTION > BUTTON MODE: L=A
+        Assert.True(BoxScene.LIsA(sav));
+        Assert.True((bool?)_scene.Build(sav, "", new SlotRef(0, 0))["l_is_a"]);
+
+        var pt = (SAV4)_saves.Create(GameVersion.Pt, "lisa-pt.sav").Sav;
+        Assert.False(BoxScene.LIsA(pt));
+        pt.General[0x65] = (byte)((pt.General[0x65] & ~0x03) | 2); // buttonMode, bits 8-9
+        Assert.True(BoxScene.LIsA(pt));
+    }
 }

@@ -1674,6 +1674,7 @@ int main(int argc, char *argv[])
         scene.box = 1;
         scene.slot = 0;
     }
+    bool l_is_a = json_object_get_boolean(json_value_get_object(scene.root), "l_is_a") == 1;
     // Back from an evolution: its screen first, then the box (or party) as it was
     const char *evolved = json_object_get_string(json_value_get_object(scene.root), "evolved");
     if (evolved && evolved[0])
@@ -1726,6 +1727,12 @@ int main(int argc, char *argv[])
         int dy = PAD_justRepeated(BTN_UP) ? -1 : PAD_justRepeated(BTN_DOWN) ? 1 : 0;
         bool a = PAD_justReleased(BTN_A), b = PAD_justReleased(BTN_B);
         bool l1 = PAD_justRepeated(BTN_L1), r1 = PAD_justRepeated(BTN_R1);
+        if (l_is_a)
+        {
+            // the game's BUTTON MODE: L=A
+            a = a || PAD_justReleased(BTN_L1);
+            l1 = false;
+        }
         if (dx || dy || a || b || l1 || r1)
             dirty = 1;
 

@@ -68,6 +68,8 @@ public sealed class BoxScene(string assetDir)
             ["boxes"] = boxes,
             ["skin"] = Skin(sav),
         };
+        if (LIsA(sav))
+            scene["l_is_a"] = true;
         // The PC's windows in the frame picked in the game's options
         var (menuFrame, messageFrame) = WindowFrames(sav);
         if (menuFrame is not null)
@@ -176,6 +178,17 @@ public sealed class BoxScene(string assetDir)
                 return (null, null);
         }
     }
+
+    /// <summary>
+    /// Whether the game's BUTTON MODE is L=A: Gen 3's optionsButtonMode (SaveBlock2 byte 0x13,
+    /// OPTIONS_BUTTON_MODE_L_EQUALS_A = 2), Gen 4's Options.buttonMode (bits 8-9, OPTIONS_BUTTON_MODE_L_IS_A = 2).
+    /// </summary>
+    public static bool LIsA(SaveFile sav) => sav switch
+    {
+        SAV3 s3 => s3.Small.Length > 0x13 && s3.Small[0x13] == 2,
+        SAV4 s4 => Options4(s4) is { } options && ((options >> 8) & 3) == 2,
+        _ => false,
+    };
 
     /// <summary>The Gen 4 Options u16 (PlayerSave.options, 4 bytes before the trainer's name).</summary>
     internal static int? Options4(SAV4 sav)

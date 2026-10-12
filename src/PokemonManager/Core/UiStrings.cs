@@ -31,6 +31,66 @@ public static class UiStrings
             "알의 상태\n태어나려면 아직\n시간이 많이 걸릴 것 같다"),
     };
 
+    /// <summary>
+    /// The evolution's words: the viewer's "Evolve {0}?" with YES / NO, and the message after it ({0} the
+    /// nickname, {1} the new species; "\n" a new line, "\f" a new page). English follows each game's text
+    /// (pokered _EvolvedText/_IntoText, pokecrystal _CongratulationsYourPokemonText/_EvolvedIntoText,
+    /// pokeemerald and pokeplatinum gText_CongratsPkmnEvolved); the other languages say the same, broken the
+    /// same way.
+    /// </summary>
+    private sealed record EvolveWords(string Question, string Yes, string No, string Evolved, string? Gen1 = null, string? Gen2 = null);
+
+    private static readonly Dictionary<string, EvolveWords> Evolution = new()
+    {
+        ["en"] = new("Evolve {0}?", "YES", "NO", "Congratulations! Your {0}\nevolved into {1}!",
+            "{0} evolved\ninto {1}!", "Congratulations!\nYour {0}\fevolved into\n{1}!"),
+        ["fr"] = new("Faire évoluer {0} ?", "OUI", "NON", "Félicitations ! Votre {0}\na évolué en {1} !",
+            "{0} a évolué\nen {1} !", "Félicitations !\nVotre {0}\fa évolué en\n{1} !"),
+        ["de"] = new("{0} entwickeln?", "JA", "NEIN", "Glückwunsch! Dein {0}\nhat sich zu {1} entwickelt!",
+            "{0} hat sich zu\n{1} entwickelt!", "Glückwunsch!\nDein {0}\fhat sich zu\n{1} entwickelt!"),
+        ["it"] = new("Far evolvere {0}?", "SÌ", "NO", "Congratulazioni! Il tuo {0}\nsi è evoluto in {1}!",
+            "{0} si è\nevoluto in {1}!", "Congratulazioni!\nIl tuo {0}\fsi è evoluto\nin {1}!"),
+        ["es"] = new("¿Hacer evolucionar a {0}?", "SÍ", "NO", "¡Enhorabuena! ¡Tu {0}\nha evolucionado a {1}!",
+            "¡{0} ha evolucionado\na {1}!", "¡Enhorabuena!\n¡Tu {0}\fha evolucionado\na {1}!"),
+        ["ja"] = new("{0}を しんかさせますか？", "はい", "いいえ", "おめでとう！ {0}は\n{1}に しんかした！"),
+        ["ko"] = new("{0}|진화시키겠습니까?", "예", "아니오", "축하합니다! {0}|\n{1}|진화했다!"),
+    };
+
+    private static EvolveWords EvolutionFor(string code) => Evolution.TryGetValue(code, out var w) ? w : Evolution["en"];
+
+    /// <summary>The message after an evolution, in the language and the generation's own form.</summary>
+    public static string Evolved(string code, int generation, string nickname, string species)
+    {
+        var w = EvolutionFor(code);
+        var format = generation switch { 1 => w.Gen1, 2 => w.Gen2, _ => null } ?? w.Evolved;
+        return Korean(string.Format(format, nickname, species));
+    }
+
+    /// <summary>"Evolve {0}?", the viewer's question before an evolution.</summary>
+    public static string EvolveQuestion(string code, string nickname) => Korean(string.Format(EvolutionFor(code).Question, nickname));
+
+    // Korean particles: "|" before a verb ending stands for 을/를 or 으로/로 after the name, picked by whether its
+    // last syllable has a final consonant.
+    private static string Korean(string text)
+    {
+        if (!text.Contains('|'))
+            return text;
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < text.Length; i++)
+        {
+            if (text[i] != '|')
+            {
+                sb.Append(text[i]);
+                continue;
+            }
+            char last = sb.Length > 0 ? sb[^1] : ' ';
+            bool batchim = last is >= '가' and <= '힣' && (last - '가') % 28 != 0;
+            var rest = text[(i + 1)..];
+            sb.Append(rest.StartsWith('\n') ? (batchim ? "은" : "는") : rest.StartsWith("진화했") ? (batchim ? "으로 " : "로 ") : (batchim ? "을 " : "를 "));
+        }
+        return sb.ToString();
+    }
+
     /// <summary>PKHeX's language code for a gallery language (ENG, GER, JPN...), else the save's own.</summary>
     public static string Code(string? language, SaveFile sav) => language switch
     {
@@ -65,6 +125,8 @@ public static class UiStrings
             ["gb_menu"] = new JsonArray(w.Transfer, w.Stats, w.Evolve, w.Cancel),
             ["cancel"] = w.Cancel,
             ["selected"] = w.Selected.Replace("{0}", "%s"),
+            ["evolve_question"] = EvolutionFor(code).Question.Replace("{0}", "%s"),
+            ["yes_no"] = new JsonArray(EvolutionFor(code).Yes, EvolutionFor(code).No),
         };
     }
 
