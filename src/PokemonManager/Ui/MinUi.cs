@@ -39,6 +39,16 @@ public sealed class MinUi : IUi
     }
 
     /// <summary>The icon for a Legal/Illegal tag at this UI scale, if the pak has it.</summary>
+    /// <summary>The "✅ Legal" / "☠️ Illegal" thumbnail (scripts/build-icons.py), when the pak has it.</summary>
+    private string? LabelIcon(string tag)
+    {
+        var name = tag switch { "Legal" => "legal", "Illegal" => "illegal", _ => null };
+        if (name is null || _iconsDir is null)
+            return null;
+        var path = Path.Combine(_iconsDir, $"{name}-label-{_scale}x.png");
+        return File.Exists(path) ? path : null;
+    }
+
     private string? TagIcon(string tag)
     {
         var name = tag switch { "Legal" => "legal", "Illegal" => "illegal", _ => null };
@@ -97,7 +107,12 @@ public sealed class MinUi : IUi
         for (int i = 0; i < items.Count; i++)
         {
             var row = new JsonObject { ["name"] = string.IsNullOrWhiteSpace(items[i]) ? "-" : items[i] };
-            if (tags is not null && i < tags.Count && tags[i] is { Length: > 0 } tag)
+            if (images is null && tags is not null && i < tags.Count && tags[i] is { Length: > 0 } legal && LabelIcon(legal) is { } label)
+            {
+                // Legal / Illegal: a "✅ Legal" thumbnail at the right of every item, outside the highlight
+                row["features"] = new JsonObject { ["images"] = new JsonObject { ["default"] = label } };
+            }
+            else if (tags is not null && i < tags.Count && tags[i] is { Length: > 0 } tag)
             {
                 // A single option is drawn right-aligned (on the highlighted row only, see below), with its icon
                 // (✅ or ☠️, which the fonts don't have) just left of it; show_confirm keeps A selecting the item.
@@ -154,7 +169,7 @@ public sealed class MinUi : IUi
         background ??= Background;
         if (background is not null && File.Exists(background))
             args = [.. args, "--background-image", background];
-        if (images is null && tags is not null && tags.Any(t => t is { Length: > 0 }))
+        if (images is null && tags is not null && tags.Any(t => t is { Length: > 0 } && LabelIcon(t) is null))
             args = [.. args, "--options-selected-only"];
         if (titleImaged)
             args = [.. args, "--title-image", titleImage!];
