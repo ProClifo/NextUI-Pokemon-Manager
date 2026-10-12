@@ -19,7 +19,7 @@ public static class UiStrings
             "The EGG Watch\nIt looks like this EGG will\ntake a long time to hatch."),
         ["fr"] = new("TRANSFÉRER", "RÉSUMÉ", "STATS", "ÉVOLUER", "ANNULER", "{0} est sélectionné.", "AUCUN",
             "Observation de l'ŒUF\nOn dirait que cet ŒUF va\nmettre du temps à éclore."),
-        ["de"] = new("TRANSFER", "BERICHT", "STATUS", "ENTWICKELN", "ZURÜCK", "{0} ist ausgewählt.", "KEINS",
+        ["de"] = new("SENDEN", "BERICHT", "STATUS", "ENTWICKELN", "ZURÜCK", "{0} ist ausgewählt.", "KEINS",
             "EI-Beobachtung\nEs sieht so aus, als würde es\nnoch lange dauern."),
         ["it"] = new("TRASFERISCI", "SOMMARIO", "STATISTICHE", "EVOLVI", "ESCI", "Hai scelto {0}.", "NESSUNO",
             "Osservazione UOVO\nSembra che quest'UOVO\nci metterà molto a schiudersi."),
