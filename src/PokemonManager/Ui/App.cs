@@ -878,12 +878,17 @@ public sealed class App
             .SelectMany(rom => _paths.RomRoots.Select(root => (rom, root)))
             .Where(r => SaveStates.HasSelected(sd, r.root, r.rom))
             .ToList();
-        if (states.Count == 0)
+        bool draStic = entry.Sav.Generation >= 4 && SaveStates.HasDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"));
+        if (states.Count == 0 && !draStic)
             return;
         if (_ui.Confirm($"{Names.Game(entry.Sav)} has a save state it would resume from, which keeps the old clock.\n" +
                 "Delete it so the game starts from its save with the new time?", "DELETE", "KEEP"))
+        {
             foreach (var (rom, root) in states)
                 SaveStates.DeleteSelected(sd, root, rom);
+            if (draStic)
+                SaveStates.DeleteDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"));
+        }
     }
 
     private void SetClock(SaveEntry entry, string? rtcPath, int weekday, int hour, int minute)
@@ -1546,6 +1551,9 @@ public sealed class App
                 foreach (var rom in RomIndex.FindRoms(entry.Path))
                     foreach (var root in _paths.RomRoots)
                         SaveStates.DeleteSelected(sd, root, rom);
+                // the DS pak's DraStic keeps its own auto save state
+                if (entry.Sav.Generation >= 4)
+                    SaveStates.DeleteDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"));
             }
             catch (Exception ex)
             {

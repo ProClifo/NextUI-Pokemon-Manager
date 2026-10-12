@@ -64,6 +64,60 @@ public static class SaveStates
         return doomed;
     }
 
+    /// <summary>
+    /// The DS pak's (NDS.pak, DraStic) auto save state, which DraStic loads when the game starts: in
+    /// .userdata/shared/NDS-advanced-drastic, named "&lt;game&gt;_&lt;slot&gt;.dss" after the save ("&lt;game&gt;.dsv"), the
+    /// slot being drastic.cfg's autosavestate_slot (10 unless changed). Returns how many files were deleted.
+    /// </summary>
+    public static int DeleteDraSticAuto(string sdRoot, string savePath, string? platform)
+    {
+        var file = DraSticAuto(sdRoot, savePath, platform);
+        if (file is null || !File.Exists(file))
+            return 0;
+        try
+        {
+            File.Delete(file);
+            return 1;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine($"Couldn't delete {file}: {ex.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>Whether DraStic would resume the game from its auto save state.</summary>
+    public static bool HasDraSticAuto(string sdRoot, string savePath, string? platform)
+        => DraSticAuto(sdRoot, savePath, platform) is { } file && File.Exists(file);
+
+    private static string? DraSticAuto(string sdRoot, string savePath, string? platform)
+    {
+        if (!savePath.EndsWith(".dsv", StringComparison.OrdinalIgnoreCase) && !savePath.EndsWith(".sav", StringComparison.OrdinalIgnoreCase))
+            return null;
+        int slot = 10;
+        if (platform is not null)
+        {
+            var cfg = Path.Combine(sdRoot, "Emus", platform, "NDS.pak", "drastic", "config", "drastic.cfg");
+            try
+            {
+                if (File.Exists(cfg))
+                {
+                    foreach (var line in File.ReadLines(cfg))
+                    {
+                        var parts = line.Split('=', 2);
+                        if (parts.Length == 2 && parts[0].Trim() == "autosavestate_slot" && int.TryParse(parts[1].Trim(), out var s))
+                            slot = s;
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+        var game = Path.GetFileNameWithoutExtension(savePath);
+        return Path.Combine(sdRoot, ".userdata", "shared", "NDS-advanced-drastic", $"{game}_{slot}.dss");
+    }
+
     /// <summary>NextUI's emulator tag: the "(GBA)" part of the ROM's top folder under Roms.</summary>
     public static string? EmuName(string romsRoot, string romPath)
     {

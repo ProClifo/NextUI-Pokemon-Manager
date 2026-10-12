@@ -57,4 +57,22 @@ public sealed class SaveStatesTests : IDisposable
         Touch(".userdata", "shared", "GBA-gpsp", "Pokemon Sapphire.gba.st9");
         Assert.True(SaveStates.HasSelected(_sd, roms, rom));
     }
+
+    [Fact]
+    public void DeletesDraSticsAutoSaveState()
+    {
+        var save = Touch("Saves", "NDS", "Pokemon Platinum.dsv");
+        var auto = Touch(".userdata", "shared", "NDS-advanced-drastic", "Pokemon Platinum_10.dss");
+        var manual = Touch(".userdata", "shared", "NDS-advanced-drastic", "Pokemon Platinum_0.dss");
+        Assert.True(SaveStates.HasDraSticAuto(_sd, save, "tg5040"));
+        Assert.Equal(1, SaveStates.DeleteDraSticAuto(_sd, save, "tg5040"));
+        Assert.False(File.Exists(auto));
+        Assert.True(File.Exists(manual));
+
+        // a different auto slot in the pak's drastic.cfg
+        var cfg = Touch("Emus", "tg5040", "NDS.pak", "drastic", "config", "drastic.cfg");
+        File.WriteAllText(cfg, "enable_autosavestate = 1\nautosavestate_slot = 0\n");
+        Assert.Equal(1, SaveStates.DeleteDraSticAuto(_sd, save, "tg5040"));
+        Assert.False(File.Exists(manual));
+    }
 }
