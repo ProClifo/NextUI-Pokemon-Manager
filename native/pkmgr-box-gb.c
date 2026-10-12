@@ -513,7 +513,7 @@ static void gb_draw(SDL_Surface *dst, Scene *scene, const Layout *l, GbState *st
         if (st->cursor < gb_count(box))
             gb_pic(dst, l, &box->slots[st->cursor], (GB_W - 56) / 2, 24, false);
         char lines[8][160];
-        int n = wrap_lines(st->evolved, 18, gb_measure, NULL, lines, 8);
+        int n = wrap_lines(st->evolved, 18, gb_measure, NULL, lines, 8, 2);
         gb_box(dst, scene, l, 0, 12, 20, 6);
         for (int i = 0; i < 2 && st->evolved_page * 2 + i < n; i++)
             gb_print(dst, scene, l, lines[st->evolved_page * 2 + i], 1, 14 + i * 2);
@@ -700,7 +700,7 @@ static int gb_run(SDL_Surface *screen, Scene *scene, const char *write_location)
         else if (st.mode == GB_EVOLVED)
         {
             char lines[8][160];
-            int n = wrap_lines(st.evolved, 18, gb_measure, NULL, lines, 8);
+            int n = wrap_lines(st.evolved, 18, gb_measure, NULL, lines, 8, 2);
             if (a && st.evolved_page * 2 + 2 < n)
                 st.evolved_page++;
             else if (a || b)

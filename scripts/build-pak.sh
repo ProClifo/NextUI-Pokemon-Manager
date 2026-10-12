@@ -127,11 +127,12 @@ sparse_clone pokeruby "$POKERUBY_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon
     '/graphics/trainer_card/' '/graphics/trainers/brendan.png' '/graphics/trainers/may.png'
 sparse_clone pokeemerald "$POKEEMERALD_COMMIT" '/graphics/pokemon_storage/' '/graphics/pokemon/' '/graphics_file_rules.mk' \
     '/src/pokemon_icon.c' '/graphics/object_events/pics/people/' '/src/data/text/abilities.h' '/include/constants/abilities.h' \
-    "${GBA_UI[@]}" '/graphics/balls/' '/graphics/battle_interface/' '/graphics/types/' '/src/fonts.c' \
+    "${GBA_UI[@]}" '/graphics/balls/' '/graphics/battle_interface/' '/graphics/battle_environment/building/' '/graphics/battle_environment/plain/' '/graphics/types/' '/src/fonts.c' \
     '/graphics/trainer_card/' '/graphics/trainers/front_pics/brendan.png' '/graphics/trainers/front_pics/may.png' \
     '/graphics/trainers/palettes/brendan.pal' '/graphics/trainers/palettes/may.pal'
 sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemon_icon.c' \
     '/graphics/object_events/pics/people/' "${GBA_UI[@]}" '/graphics/misc/' '/src/text.c' '/graphics/battle_interface/' \
+    '/graphics/battle_terrain/building/' '/graphics/battle_terrain/indoor/' \
     '/graphics/trainer_card/' '/graphics/trainers/front_pics/red_front_pic.png' '/graphics/trainers/front_pics/leaf_front_pic.png' \
     '/graphics/trainers/palettes/red.pal' '/graphics/trainers/palettes/leaf.pal'
 sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \

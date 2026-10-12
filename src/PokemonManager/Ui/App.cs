@@ -960,9 +960,16 @@ public sealed class App
         // the species as the game writes it (KADABRA in Gen 1-4, Kadabra in Gen 5)
         var evolvedPk = slot.Get(entry.Sav);
         var species = SpeciesName.GetSpeciesNameGeneration(evolvedPk.Species, evolvedPk.Language, entry.Sav.Generation);
-        evolvedText = $"Congratulations! Your {nickname} evolved into {species}!";
+        // each game's own words and line breaks ("\f" a new page): pokered _EvolvedText/_IntoText, pokecrystal
+        // _CongratulationsYourPokemonText/_EvolvedIntoText, pokeemerald/pokeplatinum gText_CongratsPkmnEvolved
+        evolvedText = entry.Sav.Generation switch
+        {
+            1 => $"{nickname} evolved\ninto {species}!",
+            2 => $"Congratulations!\nYour {nickname}\fevolved into\n{species}!",
+            _ => $"Congratulations! Your {nickname}\nevolved into {species}!",
+        };
         if (!confirmed)
-            _ui.Message(evolvedText);
+            _ui.Message(evolvedText.Replace("\f", "\n"));
         return false;
     }
 

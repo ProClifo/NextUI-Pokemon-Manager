@@ -880,19 +880,32 @@ static int wrap_two_lines(const char *text, int max_w, int (*width)(const char *
 }
 
 // Splits text into at most max_lines lines of at most max_w pixels, at spaces (a word wider than a line gets
-// one to itself). Returns how many lines.
-static int wrap_lines(const char *text, int max_w, int (*width)(const char *, const void *), const void *ctx, char lines[][160], int max_lines)
+// one to itself). "\n" starts a new line and "\f" a new page of per lines (the games' line and page breaks).
+// Returns how many lines.
+static int wrap_lines(const char *text, int max_w, int (*width)(const char *, const void *), const void *ctx, char lines[][160], int max_lines, int per)
 {
     int n = 0;
     const char *p = text;
-    while (*p == ' ')
-        p++;
     while (*p && n < max_lines)
     {
-        int end = 0, best = -1;
+        while (*p == ' ')
+            p++;
+        if (*p == '\n' || *p == '\f')
+        {
+            // an empty line, or the rest of the page left empty
+            if (*p == '\f' && per > 0)
+                while (n % per != 0 && n < max_lines)
+                    lines[n++][0] = '\0';
+            else if (*p == '\n')
+                lines[n++][0] = '\0';
+            p++;
+            continue;
+        }
+        int best = -1;
         for (int i = 0;; i++)
         {
-            if (p[i] == ' ' || p[i] == '\0')
+            char c = p[i];
+            if (c == ' ' || c == '\0' || c == '\n' || c == '\f')
             {
                 char head[160];
                 snprintf(head, sizeof(head), "%.*s", i, p);
@@ -900,15 +913,24 @@ static int wrap_lines(const char *text, int max_w, int (*width)(const char *, co
                     best = i;
                 else
                     break;
-                if (p[i] == '\0')
+                if (c != ' ')
                     break;
             }
         }
-        end = best < 0 ? (int)strlen(p) : best;
-        snprintf(lines[n++], 160, "%.*s", end, p);
-        p += end;
+        snprintf(lines[n++], 160, "%.*s", best, p);
+        p += best;
         while (*p == ' ')
             p++;
+        // a break right after a full line ends that line
+        if (*p == '\n')
+            p++;
+        else if (*p == '\f')
+        {
+            if (per > 0)
+                while (n % per != 0 && n < max_lines)
+                    lines[n++][0] = '\0';
+            p++;
+        }
     }
     return n;
 }
@@ -1212,7 +1234,7 @@ static int evolved_lines(Scene *scene, State *st, const Layout *l, char lines[8]
 {
     JSON_Object *ev = json_object_get_object(scene->layout, "evolution");
     int font_before = use_font(json_object_get_string(ev, "font") ? json_object_get_string(ev, "font") : json_object_dotget_string(scene->layout, "pc.message_font"));
-    int n = wrap_lines(st->evolved, get_int(ev, "width", 200), measure_text, l, lines, 8);
+    int n = wrap_lines(st->evolved, get_int(ev, "width", 200), measure_text, l, lines, 8, get_int(ev, "lines", 2));
     active_font = font_before;
     return n;
 }
@@ -1266,7 +1288,7 @@ static void draw_evolved(SDL_Surface *screen, Scene *scene, State *st, const Lay
     int pad = pm.h > 0 ? pm.h - 16 : 8; // the window's height around one line
     int w = logical_w - 8;
     char lines[3][160];
-    int n = wrap_lines(st->evolved, w - 2 * mt.x - 2, measure_text, l, lines, 3);
+    int n = wrap_lines(st->evolved, w - 2 * mt.x - 2, measure_text, l, lines, 3, 0);
     int h = pad + n * 16, y = logical_h - 4 - h;
     Slot *cur = hovered(scene, st);
     if (cur && cur->filled)

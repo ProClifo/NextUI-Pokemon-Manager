@@ -1,7 +1,8 @@
 """The games' own screens after an evolution, for the PC viewer's "Congratulations! ..." screen.
 
-Ruby/Sapphire/Emerald and FireRed/LeafGreen (src/evolution_scene.c): the screen is black but for the battle
-text box (LoadBattleTextboxAndBackground; graphics/battle_interface/textbox + its tilemap, rows 14-19), the
+Ruby/Sapphire/Emerald and FireRed/LeafGreen (src/evolution_scene.c): the PLAIN battle background, scrolled
+256 pixels (gBattle_BG3_X), and the battle text box (LoadBattleTextboxAndBackground; graphics/battle_interface/
+textbox + its tilemap, rows 14-19), the
 evolved Pokémon centred on (120, 64), and the message in B_WIN_MSG (tile 2,15) in the text box palette's
 colours 1 (white) and 6 (shadow). Ruby/Sapphire's text box is Emerald's.
 
@@ -21,10 +22,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pc_ui import gba, nds  # noqa: E402
 
 
-def _gba_textbox(png, tilemap, pal):
+def _gba_screen(env_png, env_map, env_pal, png, tilemap, pal):
+    """The battle background (BG3: the PLAIN environment = the building's tiles with the plain palette in
+    palettes 2-4, its 64x32 map scrolled 256 pixels right) under the text box."""
+    img = Image.new("RGBA", (240, 160), (0, 0, 0, 255))
+    if all(os.path.exists(p) for p in (env_png, env_map, env_pal)):
+        etiles, eentries = gba.load_tiles(env_png), gba.read_tilemap(env_map)
+        epals = [None, None] + gba.split16(gba.read_jasc(env_pal)) + [None] * 11
+        emap = gba.screen_map_64(eentries[:1024], eentries[1024:]) if len(eentries) == 2048 else eentries
+        bg = gba.new_screen(240, 160)
+        gba.draw_tilemap(bg, emap, 64 if len(eentries) == 2048 else 32, etiles, epals, src_x=32, src_y=0, w=30, h=20)
+        img.alpha_composite(bg.convert("RGBA"))
     tiles, entries = gba.load_tiles(png), gba.read_tilemap(tilemap)
     colors = gba.read_jasc(pal)
-    img = Image.new("RGBA", (240, 160), (0, 0, 0, 255))
     box = gba.new_screen(240, 48)
     gba.draw_tilemap(box, entries, 32, tiles, [colors] * 16, src_x=0, src_y=14, w=30, h=6)
     img.alpha_composite(box.convert("RGBA"), (0, 112))
@@ -76,7 +86,10 @@ def build(decomp, out):
     made = []
     e = os.path.join(decomp, "pokeemerald", "graphics", "battle_interface")
     if os.path.exists(os.path.join(e, "textbox.png")):
-        img, colors = _gba_textbox(os.path.join(e, "textbox.png"), os.path.join(e, "textbox_map.bin"), os.path.join(e, "textbox_0.pal"))
+        env = os.path.join(decomp, "pokeemerald", "graphics", "battle_environment")
+        img, colors = _gba_screen(os.path.join(env, "building", "tiles.png"), os.path.join(env, "building", "map.bin"),
+                                  os.path.join(env, "plain", "palette.pal"),
+                                  os.path.join(e, "textbox.png"), os.path.join(e, "textbox_map.bin"), os.path.join(e, "textbox_0.pal"))
         entry = {"image": "evolution_bg.png", "sprite": [120, 64], "text": [16, 121], "width": 208, "lines": 2,
                  "line_height": 16, "font": "normal", "color": list(colors[1]), "shadow": list(colors[6])}
         for game in ("e", "rs"):
@@ -84,7 +97,10 @@ def build(decomp, out):
                 made.append(game)
     fr = os.path.join(decomp, "pokefirered", "graphics", "battle_interface")
     if os.path.exists(os.path.join(fr, "textbox.png")):
-        img, colors = _gba_textbox(os.path.join(fr, "textbox.png"), os.path.join(fr, "textbox.bin"), os.path.join(fr, "textbox1.pal"))
+        terrain = os.path.join(decomp, "pokefirered", "graphics", "battle_terrain")
+        img, colors = _gba_screen(os.path.join(terrain, "building", "terrain.png"), os.path.join(terrain, "building", "terrain.bin"),
+                                  os.path.join(terrain, "indoor", "plain.pal"),
+                                  os.path.join(fr, "textbox.png"), os.path.join(fr, "textbox.bin"), os.path.join(fr, "textbox1.pal"))
         entry = {"image": "evolution_bg.png", "sprite": [120, 64], "text": [18, 122], "width": 206, "lines": 2,
                  "line_height": 16, "font": "normal", "color": list(colors[1]), "shadow": list(colors[6])}
         if _add(os.path.join(out, "frlg"), img, entry):
