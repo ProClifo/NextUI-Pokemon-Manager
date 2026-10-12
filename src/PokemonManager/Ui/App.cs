@@ -158,18 +158,9 @@ public sealed class App
         _backgroundCache.Clear();
         _profiles.Clear();
         _tickets.Clear();
-        // Only saves with their game's ROM (same file name) are listed.
-        foreach (var save in all.Where(s => RomIndex.FindRoms(s.Path).Count == 0).ToList())
-        {
-            _hidden.Add((save, new RomCheck(RomStatus.RomNotFound, null, null).Describe()));
-            all.Remove(save);
-        }
-        // ...and only games that have got as far as receiving the Pokédex.
-        foreach (var save in all.Where(s => !TradeRules.HasPokedex(s.Sav)).ToList())
-        {
-            _hidden.Add((save, "hasn't received the Pokédex yet"));
-            all.Remove(save);
-        }
+        // Only saves with their game's ROM (same file name), in games that have got as far as receiving the
+        // Pokédex, are shown at all; [N others] lists only those whose ROM isn't an official release.
+        all.RemoveAll(s => RomIndex.FindRoms(s.Path).Count == 0 || !TradeRules.HasPokedex(s.Sav));
         if (_settings.OnlyOfficialRoms && all.Count != 0)
         {
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
