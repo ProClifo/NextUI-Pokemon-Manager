@@ -944,6 +944,9 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     Box *box = &scene->boxes[scene->box];
     SDL_Rect wp = get_rect(lo, "pc.wallpaper");
     blit_scaled(load_image(box->wallpaper), NULL, screen, l, wp.x, wp.y);
+    // A skin whose frame lies over the wallpaper (HeartGold/SoulSilver's rim) draws it after it.
+    if (json_object_dotget_boolean(lo, "pc.foreground") == 1)
+        blit_scaled(skin_image(scene, "pc_fg.png"), NULL, screen, l, 0, 0);
     SDL_Rect name = get_rect(lo, "pc.box_name");
     int font_before = use_font(json_object_dotget_string(lo, "pc.box_name_font"));
     draw_text_c(screen, l, box->name, name.x, name.y, 1,

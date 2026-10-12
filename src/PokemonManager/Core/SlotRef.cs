@@ -52,7 +52,8 @@ public readonly record struct SlotRef(int Box, int Slot)
     {
         if (sav is IBoxDetailName named)
         {
-            var name = named.GetBoxName(box);
+            // a box the game never named reads as unset characters (0xFFFF) in a fresh DS save
+            var name = named.GetBoxName(box).Replace("\uffff", "");
             if (!string.IsNullOrWhiteSpace(name))
                 return name;
         }

@@ -143,7 +143,7 @@ sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/spe
 sparse_clone pokediamond "$POKEDIAMOND_COMMIT" '/files/graphic/box/'
 # HeartGold's player sprites (MMODEL_HERO, MMODEL_HEROINE)
 sparse_clone pokeheartgold "$POKEHEARTGOLD_COMMIT" '/files/data/mmodel/mmodel/mmodel_00000069.NSBTX' '/files/data/mmodel/mmodel/mmodel_00000070.NSBTX' \
-    '/files/demo/opening/gs_opening/'
+    '/files/demo/opening/gs_opening/' '/files/a/0/1/9'  # HGSS's PC (scripts/pc_ui/ds.py build_hgss)
 
 echo "==> PC box art"
 python3 "$ROOT/scripts/build-box-assets.py" "$DECOMP/pokeemerald" "$PAK/res/box"

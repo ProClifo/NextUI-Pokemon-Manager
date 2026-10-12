@@ -37,4 +37,11 @@ public sealed class SlotRefTests : IDisposable
         Assert.Equal(0, new SlotRef(0, 0).Get(sav).Species);
         Assert.Equal((ushort)Species.Rattata, new SlotRef(0, 1).Get(sav).Species);
     }
+
+    [Fact]
+    public void AnUnnamedDsBoxIsCalledBoxN()
+    {
+        var sav = BlankSaveFile.Get(GameVersion.HG, "ETHAN", LanguageID.English);
+        Assert.Equal("Box 2", SlotRef.BoxName(sav, 1));
+    }
 }
