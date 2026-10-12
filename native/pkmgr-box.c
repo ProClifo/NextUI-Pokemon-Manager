@@ -1525,9 +1525,22 @@ static void change_box(Scene *scene, int delta)
 }
 
 // The party panel: slot 0 on the left, 1-5 down the right, CANCEL (6) below them.
-static void party_move(State *st, int dx, int dy)
+static void party_move(State *st, int dx, int dy, bool grid)
 {
     int s = st->party_slot;
+    if (grid)
+    {
+        // the DS games' two columns: down goes 1 > 3 > 5 > EXIT and 2 > 4 > 6 > EXIT, EXIT > 1; up from the top
+        // row goes to EXIT, from EXIT to the bottom row; left/right switch columns
+        if (dy > 0)
+            s = s == 6 ? 0 : s + 2 > 5 ? 6 : s + 2;
+        else if (dy < 0)
+            s = s == 6 ? 4 : s < 2 ? 6 : s - 2;
+        else if (dx != 0 && s < 6)
+            s ^= 1;
+        st->party_slot = s;
+        return;
+    }
     if (dx < 0)
         s = 0;
     else if (dx > 0 && s == 0)
@@ -1766,7 +1779,8 @@ int main(int argc, char *argv[])
         }
         else if (st.mode == VIEW_PARTY)
         {
-            if (dx > 0 && st.party_slot > 0)
+            bool grid = json_object_dotget_boolean(scene.layout, "pc.party.grid") == 1;
+            if (dx > 0 && (grid ? st.party_slot < 6 && st.party_slot % 2 == 1 : st.party_slot > 0))
             {
                 // Right from the party's right column goes back to the box, on its first Pokémon
                 st.mode = st.menu_from = VIEW_BOX;
@@ -1774,7 +1788,7 @@ int main(int argc, char *argv[])
                 scene.slot = 0;
             }
             else if (dx || dy)
-                party_move(&st, dx, dy);
+                party_move(&st, dx, dy, grid);
             else if (a && st.party_slot < 6 && scene.boxes[0].slots[st.party_slot].filled)
             {
                 st.mode = VIEW_MENU;

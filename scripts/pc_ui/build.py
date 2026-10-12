@@ -196,7 +196,7 @@ def normalize(full):
             "hand_shadow_offset": pc.get("hand_shadow_offset", [8, 28]),
             "mon_sprite": pc["mon_sprite"],
             "mon_text": gender_and_level(pc["mon_text"], mon_color, mon_shadow),
-            "party": {k: pc["party"][k] for k in ("x", "y", "slots", "cancel")},
+            "party": {k: pc["party"][k] for k in ("x", "y", "slots", "cancel", "grid") if k in pc["party"]},
             "menu": {
                 "right": menu["right"], "bottom": menu["bottom"], "line_height": menu["line_height"],
                 "text_x": menu["text_x"], "text_y": menu.get("text_y", 1),
