@@ -74,11 +74,11 @@ public sealed class App
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
-                items.Add($"[{_hidden.Count} {(_hidden.Count == 1 ? "ROM hack" : "ROM hacks")}]");
-            int rescan = items.Count; items.Add("[Rescan SD card]");
-            int settings = items.Count; items.Add("[Settings]");
-            int update = items.Count; items.Add("[Update]");
-            int help = items.Count; items.Add("[Help]");
+                items.Add($"{_hidden.Count} {(_hidden.Count == 1 ? "ROM hack" : "ROM hacks")}");
+            int rescan = items.Count; items.Add("Rescan SD card");
+            int settings = items.Count; items.Add("Settings");
+            int update = items.Count; items.Add("Update");
+            int help = items.Count; items.Add("Help");
 
             var icons = saves.Select(CartridgeIcon).ToList();
             var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags, images: sprites, icons: icons);
@@ -161,7 +161,7 @@ public sealed class App
         _profiles.Clear();
         _tickets.Clear();
         // Only saves with their game's ROM (same file name), in games that have got as far as receiving the
-        // Pokédex, are shown at all; [N ROM hacks] lists only those whose ROM isn't an official release.
+        // Pokédex, are shown at all; "N ROM hacks" lists only those whose ROM isn't an official release.
         all.RemoveAll(s => RomIndex.FindRoms(s.Path).Count == 0 || !TradeRules.HasPokedex(s.Sav));
         if (_settings.OnlyOfficialRoms && all.Count != 0)
         {
