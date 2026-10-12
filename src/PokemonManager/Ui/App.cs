@@ -746,13 +746,7 @@ public sealed class App
             return false;
         }
 
-        var verb = mode == TransferMode.Move ? "Move" : "Copy";
-        var question = $"{verb} {Names.Summary(pk)}\nfrom {Names.Game(source.Sav)} ({source.Sav.OT})\nto {Names.Game(dest.Sav)} ({dest.Sav.OT})?";
-        if (check.Message.Length != 0)
-            question += "\n\n" + check.Message;
-        if (!_ui.Confirm(question))
-            return false;
-
+        // Picking the game is the confirmation: it's done at once, and the box comes back without a message.
         var result = TransferService.Transfer(source, from, dest, mode, _settings.AllowIllegalTransfers, out var placedAt);
         if (!result.Ok)
         {
@@ -763,9 +757,11 @@ public sealed class App
         }
 
         var message = result.Message;
+        if (check.Message.Length != 0)
+            message += " " + check.Message;
         // Ruby/Sapphire get the National Pokédex from a trade partner that has it.
         if (TradeRules.UnlockNationalDexByTrade(source.Sav, dest.Sav) is { } unlocked)
-            message += $"\n{Names.Game(unlocked)} received the National Pokédex!";
+            message += $" {Names.Game(unlocked)} received the National Pokédex.";
 
         // Write the destination first: if the source write then fails, nothing is lost (only duplicated).
         if (!TryWrite(dest, out var destBackup))
@@ -779,7 +775,7 @@ public sealed class App
             return true;
         }
 
-        _ui.Message($"{message}\n\nBackups were saved to PokemonManager/Backups.\n{SaveStateWarning}");
+        Console.Error.WriteLine($"transfer: {message}");
         return mode == TransferMode.Move;
     }
 
