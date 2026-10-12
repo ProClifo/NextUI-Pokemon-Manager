@@ -37,6 +37,7 @@ public sealed class AppPaths
 
     public string BackupDir => Path.Combine(DataDir, "Backups");
     public string SettingsFile => Path.Combine(DataDir, "settings.txt");
+    public string SaveNamesFile => Path.Combine(DataDir, "save-names.txt");
     public string RomCheckCache => Path.Combine(DataDir, "rom-check-cache.txt");
 
     public void EnsureCreated()

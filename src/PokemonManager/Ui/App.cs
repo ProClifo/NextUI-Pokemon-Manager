@@ -24,6 +24,8 @@ public sealed class App
     private List<SaveEntry>? _saves;
     /// <summary>Saves left off the main menu, and why.</summary>
     private List<(SaveEntry Save, string Reason)> _hidden = [];
+    private SaveNames? _saveNames;
+    private SaveNames SavedNames => _saveNames ??= new SaveNames(_paths.SaveNamesFile);
     private VanillaRoms.Index? _romIndex;
     private readonly GameBackgrounds _backgrounds;
     private readonly (int Width, int Height)? _screen =
@@ -206,10 +208,17 @@ public sealed class App
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
             var choice = _ui.Choose("Other saves", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
-                icons: saves.Select(CartridgeIcon).ToList());
+                icons: saves.Select(CartridgeIcon).ToList(), actionText: "RENAME");
             if (choice is not { } c)
                 return;
             selected = c;
+            if (_ui.ActionPressed)
+            {
+                // Y: a name of the player's own (an empty one brings back the game's name)
+                if (_ui.Keyboard("Rename save", SaveName(saves[c])) is { } name)
+                    SavedNames.Set(saves[c].Path, name == GameName(saves[c]) ? null : name);
+                continue;
+            }
             Console.Error.WriteLine($"opening {_hidden[c].Save.FileName}, not listed: {_hidden[c].Reason}");
             SaveMenu(_hidden[c].Save);
         }
@@ -999,8 +1008,10 @@ public sealed class App
     /// The player's overworld sprite in this save's game, boy or girl (scripts/build-trainers.py), or an empty
     /// path where there's none: Black/White have no decompilation to take it from.
     /// </summary>
-    /// <summary>A save as the main menu names it: its game in the game's own language ("Emerald", "Smaragd").</summary>
-    private string SaveName(SaveEntry save)
+    /// <summary>A save as the menus name it: the name given to it on Other saves, else its game in the game's own language ("Emerald", "Smaragd").</summary>
+    private string SaveName(SaveEntry save) => SavedNames.Get(save.Path) ?? GameName(save);
+
+    private string GameName(SaveEntry save)
     {
         var profile = ProfileFor(save);
         return Names.NativeGame(profile.Version(save.Sav), profile.ShownLanguage ?? profile.Language);

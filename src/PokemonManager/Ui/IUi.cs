@@ -21,9 +21,10 @@ public interface IUi
     /// item shows its tag, and a tag written "LEFT\tRIGHT" has the item's image between the two parts.
     /// <paramref name="disabled"/> items are greyed out; picking one returns its index, which callers ignore.
     /// <paramref name="icons"/> are images drawn in front of the items' names. <paramref name="titleImageRect"/> picks
-    /// a part of <paramref name="titleImage"/> (one frame of an icon sheet).
+    /// a part of <paramref name="titleImage"/> (one frame of an icon sheet). With <paramref name="actionText"/>, Y is
+    /// shown with that label; pressing it returns the highlighted index with <see cref="ActionPressed"/> set.
     /// </summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null);
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null);
 
     /// <summary>
     /// A settings list like NextUI's: each row's name on the left and its value on the right, changed with
@@ -31,6 +32,12 @@ public interface IUi
     /// when A is pressed, or null for B.
     /// </summary>
     (int[] Values, int Selected)? Options(string title, IReadOnlyList<string> names, IReadOnlyList<string[]> options, IReadOnlyList<int> values, int selected = 0);
+
+    /// <summary>Whether the last <see cref="Choose"/> ended with Y (its action) rather than A.</summary>
+    bool ActionPressed { get; }
+
+    /// <summary>An on-screen keyboard; returns the text entered, or null when the user backs out.</summary>
+    string? Keyboard(string title, string initial);
 
     /// <summary>Shows text until the user presses A or B. Long text is split into pages.</summary>
     void Message(string text);

@@ -17,6 +17,7 @@ PAK="$BUILD/Pokemon Manager.pak"
 
 MINUI_LIST_VERSION="${MINUI_LIST_VERSION:-0.15.4}"  # also pinned in native/Makefile
 MINUI_PRESENTER_VERSION="${MINUI_PRESENTER_VERSION:-0.13.4}"
+MINUI_KEYBOARD_VERSION="${MINUI_KEYBOARD_VERSION:-0.10.1}"  # renaming saves on Other saves
 POKEEMERALD_COMMIT="${POKEEMERALD_COMMIT:-731ad5bfd6e6f265508d0efcca0ba42f9dcf5881}"
 EVENTSGALLERY_COMMIT="${EVENTSGALLERY_COMMIT:-154d81be88453f6f78ec1d6d86e85fe0f2f5c240}"
 NOTO_EMOJI_COMMIT="${NOTO_EMOJI_COMMIT:-e20cbc2bbec1926686be9f9bee7d1d2cfa1fea0e}"
@@ -59,6 +60,11 @@ echo "==> Fetching minui-presenter $MINUI_PRESENTER_VERSION"
 for platform in "${PLATFORMS[@]}"; do
     mkdir -p "$PAK/bin/$platform"
     fetch "https://github.com/josegonzalez/minui-presenter/releases/download/$MINUI_PRESENTER_VERSION/minui-presenter-$platform-nextui" "$PAK/bin/$platform/minui-presenter"
+done
+
+echo "==> Fetching minui-keyboard $MINUI_KEYBOARD_VERSION"
+for platform in "${PLATFORMS[@]}"; do
+    fetch "https://github.com/josegonzalez/minui-keyboard/releases/download/$MINUI_KEYBOARD_VERSION/minui-keyboard-$platform-nextui" "$PAK/bin/$platform/minui-keyboard"
 done
 
 # Built from source: the PC box viewer, and minui-list $MINUI_LIST_VERSION patched (native/minui-list.patch) so its

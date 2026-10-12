@@ -12,6 +12,7 @@ namespace PokemonManager.Ui;
 public sealed class MinUi : IUi
 {
     private const int ExitSelected = 0;
+    private const int ExitAction = 4; // minui-list's ExitCodeActionButton
     private const int MaxCrashRetries = 3;
 
     private readonly string _tmp;
@@ -67,7 +68,7 @@ public sealed class MinUi : IUi
     private string[] MessageFont(params string[] texts)
         => FontFor(texts) is { } path ? ["--font-default", path] : [];
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -78,14 +79,14 @@ public sealed class MinUi : IUi
         // Should a list still crash, reopen it at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
-            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, icons, titleImageRect, out bool crashed);
+            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, icons, titleImageRect, actionText, out bool crashed);
             if (!crashed || attempt == MaxCrashRetries)
                 return result;
             selected = 0;
         }
     }
 
-    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, IReadOnlyList<bool>? disabled, IReadOnlyList<string?>? icons, (int X, int Y, int W, int H)? titleImageRect, out bool crashed)
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, IReadOnlyList<bool>? disabled, IReadOnlyList<string?>? icons, (int X, int Y, int W, int H)? titleImageRect, string? actionText, out bool crashed)
     {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
@@ -149,13 +150,16 @@ public sealed class MinUi : IUi
             args = [.. args, "--title-image", titleImage!];
         if (titleImaged && titleImageRect is { } r)
             args = [.. args, "--title-image-rect", $"{r.X},{r.Y},{r.W},{r.H}"];
-        args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK"])];
+        if (actionText is not null)
+            args = [.. args, "--action-button", "Y", "--action-text", actionText];
+        args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "BACK", actionText])];
         int code = Run("minui-list", args);
+        ActionPressed = code == ExitAction;
         // Killed by a signal: .NET reports 128 + the signal number (139 = SIGSEGV).
         crashed = code > 128;
         if (crashed)
             Console.Error.WriteLine($"minui-list crashed (exit {code}); reopening the list.");
-        if (code != ExitSelected || !File.Exists(output))
+        if ((code != ExitSelected && !ActionPressed) || !File.Exists(output))
             return null;
 
         try
@@ -168,6 +172,19 @@ public sealed class MinUi : IUi
         {
             return null;
         }
+    }
+
+    public bool ActionPressed { get; private set; }
+
+    public string? Keyboard(string title, string initial)
+    {
+        StopBusy();
+        var output = Path.Combine(_tmp, "keyboard-out.txt");
+        File.Delete(output);
+        int code = Run("minui-keyboard", "--title", title, "--initial-value", initial, "--write-location", output);
+        if (code != ExitSelected || !File.Exists(output))
+            return null;
+        return File.ReadAllText(output).TrimEnd('\r', '\n');
     }
 
     public (int[] Values, int Selected)? Options(string title, IReadOnlyList<string> names, IReadOnlyList<string[]> options, IReadOnlyList<int> values, int selected = 0)
@@ -350,7 +367,7 @@ public sealed class ConsoleUi : IUi
     public UiFont? Font { get; set; }
     public string? Background { get; set; }
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null)
     {
         if (items.Count == 0)
             return null;
@@ -363,6 +380,14 @@ public sealed class ConsoleUi : IUi
         if (line is null || !int.TryParse(line.Trim(), out var n) || n < 1 || n > items.Count)
             return null;
         return n - 1;
+    }
+
+    public bool ActionPressed => false;
+
+    public string? Keyboard(string title, string initial)
+    {
+        Console.Write($"{title} [{initial}]: ");
+        return Console.ReadLine() is { Length: > 0 } line ? line : null;
     }
 
     public (int[] Values, int Selected)? Options(string title, IReadOnlyList<string> names, IReadOnlyList<string[]> options, IReadOnlyList<int> values, int selected = 0)
