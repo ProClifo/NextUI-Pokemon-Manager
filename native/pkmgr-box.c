@@ -768,6 +768,13 @@ static int measure_text(const char *text, const void *ctx)
 }
 
 // The message box at the bottom; a second line makes it one line taller, upwards.
+// The message box's frame: the scene's (FireRed's and LeafGreen's own frame types), else the skin's.
+static const char *message_frame(Scene *scene)
+{
+    const char *own = json_object_get_string(json_value_get_object(scene->root), "message_frame");
+    return own ? own : json_object_dotget_string(scene->layout, "pc.message_frame");
+}
+
 static void draw_message(SDL_Surface *screen, Scene *scene, const Layout *l, const char *text)
 {
     JSON_Object *lo = scene->layout;
@@ -781,7 +788,7 @@ static void draw_message(SDL_Surface *screen, Scene *scene, const Layout *l, con
         m.y -= 16;
         m.h += 16;
     }
-    draw_window(screen, scene, l, json_object_dotget_string(lo, "pc.message_frame"), m.x, m.y, m.w, m.h);
+    draw_window(screen, scene, l, message_frame(scene), m.x, m.y, m.w, m.h);
     for (int i = 0; i < n; i++)
         draw_text_c(screen, l, lines[i], m.x + mt.x, m.y + mt.y + i * 16, 0, color, shadow);
     active_font = font_before;
@@ -1219,7 +1226,7 @@ static void draw_evolved(SDL_Surface *screen, Scene *scene, State *st, const Lay
     Slot *cur = hovered(scene, st);
     if (cur && cur->filled)
         draw_sprite(screen, l, cur, logical_w / 2, y / 2 + 4, false, get_int(lo, "sprite_size", 64));
-    draw_window(screen, scene, l, json_object_dotget_string(lo, "pc.message_frame"), 4, y, w, h);
+    draw_window(screen, scene, l, message_frame(scene), 4, y, w, h);
     for (int i = 0; i < n; i++)
         draw_text_c(screen, l, lines[i], 4 + mt.x, y + mt.y + i * 16, 0, color, shadow);
     active_font = font_before;

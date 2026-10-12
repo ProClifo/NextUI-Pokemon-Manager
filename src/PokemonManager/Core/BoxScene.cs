@@ -68,6 +68,9 @@ public sealed class BoxScene(string assetDir)
             ["boxes"] = boxes,
             ["skin"] = Skin(sav),
         };
+        // FireRed's PC message boxes in frame type 3 (red), LeafGreen's in type 4 (green)
+        if (sav is SAV3FRLG frlg)
+            scene["message_frame"] = frlg.Version == GameVersion.LG ? "window_frames/type4.png" : "window_frames/type3.png";
         // The font to draw in, unless it lacks some of the text (OG has no Japanese): then the fallback.
         var chosen = font is not null && font.Covers(Strings(scene)) ? font : fallbackFont;
         if (chosen is not null)
