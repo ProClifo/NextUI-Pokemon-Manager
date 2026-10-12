@@ -383,6 +383,8 @@ static void load_game_fonts(const char *skin, JSON_Object *layout)
         JSON_Array *cell = json_object_get_array(mo, "cell");
         f->cell_w = cell ? (int)json_array_get_number(cell, 0) : 8;
         f->columns = (int)json_object_get_number(mo, "columns");
+        if (f->columns <= 0)
+            f->columns = 16;
         JSON_Array *widths = json_object_get_array(mo, "widths");
         f->count = widths ? (int)json_array_get_count(widths) : 0;
         if (f->count > 640)
@@ -437,6 +439,15 @@ static int encode_glyphs(const char *text, int *glyphs, int max)
             continue;
         }
         int len = (*p & 0x80) == 0 ? 1 : (*p & 0xE0) == 0xC0 ? 2 : (*p & 0xF0) == 0xE0 ? 3 : 4;
+        // a character cut off by a shortened string (or a stray continuation byte) is skipped
+        int k = 1;
+        while (k < len && (p[k] & 0xC0) == 0x80)
+            k++;
+        if (k < len || (*p & 0xC0) == 0x80)
+        {
+            p++;
+            continue;
+        }
         char ch[5] = {0};
         memcpy(ch, p, len);
         p += len;
@@ -471,7 +482,7 @@ static int game_text_width(const char *text)
     GameFont *f = &game_fonts[active_font];
     int glyphs[256], n = encode_glyphs(text, glyphs, 256), w = 0;
     for (int i = 0; i < n; i++)
-        w += glyphs[i] < f->count ? f->widths[glyphs[i]] : 0;
+        w += glyphs[i] >= 0 && glyphs[i] < f->count ? f->widths[glyphs[i]] : 0;
     return w;
 }
 
@@ -481,7 +492,7 @@ static int draw_game_text(SDL_Surface *dst, const Layout *l, const char *text, i
     int glyphs[256], n = encode_glyphs(text, glyphs, 256);
     int w = 0;
     for (int i = 0; i < n; i++)
-        w += glyphs[i] < f->count ? f->widths[glyphs[i]] : 0;
+        w += glyphs[i] >= 0 && glyphs[i] < f->count ? f->widths[glyphs[i]] : 0;
     if (w <= 0)
         return 0;
     if (align == 1)
@@ -499,7 +510,7 @@ static int draw_game_text(SDL_Surface *dst, const Layout *l, const char *text, i
     for (int i = 0; i < n; i++)
     {
         int g = glyphs[i];
-        if (g >= f->count)
+        if (g < 0 || g >= f->count)
             continue;
         int gw = f->widths[g] < f->cell_w ? f->widths[g] : f->cell_w;
         int sx = (g % f->columns) * f->cell_w, sy = (g / f->columns) * 16;
@@ -507,7 +518,7 @@ static int draw_game_text(SDL_Surface *dst, const Layout *l, const char *text, i
         {
             Uint32 *src = (Uint32 *)((Uint8 *)sheet->pixels + (sy + yy) * sheet->pitch);
             Uint32 *out = (Uint32 *)((Uint8 *)line->pixels + yy * line->pitch);
-            for (int xx = 0; xx < gw && pen + xx < w; xx++)
+            for (int xx = 0; xx < gw && pen + xx < w && sx + xx < sheet->w; xx++)
             {
                 Uint8 r, gg, b, a;
                 SDL_GetRGBA(src[sx + xx], sheet->format, &r, &gg, &b, &a);
@@ -733,6 +744,8 @@ static void draw_window(SDL_Surface *dst, Scene *scene, const Layout *l, const c
         return;
     }
     int t = frame->w / 3;
+    if (t <= 0)
+        return;
     for (int ty = y - t; ty < y + h + t; ty += t)
     {
         for (int tx = x - t; tx < x + w + t; tx += t)
@@ -1149,6 +1162,7 @@ static void summary_page(JSON_Object *lo, int page, const char **image, const ch
     static const char *LISTS[] = {"summary.info", "summary.skills", "summary.moves"};
     JSON_Array *pages = json_object_dotget_array(lo, "summary.pages");
     JSON_Object *p = pages ? json_array_get_object(pages, page) : NULL;
+    page = page < 0 ? 0 : page;
     *image = p && json_object_get_string(p, "image") ? json_object_get_string(p, "image") : PAGES[page % 3];
     *list = p && json_object_get_string(p, "list") ? json_object_get_string(p, "list") : LISTS[page % 3];
 }
@@ -1308,7 +1322,7 @@ static void box_move(Scene *scene, State *st, int dx, int dy)
             if (st->target == TARGET_PARTY_BUTTON)
                 col = 0;
             else if (st->target == TARGET_CLOSE_BUTTON)
-                col = box->columns - 2;
+                col = box->columns >= 2 ? box->columns - 2 : 0;
             else if (st->target == TARGET_TITLE)
                 col = box->columns > 2 ? 2 : 0;
             st->target = TARGET_SLOT;
