@@ -226,7 +226,7 @@ public sealed class App
             var saves = _hidden.Select(h => h.Save).ToList();
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-            var choice = _ui.Choose("Others", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
+            var choice = _ui.Choose("Other saves", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
                 icons: saves.Select(CartridgeIcon).ToList(), actionText: "RENAME", secondaryText: "MOVE");
             if (choice is not { } c)
                 return;
