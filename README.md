@@ -121,6 +121,8 @@ The gallery is [projectpokemon/EventsGallery](https://github.com/projectpokemon/
 - **Settings → Gallery: All Languages** (off by default) lists every language in the Gallery. Events and Distributions always stick to the game's language.
 - **Settings → Gallery: Unreleased Files** (off by default) adds the gallery's *Unreleased* folder: debug and test data that was never distributed.
 
+**Update** (on the main menu) checks this project's GitHub releases over Wi-Fi: when the newest release (alpha releases included) isn't the installed one, it offers to download that release's zip for your device and puts the new pak files in place; then the pak closes, and the new version runs next time you open it. Your saves, backups and settings aren't touched. It uses .NET's own HTTPS, or the device's `curl`/`wget` if that isn't available.
+
 **Settings** look like NextUI's own: each setting's name on the left and *Enabled*/*Disabled* on the right, changed with left/right and kept with A (SAVE). **Reset to Default** (after a confirmation) puts every setting back to how it was when the pak was installed. **Save State Deletion** (disabled by default) deletes the ROM's save state in its selected slot, its preview and NextUI's resume entry whenever Pokémon Manager changes a save, so pressing X can't resume a state from before the change and undo it: the game has to start from its save. NextUI keeps the selected slot in `.userdata/shared/.minui/<EMU>/<rom>.txt` and the states in `.userdata/shared/<EMU>-<core>/`.
 
 ### ⚠️ Save states

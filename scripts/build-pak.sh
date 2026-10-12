@@ -158,6 +158,9 @@ python3 "$ROOT/scripts/build-backgrounds.py" "$ROOT/assets/backgrounds" "$PAK/re
 
 cp "$ROOT/launch.sh" "$ROOT/pak.json" "$ROOT/LICENSE" "$PAK/"
 cp "$ROOT/README.md" "$PAK/README.md"
+# The release this pak is (the in-app Update compares it with GitHub's newest release); "dev" for local builds.
+mkdir -p "$PAK/res"
+echo "${PKMGR_RELEASE:-dev}" > "$PAK/res/release.txt"
 chmod +x "$PAK/launch.sh"
 
 echo "==> Zipping"

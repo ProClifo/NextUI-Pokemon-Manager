@@ -37,6 +37,9 @@ jobs:
 
       - name: Build pak
         run: scripts/build-pak.sh
+        env:
+          # the release tag the pak records for its Update menu (release runs only)
+          PKMGR_RELEASE: ${{ inputs.release_tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || 'dev' }}
 
       - uses: actions/upload-artifact@v4
         with:

@@ -75,6 +75,7 @@ public sealed class App
                 items.Add($"[{_hidden.Count} {(_hidden.Count == 1 ? "other" : "others")}]");
             int rescan = items.Count; items.Add("[Rescan SD card]");
             int settings = items.Count; items.Add("[Settings]");
+            int update = items.Count; items.Add("[Update]");
             int help = items.Count; items.Add("[Help]");
 
             var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, tags: tags, images: sprites);
@@ -83,9 +84,66 @@ public sealed class App
             if (choice == hidden) { ShowHidden(); continue; }
             if (choice == rescan) { _saves = null; continue; }
             if (choice == settings) { SettingsMenu(); continue; }
+            if (choice == update) { if (UpdateFlow()) return 0; continue; }
             if (choice == help) { _ui.Message(HelpText); continue; }
             SaveMenu(saves[choice.Value]);
         }
+    }
+
+    /// <summary>
+    /// Update: the newest GitHub release replaces this pak's files when it's not the one installed. Returns true
+    /// when it did (the app then closes, so the new version starts next time).
+    /// </summary>
+    private bool UpdateFlow()
+    {
+        var platform = Environment.GetEnvironmentVariable("PLATFORM");
+        if (string.IsNullOrEmpty(platform))
+        {
+            _ui.Message("Updates are only available on the device.");
+            return false;
+        }
+        var pakDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
+        var updater = new Updater(pakDir, Path.Combine(_paths.DataDir, "update"));
+        Updater.Release release;
+        try
+        {
+            _ui.Busy("Checking for updates...");
+            release = updater.Latest(platform);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"update check failed: {ex}");
+            _ui.Message($"Couldn't check for updates.\n{ex.Message}\n\nUpdates need Wi-Fi: turn it on in NextUI's settings.");
+            return false;
+        }
+        var installed = updater.InstalledTag;
+        if (release.Tag == installed)
+        {
+            _ui.Message($"Pokémon Manager is up to date ({installed}).");
+            return false;
+        }
+        if (release.AssetUrl is null)
+        {
+            _ui.Message($"{release.Name} has no download for this device ({platform}).");
+            return false;
+        }
+        var size = release.AssetSize > 0 ? $" ({release.AssetSize / (1024 * 1024)} MB)" : "";
+        if (!_ui.Confirm($"Update Pokémon Manager?\n\nInstalled: {installed}\nNew: {release.Name}{size}", "UPDATE", "CANCEL"))
+            return false;
+        try
+        {
+            _ui.Busy($"Downloading {release.Name}...\nThis can take a few minutes.");
+            int files = updater.Install(release, platform);
+            Console.Error.WriteLine($"update: installed {files} files from {release.Tag}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"update failed: {ex}");
+            _ui.Message($"The update didn't finish.\n{ex.Message}\n\nDetails are in the log.");
+            return false;
+        }
+        _ui.Message($"Updated to {release.Name}.\nPokémon Manager will close now: open it again to use the new version.");
+        return true;
     }
 
     private List<SaveEntry> GetSaves()
