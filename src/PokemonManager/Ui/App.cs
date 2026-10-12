@@ -1048,6 +1048,10 @@ public sealed class App
         };
         if (name is null)
             return null;
+        // the Japanese Red and Blue cartridges are grey
+        var profile = ProfileFor(save);
+        if (name is "red" or "blue" && (profile.ShownLanguage ?? profile.Language) == GalleryLanguage.Japanese)
+            name += "-jp";
         var path = Path.Combine(_paths.IconsDir, $"cart-{name}.png");
         return File.Exists(path) ? path : null;
     }
