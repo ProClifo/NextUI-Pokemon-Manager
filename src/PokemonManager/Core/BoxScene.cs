@@ -68,9 +68,12 @@ public sealed class BoxScene(string assetDir)
             ["boxes"] = boxes,
             ["skin"] = Skin(sav),
         };
-        // FireRed's PC message boxes in frame type 3 (red), LeafGreen's in type 4 (green)
-        if (sav is SAV3FRLG frlg)
-            scene["message_frame"] = frlg.Version == GameVersion.LG ? "window_frames/type4.png" : "window_frames/type3.png";
+        // The PC's windows in the frame type picked in the game's OPTION menu
+        if (WindowFrame(sav) is { } frame)
+        {
+            scene["menu_frame"] = frame;
+            scene["message_frame"] = frame;
+        }
         // The font to draw in, unless it lacks some of the text (OG has no Japanese): then the fallback.
         var chosen = font is not null && font.Covers(Strings(scene)) ? font : fallbackFont;
         if (chosen is not null)
@@ -146,6 +149,20 @@ public sealed class BoxScene(string assetDir)
     /// Diamond/Pearl's, Platinum's (also for Black/White, whose PC art no decompilation has), HeartGold/SoulSilver's,
     /// and Emerald's for Emerald (scripts/pc_ui).
     /// </summary>
+    /// <summary>
+    /// The game's window frame (OPTION > FRAME), from SaveBlock2's options (pokeemerald/pokefirered
+    /// include/global.h: optionsWindowFrameType, bits 3-7 of byte 0x14), as the skin's window_frames image.
+    /// Emerald's 20 frames are "N.png", FireRed/LeafGreen's 10 "typeN.png".
+    /// </summary>
+    public string? WindowFrame(SaveFile sav)
+    {
+        if (sav is not SAV3 s3 || s3.Small.Length <= 0x14)
+            return null;
+        int type = (s3.Small[0x14] >> 3) & 0x1F;
+        var name = sav is SAV3FRLG ? $"window_frames/type{type + 1}.png" : $"window_frames/{type + 1}.png";
+        return File.Exists(Path.Combine(Skin(sav), name)) ? name : null;
+    }
+
     public string Skin(SaveFile sav)
     {
         var game = sav switch

@@ -736,7 +736,9 @@ static void draw_lines(SDL_Surface *dst, const Layout *l, JSON_Object *f, const 
 // A window: the frame image's 3x3 tiles drawn one tile outside the inner rect, which is filled from the centre.
 static void draw_window(SDL_Surface *dst, Scene *scene, const Layout *l, const char *frame_name, int x, int y, int w, int h)
 {
-    SDL_Surface *frame = skin_image(scene, frame_name ? frame_name : "window_frame.png");
+    // no frame named: the scene's (the game's own frame type), else the skin's
+    const char *own = json_object_get_string(json_value_get_object(scene->root), "menu_frame");
+    SDL_Surface *frame = skin_image(scene, frame_name ? frame_name : own ? own : "window_frame.png");
     if (frame == NULL)
     {
         fill_logical(dst, l, x - 2, y - 2, w + 4, h + 4, (SDL_Color){96, 96, 96, 255});

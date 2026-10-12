@@ -205,4 +205,21 @@ public sealed class BoxSceneTests : IDisposable
         wallpaper = (string?)_scene.Build(emerald, "Emerald", new SlotRef(0, 0))["boxes"]![1]!["wallpaper"];
         Assert.StartsWith(Path.Combine(_assets, "wallpapers"), wallpaper);
     }
+
+    [Fact]
+    public void ThePcWindowsUseTheGamesFrameType()
+    {
+        foreach (var (version, file) in new[] { (GameVersion.FR, "type3.png"), (GameVersion.E, "3.png") })
+        {
+            var sav = _saves.Create(version, $"{version}.sav").Sav;
+            var frames = Path.Combine(_scene.Skin(sav), "window_frames");
+            Directory.CreateDirectory(frames);
+            File.WriteAllText(Path.Combine(frames, file), "");
+            var small = ((SAV3)sav).Small;
+            small[0x14] = (byte)((small[0x14] & 0x07) | (2 << 3)); // OPTION > FRAME: TYPE 3
+            var scene = _scene.Build(sav, "", new SlotRef(0, 0));
+            Assert.Equal($"window_frames/{file}", (string?)scene["menu_frame"]);
+            Assert.Equal($"window_frames/{file}", (string?)scene["message_frame"]);
+        }
+    }
 }

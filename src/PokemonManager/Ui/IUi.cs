@@ -24,9 +24,9 @@ public interface IUi
     /// a part of <paramref name="titleImage"/> (one frame of an icon sheet). With <paramref name="actionText"/>, Y is
     /// shown with that label; pressing it returns the highlighted index with <see cref="ActionPressed"/> set.
     /// <paramref name="secondaryText"/> does the same for SELECT (<see cref="SecondaryPressed"/>); rows marked in
-    /// <paramref name="noActions"/> offer neither.
+    /// <paramref name="noActions"/> offer neither. <paramref name="confirmText"/> labels A (SELECT by default).
     /// </summary>
-    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null);
+    int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null, string? confirmText = null);
 
     /// <summary>
     /// A settings list like NextUI's: each row's name on the left and its value on the right, changed with

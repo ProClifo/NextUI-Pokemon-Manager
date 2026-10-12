@@ -69,7 +69,7 @@ public sealed class MinUi : IUi
     private string[] MessageFont(params string[] texts)
         => FontFor(texts) is { } path ? ["--font-default", path] : [];
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null, string? confirmText = null)
     {
         StopBusy();
         if (items.Count == 0)
@@ -80,14 +80,14 @@ public sealed class MinUi : IUi
         // Should a list still crash, reopen it at the top as the wrap would have.
         for (int attempt = 0; ; attempt++)
         {
-            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, icons, titleImageRect, actionText, secondaryText, noActions, out bool crashed);
+            int? result = ChooseOnce(title, items, selected, background, tags, images, titleImage, disabled, icons, titleImageRect, actionText, secondaryText, noActions, confirmText, out bool crashed);
             if (!crashed || attempt == MaxCrashRetries)
                 return result;
             selected = 0;
         }
     }
 
-    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, IReadOnlyList<bool>? disabled, IReadOnlyList<string?>? icons, (int X, int Y, int W, int H)? titleImageRect, string? actionText, string? secondaryText, IReadOnlyList<bool>? noActions, out bool crashed)
+    private int? ChooseOnce(string title, IReadOnlyList<string> items, int selected, string? background, IReadOnlyList<string?>? tags, IReadOnlyList<string?>? images, string? titleImage, IReadOnlyList<bool>? disabled, IReadOnlyList<string?>? icons, (int X, int Y, int W, int H)? titleImageRect, string? actionText, string? secondaryText, IReadOnlyList<bool>? noActions, string? confirmText, out bool crashed)
     {
         var input = Path.Combine(_tmp, "list.json");
         var output = Path.Combine(_tmp, "list-out.json");
@@ -146,7 +146,7 @@ public sealed class MinUi : IUi
             "--write-location", output,
             "--write-value", "state",
             // with a second action button there's only room for "OPEN" (as on NextUI's main menu)
-            "--confirm-text", secondaryText is null ? "SELECT" : "OPEN",
+            "--confirm-text", confirmText ?? (secondaryText is null ? "SELECT" : "OPEN"),
             "--cancel-text", "BACK",
         ];
         background ??= Background;
@@ -162,7 +162,7 @@ public sealed class MinUi : IUi
             args = [.. args, "--action-button", "Y", "--action-text", actionText];
         if (actionText is not null && secondaryText is not null)
             args = [.. args, "--secondary-button", "SELECT", "--secondary-text", secondaryText];
-        args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "OPEN", "BACK", actionText, secondaryText])];
+        args = [.. args, .. ListFont([title], items, tags ?? [], ["SELECT", "OPEN", "BACK", actionText, secondaryText, confirmText])];
         int code = Run("minui-list", args);
         ActionPressed = code == ExitAction;
         SecondaryPressed = code == ExitSecondary;
@@ -381,7 +381,7 @@ public sealed class ConsoleUi : IUi
     public UiFont? Font { get; set; }
     public string? Background { get; set; }
 
-    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null)
+    public int? Choose(string title, IReadOnlyList<string> items, int selected = 0, string? background = null, IReadOnlyList<string?>? tags = null, IReadOnlyList<string?>? images = null, string? titleImage = null, IReadOnlyList<bool>? disabled = null, IReadOnlyList<string?>? icons = null, (int X, int Y, int W, int H)? titleImageRect = null, string? actionText = null, string? secondaryText = null, IReadOnlyList<bool>? noActions = null, string? confirmText = null)
     {
         if (items.Count == 0)
             return null;

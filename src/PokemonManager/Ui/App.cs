@@ -661,7 +661,8 @@ public sealed class App
         // the Pokémon's box icon in front of the question
         var icon = _boxViewer.Icon(source.Sav, from.Get(source.Sav));
         var choice = _ui.Choose(icon is null ? title : "\t\t" + title, targets.Select(SaveName).ToList(), 0, tags: tags, images: sprites,
-            icons: targets.Select(CartridgeIcon).ToList(), titleImage: icon?.Sheet, titleImageRect: icon is null ? null : (icon.X, icon.Y, icon.W, icon.H));
+            icons: targets.Select(CartridgeIcon).ToList(), titleImage: icon?.Sheet, titleImageRect: icon is null ? null : (icon.X, icon.Y, icon.W, icon.H),
+            confirmText: "SEND");
         return choice is { } c ? targets[c] : null;
     }
 
