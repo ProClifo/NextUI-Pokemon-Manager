@@ -29,6 +29,7 @@ POKERUBY_COMMIT="${POKERUBY_COMMIT:-5784633ce4ef7ade1a7f2d2d0c288e3d5e6cdd7f}"
 POKEFIRERED_COMMIT="${POKEFIRERED_COMMIT:-037335f4c725d7c9aecdac87066f2002b4bd7e14}"
 POKEHEARTGOLD_COMMIT="${POKEHEARTGOLD_COMMIT:-9d8b7591f09b65804da2fb2dfd56f320633e0d36}"
 POKEPLATINUM_COMMIT="${POKEPLATINUM_COMMIT:-c248fb3f8cc9934ded800e489567c5c0eeee92eb}"
+POKEDIAMOND_COMMIT="${POKEDIAMOND_COMMIT:-b623abef1b4dfe204ca50aab42447ac00c134290}"
 PLATFORMS=(tg5040 tg5050 my355 h700)
 
 VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$ROOT/pak.json")"
@@ -128,7 +129,11 @@ sparse_clone pokefirered "$POKEFIRERED_COMMIT" '/graphics/pokemon/' '/src/pokemo
     '/graphics/trainer_card/' '/graphics/trainers/front_pics/red_front_pic.png' '/graphics/trainers/front_pics/leaf_front_pic.png' \
     '/graphics/trainers/palettes/red.pal' '/graphics/trainers/palettes/leaf.pal'
 sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/species.txt' \
-    '/res/graphics/field_sprites/player/'
+    '/res/graphics/field_sprites/player/' \
+    '/res/prebuilt/graphic/box.narc' '/res/prebuilt/graphic/winframe.narc' '/res/fonts/' '/res/graphics/windows/' \
+    '/tools/msgenc/charmap.txt'
+# Diamond/Pearl's PC art (scripts/pc_ui/ds.py; the rest of its skin comes from Platinum's)
+sparse_clone pokediamond "$POKEDIAMOND_COMMIT" '/files/graphic/box/'
 # HeartGold's player sprites (MMODEL_HERO, MMODEL_HEROINE)
 sparse_clone pokeheartgold "$POKEHEARTGOLD_COMMIT" '/files/data/mmodel/mmodel/mmodel_00000069.NSBTX' '/files/data/mmodel/mmodel/mmodel_00000070.NSBTX'
 

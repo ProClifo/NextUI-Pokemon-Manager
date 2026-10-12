@@ -98,13 +98,14 @@ public sealed class BoxScene(string assetDir)
     public static SlotRef FromViewer(int box, int slot) => box == 0 ? SlotRef.Party(slot) : new SlotRef(box - 1, slot);
 
     /// <summary>
-    /// The box's own wallpaper in Gen 3 and Diamond/Pearl/Platinum saves (their skins have the game's wallpapers:
-    /// Diamond/Pearl 24, Platinum 32); other games cycle through the Gen 3 set.
+    /// The box's own wallpaper in Gen 3 and Gen 4 saves (their skins have the game's wallpapers: Diamond/Pearl 24,
+    /// Platinum 32); Black/White cycle through the first 16.
     /// </summary>
     private static int WallpaperFor(SaveFile sav, int box)
     {
-        int count = sav switch { SAV4Pt => 32, SAV4DP => 24, _ => WallpaperCount };
-        if (sav is (SAV3 or SAV4DP or SAV4Pt) and IBoxDetailWallpaper wallpapers)
+        // HeartGold/SoulSilver's first 16 are the same scenes as Diamond/Pearl/Platinum's (their skin is Platinum's).
+        int count = sav switch { SAV4Pt => 32, SAV4DP => 24, SAV4HGSS => 16, _ => WallpaperCount };
+        if (sav is (SAV3 or SAV4) and IBoxDetailWallpaper wallpapers)
         {
             int id = wallpapers.GetBoxWallpaper(box);
             if (id >= 0 && id < count)
@@ -126,8 +127,8 @@ public sealed class BoxScene(string assetDir)
     /// <summary>
     /// The folder of the PC and summary screens' art and layout (res/box/ui/&lt;game&gt;): Red/Blue's, Yellow's,
     /// Gold/Silver's and Crystal's Game Boy PCs (scripts/gb_ui), Ruby/Sapphire's, FireRed/LeafGreen's,
-    /// Diamond/Pearl's, Platinum's, or Emerald's for Emerald and the games without a decompilation of their PC art
-    /// (HeartGold/SoulSilver, Black/White) (scripts/pc_ui).
+    /// Diamond/Pearl's, or Platinum's (also for HeartGold/SoulSilver and Black/White, whose PC art no decompilation
+    /// has), and Emerald's for Emerald (scripts/pc_ui).
     /// </summary>
     public string Skin(SaveFile sav)
     {
@@ -141,6 +142,7 @@ public sealed class BoxScene(string assetDir)
             SAV3FRLG => "frlg",
             SAV4DP => "dp",
             SAV4Pt => "pt",
+            SAV4HGSS or SAV5 => "pt", // no decompilation has their PC art: the nearest DS one
             _ => "e",
         };
         var dir = Path.Combine(AssetDir, "ui", game);

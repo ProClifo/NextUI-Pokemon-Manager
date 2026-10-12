@@ -975,6 +975,7 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         JSON_Object *s = cur->summary;
         draw_field(screen, l, lo, "pc.mon_text", "nickname", json_object_get_string(s, "nickname"));
         draw_field(screen, l, lo, "pc.mon_text", "species", json_object_get_string(s, "species"));
+        draw_field(screen, l, lo, "pc.mon_text", "dex_no", json_object_get_string(s, "dex_no"));
         draw_field(screen, l, lo, "pc.mon_text", "level", json_object_get_string(s, "level"));
         draw_gender(screen, l, lo, "pc.mon_text", json_object_get_string(s, "gender"));
         const char *item = json_object_get_string(s, "item");
@@ -987,7 +988,8 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     {
         SDL_Rect src = {0, 0, hand->w >= 64 ? 32 : hand->w, hand->h >= 32 ? 32 : hand->h};
         // Over PARTY POKéMON and CLOSE BOX the hand hangs upside down (the cursor sprite's vFlip)
-        bool on_button = st->mode == VIEW_BOX && (st->target == TARGET_PARTY_BUTTON || st->target == TARGET_CLOSE_BUTTON);
+        bool on_button = st->mode == VIEW_BOX && (st->target == TARGET_PARTY_BUTTON || st->target == TARGET_CLOSE_BUTTON)
+                         && json_object_dotget_boolean(lo, "pc.hand_flip_on_buttons") != 0; // missing (-1): flip, as Gen 3
         SDL_Surface *flipped = on_button ? SDL_CreateRGBSurfaceWithFormat(0, src.w, src.h, 32, SDL_PIXELFORMAT_RGBA8888) : NULL;
         if (flipped)
         {
@@ -1273,7 +1275,14 @@ static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, 
 {
     SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0, 0, 0));
     if (st->mode == VIEW_SUMMARY)
-        draw_summary(screen, scene, st, l);
+    {
+        // A GBA-sized summary on a bigger (DS) screen sits at "summary_origin"
+        SDL_Rect o = get_rect(scene->layout, "summary_origin");
+        Layout moved = *l;
+        moved.origin_x += o.x * l->scale;
+        moved.origin_y += o.y * l->scale;
+        draw_summary(screen, scene, st, &moved);
+    }
     else
         draw_pc(screen, scene, st, l, ticks);
 }
