@@ -1,7 +1,7 @@
 namespace PokemonManager.Core;
 
 /// <summary>
-/// Names given to saves on the Other saves list (Y), shown instead of the game's name: one "path&lt;TAB&gt;name"
+/// Names given to saves on the ROM hacks list (Y), shown instead of the game's name: one "path&lt;TAB&gt;name"
 /// line per save in PokemonManager/save-names.txt. An empty name removes it.
 /// </summary>
 public sealed class SaveNames(string file)

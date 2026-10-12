@@ -74,7 +74,7 @@ public sealed class App
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
-                items.Add($"[{_hidden.Count} {(_hidden.Count == 1 ? "other" : "others")}]");
+                items.Add($"[{_hidden.Count} {(_hidden.Count == 1 ? "ROM hack" : "ROM hacks")}]");
             int rescan = items.Count; items.Add("[Rescan SD card]");
             int settings = items.Count; items.Add("[Settings]");
             int update = items.Count; items.Add("[Update]");
@@ -161,7 +161,7 @@ public sealed class App
         _profiles.Clear();
         _tickets.Clear();
         // Only saves with their game's ROM (same file name), in games that have got as far as receiving the
-        // Pokédex, are shown at all; [N others] lists only those whose ROM isn't an official release.
+        // Pokédex, are shown at all; [N ROM hacks] lists only those whose ROM isn't an official release.
         all.RemoveAll(s => RomIndex.FindRoms(s.Path).Count == 0 || !TradeRules.HasPokedex(s.Sav));
         if (_settings.OnlyOfficialRoms && all.Count != 0)
         {
@@ -207,7 +207,7 @@ public sealed class App
             var saves = _hidden.Select(h => h.Save).ToList();
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
-            var choice = _ui.Choose("Other saves", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
+            var choice = _ui.Choose("ROM hacks", saves.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
                 icons: saves.Select(CartridgeIcon).ToList(), actionText: "RENAME");
             if (choice is not { } c)
                 return;
@@ -1008,7 +1008,7 @@ public sealed class App
     /// The player's overworld sprite in this save's game, boy or girl (scripts/build-trainers.py), or an empty
     /// path where there's none: Black/White have no decompilation to take it from.
     /// </summary>
-    /// <summary>A save as the menus name it: the name given to it on Other saves, else its game in the game's own language ("Emerald", "Smaragd").</summary>
+    /// <summary>A save as the menus name it: the name given to it on the ROM hacks list, else its game in the game's own language ("Emerald", "Smaragd").</summary>
     private string SaveName(SaveEntry save) => SavedNames.Get(save.Path) ?? GameName(save);
 
     private string GameName(SaveEntry save)
