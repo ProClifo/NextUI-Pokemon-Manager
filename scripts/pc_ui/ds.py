@@ -157,6 +157,7 @@ def build_skin(fs, target, wallpapers, e_skin, platinum_repo):
         "fonts": fonts,
         "card": False,
         "font": {"color": [106, 106, 98], "shadow": [197, 205, 205], "height": 12, "cap_top": 3},
+        "sprite_size": 80,  # the DS games' Pokémon pictures are 80x80 (the GBA's 64x64)
         "summary_origin": [8, 16],
     })
     summary = ds_summary.build(platinum_repo, target, _text_width(platinum_repo))

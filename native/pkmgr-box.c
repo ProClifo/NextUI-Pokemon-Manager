@@ -865,21 +865,23 @@ static void draw_icon(SDL_Surface *screen, const Layout *l, Slot *slot, int x, i
 
 // The front picture centred on (cx, cy); the summary screens mirror it unless the species is one the games
 // never flip (IsMonSpriteNotFlipped).
-static void draw_sprite(SDL_Surface *screen, const Layout *l, Slot *slot, int cx, int cy, bool flip)
+// The picture is cut to size x size (the games' frame: 64 on the GBA, 80 on the DS; the skin's "sprite_size"),
+// centred across and keeping the bottom.
+static void draw_sprite(SDL_Surface *screen, const Layout *l, Slot *slot, int cx, int cy, bool flip, int size)
 {
     SDL_Surface *sprite = load_image(slot->sprite);
     if (sprite == NULL)
         return;
     SDL_Rect src = slot->sprite_rect.w ? slot->sprite_rect : (SDL_Rect){0, 0, sprite->w, sprite->h};
-    if (src.w > 64)
+    if (src.w > size)
     {
-        src.x += (src.w - 64) / 2;
-        src.w = 64;
+        src.x += (src.w - size) / 2;
+        src.w = size;
     }
-    if (src.h > 64)
+    if (src.h > size)
     {
-        src.y += src.h - 64;
-        src.h = 64;
+        src.y += src.h - size;
+        src.h = size;
     }
     if (!flip)
     {
@@ -1020,7 +1022,7 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         if (bg.w)
             fill_logical(screen, l, bg.x, bg.y, bg.w, bg.h, get_color(lo, "pc.mon_text_bg.color", (SDL_Color){148, 148, 172, 255}));
         SDL_Rect sp = get_rect(lo, "pc.mon_sprite");
-        draw_sprite(screen, l, cur, sp.x, sp.y, false);
+        draw_sprite(screen, l, cur, sp.x, sp.y, false, get_int(scene->layout, "sprite_size", 64));
         JSON_Object *s = cur->summary;
         draw_field(screen, l, lo, "pc.mon_text", "nickname", json_object_get_string(s, "nickname"));
         draw_field(screen, l, lo, "pc.mon_text", "species", json_object_get_string(s, "species"));
@@ -1163,7 +1165,7 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
 
     // The Pokémon's picture, name, species, level, gender and ball (on every page where the layout has them).
     SDL_Rect sp = get_rect(lo, "summary.sprite");
-    draw_sprite(screen, l, cur, sp.x, sp.y, json_object_get_boolean(s, "flip") == 1);
+    draw_sprite(screen, l, cur, sp.x, sp.y, json_object_get_boolean(s, "flip") == 1, get_int(lo, "sprite_size", 64));
     static const char *TEXT[] = {"dex_no", "nickname", "species", "level", "ot", "id", "ability", "item", "ribbon",
                                  "hp", "attack", "defense", "sp_atk", "sp_def", "speed", "exp_points", "next_lv"};
     for (size_t i = 0; i < sizeof(TEXT) / sizeof(TEXT[0]); i++)
