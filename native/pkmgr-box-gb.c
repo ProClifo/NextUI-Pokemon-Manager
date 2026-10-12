@@ -20,6 +20,8 @@ typedef enum
     GB_LIST,
     GB_MENU,
     GB_STATS,
+    GB_CONFIRM, // "Evolve <nickname>?" with YES / NO
+    GB_EVOLVED, // the evolved Pokémon and the scene's "evolved" text
 } GbMode;
 
 typedef struct
@@ -30,6 +32,9 @@ typedef struct
     int menu_item;
     int page;
     const char *message; // why Transfer/Evolve can't be used, until a button is pressed
+    int yes_no;          // GB_CONFIRM: 0 YES, 1 NO
+    const char *evolved;
+    int evolved_page;    // the text box shows two lines at a time; A shows the next two
 } GbState;
 
 static const char *GB_MENU_ITEMS[] = {"TRANSFER", "STATS", "EVOLVE", "CANCEL"};
@@ -499,6 +504,46 @@ static void gb_draw(SDL_Surface *dst, Scene *scene, const Layout *l, GbState *st
 {
     SDL_FillRect(dst, NULL, SDL_MapRGB(dst->format, 0, 0, 0));
     fill_logical(dst, l, 0, 0, GB_W, GB_H, gb_bg);
+    Box *box = &scene->boxes[scene->box];
+    if (st->mode == GB_EVOLVED)
+    {
+        // as the games' evolution screen: the picture in the middle, the text box under it
+        if (st->cursor < gb_count(box))
+            gb_pic(dst, l, &box->slots[st->cursor], (GB_W - 56) / 2, 24, false);
+        char lines[8][160];
+        int n = wrap_lines(st->evolved, 18, gb_measure, NULL, lines, 8);
+        gb_box(dst, scene, l, 0, 12, 20, 6);
+        for (int i = 0; i < 2 && st->evolved_page * 2 + i < n; i++)
+            gb_print(dst, scene, l, lines[st->evolved_page * 2 + i], 1, 14 + i * 2);
+        if (st->evolved_page * 2 + 2 < n)
+            gb_print(dst, scene, l, "▼", 18, 16);
+        return;
+    }
+    if (st->mode == GB_CONFIRM)
+    {
+        // the list as it was, the games' YES / NO box (NO first) and "Evolve <nickname>?"
+        GbState under = *st;
+        under.mode = GB_LIST;
+        under.message = NULL;
+        if (gb_gen == 1)
+            gb_draw_gen1(dst, scene, l, &under);
+        else
+            gb_draw_gen2(dst, scene, l, &under);
+        gb_box(dst, scene, l, 14, 7, 6, 5);
+        gb_print(dst, scene, l, ui_string("yes_no", 0, "YES"), 16, 8);
+        gb_print(dst, scene, l, ui_string("yes_no", 1, "NO"), 16, 10);
+        gb_print(dst, scene, l, "▶", 15, 8 + st->yes_no * 2);
+        char msg[160];
+        const char *nick = st->cursor < gb_count(box) ? gb_str(box->slots[st->cursor].summary, "nickname") : "";
+        const char *format = ui_string("evolve_question", -1, "Evolve %s?");
+        const char *mark = strstr(format, "%s");
+        if (mark)
+            snprintf(msg, sizeof(msg), "%.*s%s%s", (int)(mark - format), format, nick, mark + 2);
+        else
+            snprintf(msg, sizeof(msg), "%s", format);
+        gb_message(dst, scene, l, msg);
+        return;
+    }
     if (st->mode == GB_STATS)
         gb_draw_stats(dst, scene, l, st);
     else if (gb_gen == 1)
@@ -550,7 +595,15 @@ static void gb_init(Scene *scene, GbState *st)
     memset(st, 0, sizeof(*st));
     st->mode = GB_LIST;
     st->cursor = scene->slot;
+    st->yes_no = 1;
     gb_fix_scroll(scene, st);
+    // back from an evolution: its screen first
+    const char *evolved = json_object_get_string(json_value_get_object(scene->root), "evolved");
+    if (evolved && evolved[0])
+    {
+        st->evolved = evolved;
+        st->mode = GB_EVOLVED;
+    }
 }
 
 #ifdef DESKTOP
@@ -562,6 +615,13 @@ static void gb_screenshot(SDL_Surface *screen, Scene *scene, const char *state_n
     gb_init(scene, &st);
     if (strcmp(state_name, "menu") == 0)
         st.mode = GB_MENU;
+    else if (strcmp(state_name, "evolved1") == 0)
+        st.evolved_page = 1;
+    else if (strcmp(state_name, "confirm") == 0)
+    {
+        st.mode = GB_CONFIRM;
+        st.yes_no = 1;
+    }
     else if (strcmp(state_name, "why") == 0 && st.cursor < gb_count(&scene->boxes[scene->box]))
     {
         Slot *slot = &scene->boxes[scene->box].slots[st.cursor];
@@ -635,14 +695,41 @@ static int gb_run(SDL_Surface *screen, Scene *scene, const char *write_location)
                 quitting = true;
             }
         }
+        else if (st.mode == GB_EVOLVED)
+        {
+            char lines[8][160];
+            int n = wrap_lines(st.evolved, 18, gb_measure, NULL, lines, 8);
+            if (a && st.evolved_page * 2 + 2 < n)
+                st.evolved_page++;
+            else if (a || b)
+                st.mode = GB_LIST;
+        }
+        else if (st.mode == GB_CONFIRM)
+        {
+            if (dy)
+                st.yes_no = 1 - st.yes_no;
+            else if (a && st.yes_no == 0)
+            {
+                action = "evolve";
+                exit_code = EXIT_PICKED;
+                quitting = true;
+            }
+            else if (a || b)
+                st.mode = GB_MENU;
+        }
         else if (st.mode == GB_MENU)
         {
             Slot *slot = &box->slots[st.cursor];
             if (dy)
                 st.menu_item = (st.menu_item + dy + 4) % 4;
-            else if (a && (st.menu_item == 0 || st.menu_item == 2) && menu_enabled(slot, st.menu_item))
+            else if (a && st.menu_item == 2 && menu_enabled(slot, st.menu_item))
             {
-                action = st.menu_item == 0 ? "transfer" : "evolve";
+                st.mode = GB_CONFIRM;
+                st.yes_no = 1;
+            }
+            else if (a && st.menu_item == 0 && menu_enabled(slot, st.menu_item))
+            {
+                action = "transfer";
                 exit_code = EXIT_PICKED;
                 quitting = true;
             }

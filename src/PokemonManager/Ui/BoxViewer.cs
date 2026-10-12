@@ -20,14 +20,18 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
     public bool IsAvailable => scene.AssetsPresent && FindOnPath(Tool) is not null;
 
     public Outcome Pick(SaveFile sav, string title, ref SlotRef position, UiFont? font = null, UiFont? fallbackFont = null,
-        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null, string? language = null)
+        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null, string? language = null, string? evolved = null)
     {
         Directory.CreateDirectory(tempDir);
         var scenePath = Path.Combine(tempDir, "box-scene.json");
         var outPath = Path.Combine(tempDir, "box-result.json");
         try
         {
-            File.WriteAllText(scenePath, scene.Build(sav, title, position, font, fallbackFont, actions, language).ToJsonString());
+            var built = scene.Build(sav, title, position, font, fallbackFont, actions, language);
+            // after an evolution, the viewer shows the evolved Pokémon with this text before the box
+            if (evolved is not null)
+                built["evolved"] = evolved;
+            File.WriteAllText(scenePath, built.ToJsonString());
             File.Delete(outPath);
         }
         catch (Exception ex)

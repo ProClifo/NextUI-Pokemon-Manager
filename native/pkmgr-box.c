@@ -801,6 +801,8 @@ typedef enum
     VIEW_PARTY,
     VIEW_MENU,
     VIEW_SUMMARY,
+    VIEW_CONFIRM, // "Evolve <nickname>?" with YES / NO over the box or party
+    VIEW_EVOLVED, // the evolved Pokémon and "Congratulations! ..." (the scene's "evolved" text)
 } Mode;
 
 typedef struct
@@ -812,6 +814,8 @@ typedef struct
     int menu_item;
     int page;
     const char *message; // an explanation in the message box, until a button is pressed
+    int yes_no;          // VIEW_CONFIRM: 0 YES, 1 NO
+    const char *evolved; // VIEW_EVOLVED's text
 } State;
 
 static const char *MENU_ITEMS[] = {"TRANSFER", "SUMMARY", "EVOLVE", "CANCEL"};
@@ -863,6 +867,40 @@ static int wrap_two_lines(const char *text, int max_w, int (*width)(const char *
     snprintf(lines[0], 160, "%.*s", split, text);
     snprintf(lines[1], 160, "%s", text + split + 1);
     return 2;
+}
+
+// Splits text into at most max_lines lines of at most max_w pixels, at spaces (a word wider than a line gets
+// one to itself). Returns how many lines.
+static int wrap_lines(const char *text, int max_w, int (*width)(const char *, const void *), const void *ctx, char lines[][160], int max_lines)
+{
+    int n = 0;
+    const char *p = text;
+    while (*p == ' ')
+        p++;
+    while (*p && n < max_lines)
+    {
+        int end = 0, best = -1;
+        for (int i = 0;; i++)
+        {
+            if (p[i] == ' ' || p[i] == '\0')
+            {
+                char head[160];
+                snprintf(head, sizeof(head), "%.*s", i, p);
+                if (best < 0 || width(head, ctx) <= max_w)
+                    best = i;
+                else
+                    break;
+                if (p[i] == '\0')
+                    break;
+            }
+        }
+        end = best < 0 ? (int)strlen(p) : best;
+        snprintf(lines[n++], 160, "%.*s", end, p);
+        p += end;
+        while (*p == ' ')
+            p++;
+    }
+    return n;
 }
 
 static void draw_icon(SDL_Surface *screen, const Layout *l, Slot *slot, int x, int y, bool animate, Uint32 ticks)
@@ -1002,7 +1040,7 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         hx = at.x;
         hy = at.y;
     }
-    int hand_bob = st->mode == VIEW_MENU ? 0 : (int)((ticks / 300) % 2) * 2;
+    int hand_bob = st->mode == VIEW_MENU || st->mode == VIEW_CONFIRM ? 0 : (int)((ticks / 300) % 2) * 2;
 
     // In the box the hand's shadow falls on the wallpaper, under the icons.
     if (in_box)
@@ -1117,8 +1155,74 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
             snprintf(msg, sizeof(msg), "%s", format);
         draw_message(screen, scene, l, msg);
     }
+    else if (st->mode == VIEW_CONFIRM && cur && cur->filled)
+    {
+        // YES / NO where the action menu was, NO highlighted first
+        int line = get_int(lo, "pc.menu.line_height", 16), text_x = get_int(lo, "pc.menu.text_x", 8), text_y = get_int(lo, "pc.menu.text_y", 1);
+        int menu_font_before = use_font(json_object_dotget_string(lo, "pc.menu.font"));
+        SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
+        const char *items[2] = {ui_string("yes_no", 0, "YES"), ui_string("yes_no", 1, "NO")};
+        int widest = text_width(items[0], l) > text_width(items[1], l) ? text_width(items[0], l) : text_width(items[1], l);
+        int w = ((widest + 7) / 8 + 2) * 8, h = 2 * line;
+        int x = get_int(lo, "pc.menu.right", 232) - w, y = get_int(lo, "pc.menu.bottom", 120) - h;
+        draw_window(screen, scene, l, NULL, x, y, w, h);
+        for (int i = 0; i < 2; i++)
+        {
+            int ty = y + text_y + i * line;
+            draw_text_c(screen, l, items[i], x + text_x, ty, 0, color, shadow);
+            if (i != st->yes_no)
+                continue;
+            SDL_Surface *arrow = skin_image(scene, "cursor_menu.png");
+            if (arrow)
+                blit_scaled(arrow, NULL, screen, l, x, ty);
+            else
+            {
+                for (int r = 0; r < 7; r++)
+                    fill_logical(screen, l, x + 1, ty + cap_top + (font_height - 7) / 2 + r, r < 4 ? r + 1 : 7 - r, 1, color);
+            }
+        }
+        active_font = menu_font_before;
+        char msg[160];
+        const char *nick = json_object_get_string(cur->summary, "nickname");
+        const char *format = ui_string("evolve_question", -1, "Evolve %s?");
+        const char *mark = strstr(format, "%s");
+        if (mark)
+            snprintf(msg, sizeof(msg), "%.*s%s%s", (int)(mark - format), format, nick ? nick : cur->name, mark + 2);
+        else
+            snprintf(msg, sizeof(msg), "%s", format);
+        draw_message(screen, scene, l, msg);
+    }
     else if (st->message)
         draw_message(screen, scene, l, st->message);
+}
+
+// After an evolution: the evolved Pokémon in the middle of a dark screen, the message box under it.
+static void draw_evolved(SDL_Surface *screen, Scene *scene, State *st, const Layout *l)
+{
+    JSON_Object *lo = scene->layout;
+    // the evolution scene's dark blue, lighter towards the middle
+    for (int y = 0; y < logical_h; y += 8)
+    {
+        int d = y < logical_h / 2 ? logical_h / 2 - y : y - logical_h / 2;
+        int k = 64 - d * 48 / (logical_h / 2);
+        fill_logical(screen, l, 0, y, logical_w, 8, (SDL_Color){(Uint8)(k / 3), (Uint8)(k / 2), (Uint8)(k + 24), 255});
+    }
+    // the message box across the bottom of the screen, as tall as the text needs (up to three lines)
+    SDL_Rect pm = get_rect(lo, "pc.message"), mt = get_rect(lo, "pc.message_text");
+    SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
+    int font_before = use_font(json_object_dotget_string(lo, "pc.message_font"));
+    int pad = pm.h > 0 ? pm.h - 16 : 8; // the window's height around one line
+    int w = logical_w - 8;
+    char lines[3][160];
+    int n = wrap_lines(st->evolved, w - 2 * mt.x - 2, measure_text, l, lines, 3);
+    int h = pad + n * 16, y = logical_h - 4 - h;
+    Slot *cur = hovered(scene, st);
+    if (cur && cur->filled)
+        draw_sprite(screen, l, cur, logical_w / 2, y / 2 + 4, false, get_int(lo, "sprite_size", 64));
+    draw_window(screen, scene, l, json_object_dotget_string(lo, "pc.message_frame"), 4, y, w, h);
+    for (int i = 0; i < n; i++)
+        draw_text_c(screen, l, lines[i], 4 + mt.x, y + mt.y + i * 16, 0, color, shadow);
+    active_font = font_before;
 }
 
 // ------------------------------------------------------------------ summary screen
@@ -1396,7 +1500,9 @@ static void write_result(const char *path, Scene *scene, State *st, const char *
 static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, Uint32 ticks)
 {
     SDL_FillRect(screen, NULL, SDL_MapRGB(screen->format, 0, 0, 0));
-    if (st->mode == VIEW_SUMMARY)
+    if (st->mode == VIEW_EVOLVED)
+        draw_evolved(screen, scene, st, l);
+    else if (st->mode == VIEW_SUMMARY)
     {
         // A GBA-sized summary on a bigger (DS) screen sits at "summary_origin"
         SDL_Rect o = get_rect(scene->layout, "summary_origin");
@@ -1485,7 +1591,7 @@ int main(int argc, char *argv[])
     Layout layout = make_layout(screen);
     open_text_font(&scene, &layout);
 
-    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0, NULL};
+    State st = {VIEW_BOX, VIEW_BOX, TARGET_SLOT, 0, 0, 0, NULL, 1, NULL};
     if (scene.box == 0)
     {
         // Back from a party Pokémon: the party is open again.
@@ -1493,6 +1599,14 @@ int main(int argc, char *argv[])
         st.party_slot = scene.slot < 6 ? scene.slot : 0;
         scene.box = 1;
         scene.slot = 0;
+    }
+    // Back from an evolution: its screen first, then the box (or party) as it was
+    const char *evolved = json_object_get_string(json_value_get_object(scene.root), "evolved");
+    if (evolved && evolved[0])
+    {
+        st.evolved = evolved;
+        st.menu_from = st.mode;
+        st.mode = VIEW_EVOLVED;
     }
 
 #ifdef DESKTOP
@@ -1502,6 +1616,8 @@ int main(int argc, char *argv[])
             st.mode = st.menu_from = VIEW_PARTY;
         else if (strcmp(state_name, "menu") == 0)
             st.mode = VIEW_MENU;
+        else if (strcmp(state_name, "confirm") == 0)
+            st.mode = VIEW_CONFIRM;
         else if (strncmp(state_name, "summary", 7) == 0)
         {
             st.mode = VIEW_SUMMARY;
@@ -1590,13 +1706,37 @@ int main(int argc, char *argv[])
                 st.target = TARGET_PARTY_BUTTON;
             }
         }
+        else if (st.mode == VIEW_EVOLVED)
+        {
+            if (a || b)
+                st.mode = st.menu_from;
+        }
+        else if (st.mode == VIEW_CONFIRM)
+        {
+            if (dy)
+                st.yes_no = 1 - st.yes_no;
+            else if (a && st.yes_no == 0)
+            {
+                action = "evolve";
+                exit_code = EXIT_PICKED;
+                quitting = true;
+            }
+            else if (a || b)
+                st.mode = st.menu_from;
+        }
         else if (st.mode == VIEW_MENU)
         {
             if (dy)
                 st.menu_item = (st.menu_item + dy + MENU_COUNT) % MENU_COUNT;
-            else if (a && (st.menu_item == 0 || st.menu_item == 2) && menu_enabled(hovered(&scene, &st), st.menu_item))
+            else if (a && st.menu_item == 2 && menu_enabled(hovered(&scene, &st), st.menu_item))
             {
-                action = st.menu_item == 0 ? "transfer" : "evolve";
+                // "Evolve <nickname>?" YES / NO, NO first
+                st.mode = VIEW_CONFIRM;
+                st.yes_no = 1;
+            }
+            else if (a && st.menu_item == 0 && menu_enabled(hovered(&scene, &st), st.menu_item))
+            {
+                action = "transfer";
                 exit_code = EXIT_PICKED;
                 quitting = true;
             }

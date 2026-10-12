@@ -581,10 +581,12 @@ public sealed class App
         if (_settings.PcBoxView && _boxViewer.IsAvailable)
         {
             var position = _boxPositions.GetValueOrDefault(entry.Path, new SlotRef(0, 0));
+            string? evolved = null;
             while (true)
             {
                 var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ogFont, _nextFont, ActionsFor(entry),
-                    ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language);
+                    ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, evolved);
+                evolved = null;
                 _boxPositions[entry.Path] = position;
                 if (outcome == BoxViewer.Outcome.Back)
                     return;
@@ -594,8 +596,9 @@ public sealed class App
                     break;
                 }
                 // The viewer has its own Transfer/Summary/Evolve/Cancel menu, like the game's PC.
+                // the viewer asked "Evolve <nickname>?" itself, and shows the result when it reopens
                 if (outcome == BoxViewer.Outcome.Evolve)
-                    EvolveFlow(entry, position);
+                    EvolveFlow(entry, position, confirmed: true, out evolved);
                 else
                     TransferFlow(entry, position, TransferMode.Move);
             }
@@ -623,7 +626,7 @@ public sealed class App
             {
                 ("Transfer", CanTransfer(entry, slot), () => TransferFlow(entry, slot, TransferMode.Move)),
                 ("Summary", true, () => { _ui.Message(Names.Details(pk)); return false; }),
-                ("Evolve", CanEvolve(entry, slot), () => EvolveFlow(entry, slot)),
+                ("Evolve", CanEvolve(entry, slot), () => EvolveFlow(entry, slot, confirmed: false, out _)),
                 ("Cancel", true, () => true),
             };
 
@@ -912,8 +915,12 @@ public sealed class App
 
     // ---------------------------------------------------------------- trade evolution
 
-    private bool EvolveFlow(SaveEntry entry, SlotRef slot)
+    /// <param name="confirmed">The PC viewer already asked "Evolve &lt;nickname&gt;?".</param>
+    /// <param name="evolvedText">"Congratulations! Your &lt;NICKNAME&gt; evolved into &lt;POKEMON&gt;!" for the viewer to
+    /// show; without the viewer (<paramref name="confirmed"/> false) it's shown as a message.</param>
+    private bool EvolveFlow(SaveEntry entry, SlotRef slot, bool confirmed, out string? evolvedText)
     {
+        evolvedText = null;
         if (PartyTradeBlocked(entry, slot))
             return false;
         var pk = slot.Get(entry.Sav);
@@ -933,9 +940,10 @@ public sealed class App
             option = options[pick.Value];
         }
 
-        if (!_ui.Confirm($"Evolve {Names.Summary(pk)} into {Names.Species(option.Species)}?", "EVOLVE", "CANCEL"))
+        if (!confirmed && !_ui.Confirm($"Evolve {pk.Nickname}?", "YES", "NO"))
             return false;
 
+        var nickname = pk.Nickname;
         var result = TradeEvolution.Evolve(entry.Sav, slot, option);
         if (!result.Ok)
         {
@@ -943,8 +951,15 @@ public sealed class App
             _ui.Message(result.Message);
             return false;
         }
-        if (TryWrite(entry, out _))
-            _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
+        if (!TryWrite(entry, out _))
+            return false;
+        Console.Error.WriteLine($"evolve: {result.Message}");
+        // the species as the game writes it (KADABRA in Gen 1-4, Kadabra in Gen 5)
+        var evolvedPk = slot.Get(entry.Sav);
+        var species = SpeciesName.GetSpeciesNameGeneration(evolvedPk.Species, evolvedPk.Language, entry.Sav.Generation);
+        evolvedText = $"Congratulations! Your {nickname} evolved into {species}!";
+        if (!confirmed)
+            _ui.Message(evolvedText);
         return false;
     }
 
