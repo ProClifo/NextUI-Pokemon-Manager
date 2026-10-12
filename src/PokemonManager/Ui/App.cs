@@ -26,6 +26,8 @@ public sealed class App
     private List<(SaveEntry Save, string Reason)> _hidden = [];
     private SaveNames? _saveNames;
     private SaveNames SavedNames => _saveNames ??= new SaveNames(_paths.SaveNamesFile, _paths.SdRoot);
+    private OfficialSaves? _officialSaves;
+    private OfficialSaves MarkedOfficial => _officialSaves ??= new OfficialSaves(_paths.OfficialSavesFile, _paths.SdRoot);
     private VanillaRoms.Index? _romIndex;
     private readonly GameBackgrounds _backgrounds;
     private readonly (int Width, int Height)? _screen =
@@ -168,7 +170,9 @@ public sealed class App
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
             List<OfficialRomFilter.Hidden> unofficial;
             (all, unofficial) = OfficialRomFilter.Apply(all, RomIndex);
-            _hidden.AddRange(unofficial.Select(h => (h.Save, h.Check.Describe())));
+            // ...unless the player has moved them to the main list (a retail dump No-Intro doesn't list)
+            all.AddRange(unofficial.Where(h => MarkedOfficial.Contains(h.Save.Path)).Select(h => h.Save));
+            _hidden.AddRange(unofficial.Where(h => !MarkedOfficial.Contains(h.Save.Path)).Select(h => (h.Save, h.Check.Describe())));
         }
         _saves = SaveOrder.ByLastPlayed(all, RomIndex.FindRoms, SaveOrder.ReadRecents(_paths.RecentFile, _paths.SdRoot));
         return _saves;
@@ -202,8 +206,9 @@ public sealed class App
     private void ShowHidden()
     {
         int selected = 0;
-        while (true)
+        while (_hidden.Count > 0)
         {
+            selected = Math.Min(selected, _hidden.Count - 1);
             var saves = _hidden.Select(h => h.Save).ToList();
             var sprites = saves.Select(s => TrainerSprite(s.Sav)).ToList();
             var tags = saves.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
@@ -285,6 +290,8 @@ public sealed class App
             if (Decorations.Supported(sav) && Decorations.RecordMixingUnlocked((SAV3)sav))
                 actions.Add(("Decorations", null, () => DecorationsMenu(entry)));
             actions.Add(("Info", null, () => InfoMenu(entry)));
+            if (_hidden.Any(h => h.Save == entry))
+                actions.Add(("Move to main list", null, () => MoveToMainList(entry)));
 
             // Headed like the save on the main menu: "[ENG] Emerald   NAME <player sprite> ID".
             var choice = _ui.Choose($"{SaveName(entry)}\t{sav.OT}\t{sav.DisplayTID:D5}", actions.Select(a => a.Label).ToList(), selected,
@@ -294,6 +301,30 @@ public sealed class App
             selected = choice.Value;
             RunSafely(actions[choice.Value].Run, entry);
         }
+    }
+
+    /// <summary>
+    /// For a save on the ROM hacks list whose ROM is really a retail game (a dump No-Intro doesn't list, like an
+    /// old scene release): it's listed with the official games from now on.
+    /// </summary>
+    private void MoveToMainList(SaveEntry entry)
+    {
+        if (!_ui.Confirm($"Move {SaveName(entry)} to the main list?\n\nOnly do this if its ROM is an unmodified game: a ROM hack's " +
+                         "Pokémon may not work in the official games.", "MOVE", "CANCEL"))
+            return;
+        try
+        {
+            MarkedOfficial.Add(entry.Path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _ui.Message($"Couldn't save the change.\n{ex.Message}");
+            return;
+        }
+        _hidden.RemoveAll(h => h.Save == entry);
+        if (_saves is not null)
+            _saves = SaveOrder.ByLastPlayed([.. _saves, entry], RomIndex.FindRoms, SaveOrder.ReadRecents(_paths.RecentFile, _paths.SdRoot));
+        _ui.Message($"{SaveName(entry)} is on the main list now.");
     }
 
     /// <summary>
