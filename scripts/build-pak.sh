@@ -108,7 +108,7 @@ sparse_clone() {
 GB_ART=('/gfx/pokemon/' '/gfx/icons/' '/gfx/stats/' '/gfx/sprites/' '/gfx/overworld/' '/gfx/sprites.asm' '/data/pokemon/' '/data/sgb/'
     '/data/icon_pointers.asm' '/engine/gfx/mon_icons.asm'
     '/gfx/font/' '/gfx/frames/' '/gfx/pc/' '/gfx/battle/' '/constants/charmap.asm'
-    '/gfx/trainer_card/' '/gfx/player/')  # the PC, stats and trainer card screens' tiles and font (scripts/gb_ui)
+    '/gfx/trainer_card/' '/gfx/player/' '/gfx/sgb/' '/gfx/title/')  # the PC, stats and trainer card screens' tiles and font (scripts/gb_ui)
 sparse_clone pokered "$POKERED_COMMIT" "${GB_ART[@]}"
 sparse_clone pokeyellow "$POKEYELLOW_COMMIT" "${GB_ART[@]}"
 sparse_clone pokegold "$POKEGOLD_COMMIT" "${GB_ART[@]}"
@@ -136,7 +136,8 @@ sparse_clone pokeplatinum "$POKEPLATINUM_COMMIT" '/res/pokemon/' '/generated/spe
 # Diamond/Pearl's PC art (scripts/pc_ui/ds.py; the rest of its skin comes from Platinum's)
 sparse_clone pokediamond "$POKEDIAMOND_COMMIT" '/files/graphic/box/'
 # HeartGold's player sprites (MMODEL_HERO, MMODEL_HEROINE)
-sparse_clone pokeheartgold "$POKEHEARTGOLD_COMMIT" '/files/data/mmodel/mmodel/mmodel_00000069.NSBTX' '/files/data/mmodel/mmodel/mmodel_00000070.NSBTX'
+sparse_clone pokeheartgold "$POKEHEARTGOLD_COMMIT" '/files/data/mmodel/mmodel/mmodel_00000069.NSBTX' '/files/data/mmodel/mmodel/mmodel_00000070.NSBTX' \
+    '/files/demo/opening/gs_opening/'
 
 echo "==> PC box art"
 python3 "$ROOT/scripts/build-box-assets.py" "$DECOMP/pokeemerald" "$PAK/res/box"
@@ -156,7 +157,12 @@ python3 "$ROOT/scripts/build-icons.py" "$NOTO" "$PAK/res/icons"
 python3 "$ROOT/scripts/build-carts.py" "$PAK/res/icons"
 
 echo "==> Per-game menu backgrounds"
-python3 "$ROOT/scripts/build-backgrounds.py" "$ROOT/assets/backgrounds" "$PAK/res/backgrounds"
+# The games without art in assets/backgrounds get it drawn from the decompilations (build-title-backgrounds.py).
+BG_SRC="$BUILD/backgrounds-src"
+rm -rf "$BG_SRC"
+python3 "$ROOT/scripts/build-title-backgrounds.py" "$DECOMP" "$BG_SRC"
+cp "$ROOT"/assets/backgrounds/*.png "$BG_SRC/"
+python3 "$ROOT/scripts/build-backgrounds.py" "$BG_SRC" "$PAK/res/backgrounds"
 
 cp "$ROOT/launch.sh" "$ROOT/pak.json" "$ROOT/LICENSE" "$PAK/"
 cp "$ROOT/README.md" "$PAK/README.md"
