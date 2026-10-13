@@ -15,7 +15,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
   - The highlighted item shows **✅ Legal** or **☠️ Illegal**.
 - **Automatic backups** before every change, in `PokemonManager/Backups`, one folder per save named after the game, trainer and ID (e.g. `Emerald - MAY - 12345`).
 
-> **Status:** early release. The code is covered by automated tests on generated saves, and the ARM64 build has been run under emulation. It has **not yet been tested on real hardware**. Keep your own backup of any save you care about until it has been.
+> **Status:** public beta. Tested on real hardware on the Anbernic RG35XX SP (640×480), and covered by automated tests on generated saves. Other NextUI devices and screen sizes haven't been tried on hardware yet. Every change is backed up first, but keep your own backup of any save you care about, and please report problems with your device, game, language and pak version.
 
 ## Installation
 
