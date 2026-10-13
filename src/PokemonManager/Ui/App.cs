@@ -782,8 +782,11 @@ public sealed class App
             // headed "<icon> Ruby → Platinum", like the game list
             var icon = _boxViewer.Icon(source.Sav, pk);
             var title = $"{SaveName(source)} → {SaveName(dest)}";
-            if (!AskYesNo("WARNING: This action is irreversible. Continue?", icon is null ? title : "\t\t" + title,
-                    icon?.Sheet, icon is null ? null : (icon.X, icon.Y, icon.W, icon.H)))
+            // YES / NO side by side in the middle (the viewer), else as a list
+            var answer = _boxViewer.YesNo(title, "WARNING: This action is irreversible.\nContinue?", icon, _ui.Background)
+                ?? AskYesNo("WARNING: This action is irreversible. Continue?", icon is null ? title : "\t\t" + title,
+                    icon?.Sheet, icon is null ? null : (icon.X, icon.Y, icon.W, icon.H));
+            if (!answer)
                 return false;
         }
 

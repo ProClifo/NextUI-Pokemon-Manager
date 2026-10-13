@@ -195,6 +195,47 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         return null;
     }
 
+    /// <summary>
+    /// A YES / NO question with the answers side by side in the middle (pkmgr-box --dialog), NO highlighted
+    /// first. True for YES, false for NO, null when the viewer couldn't show it.
+    /// </summary>
+    public bool? YesNo(string title, string message, BoxScene.ArtImage? icon, string? background)
+    {
+        if (FindOnPath(Tool) is null)
+            return null;
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            var path = Path.Combine(tempDir, "dialog.json");
+            var json = new System.Text.Json.Nodes.JsonObject { ["title"] = title, ["message"] = message, ["selected"] = 1 };
+            if (icon is not null)
+            {
+                json["icon"] = icon.Sheet;
+                json["icon_rect"] = new System.Text.Json.Nodes.JsonArray(icon.X, icon.Y, icon.W, icon.H);
+            }
+            if (background is not null && File.Exists(background))
+                json["background"] = background;
+            File.WriteAllText(path, json.ToJsonString());
+            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            psi.ArgumentList.Add("--dialog");
+            psi.ArgumentList.Add(path);
+            using var p = Process.Start(psi);
+            if (p is null)
+                return null;
+            p.OutputDataReceived += static (_, _) => { };
+            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
+            p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
+            p.WaitForExit();
+            return p.ExitCode switch { 0 => true, 2 => false, _ => null };
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
+        {
+            Console.Error.WriteLine($"pkmgr-box --dialog failed: {ex.Message}");
+            return null;
+        }
+    }
+
     public bool HasCard(SaveFile sav) => FindOnPath(Tool) is not null && TrainerCard.Available(sav, scene.Skin(sav));
 
     /// <summary>
