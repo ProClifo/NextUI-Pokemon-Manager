@@ -121,6 +121,12 @@ public static class GiftService
         for (int i = 0; i < count; i++)
             album[i] = storage.GetMysteryGift(i);
 
+        // An event key item (Member Card, Azure Flute, Liberty Pass...) the save already has, or that's already waiting to be
+        // picked up, isn't given twice: the real games turned a card they already had away, and the delivery man
+        // would hand a second copy out. Ordinary items can come again, as from different distributions.
+        if (gift.IsItem && AlreadyHas(sav, album, gift.ItemID) is { } had)
+            return OpResult.Fail(had);
+
         if (storage is MysteryBlock4 block4)
         {
             // Gen 4 keeps the card (PCD, shown in the album) and the pending gift (PGT, handed out by the
@@ -184,6 +190,22 @@ public static class GiftService
             _ => "Pick it up from the delivery person (Pokémon Center / Poké Mart, depending on the game).",
         };
         return OpResult.Success($"Added \"{Describe(gift)}\" to the Mystery Gift album.\n{where}");
+    }
+
+    /// <summary>The DS games' event key items (Gen 4/5 item IDs).</summary>
+    private static readonly HashSet<int> EventKeyItems =
+        [Tickets.ItemMemberCard, Tickets.ItemOaksLetter, Tickets.ItemAzureFlute, Tickets.ItemSecretKey, Tickets.ItemEnigmaStone, Tickets.ItemLibertyPass];
+
+    private static string? AlreadyHas(SaveFile sav, DataMysteryGift[] album, int item)
+    {
+        if (!EventKeyItems.Contains(item))
+            return null;
+        var name = GameInfo.Strings.Item.Count > item ? GameInfo.Strings.Item[item] : "item";
+        if (sav.Inventory.Pouches.Any(p => p.HasItem((ushort)item)))
+            return $"You already have the {name}.";
+        // Gen 4 gifts wait in their own slots (PGT); later cards carry theirs until it's picked up
+        bool waiting = album.Any(g => !g.IsEmpty && g.IsItem && g.ItemID == item && (g is PGT || (g is not PCD && !g.GiftUsed)));
+        return waiting ? $"The {name} is already waiting to be picked up." : null;
     }
 
     /// <summary>

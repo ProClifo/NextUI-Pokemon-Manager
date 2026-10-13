@@ -87,6 +87,32 @@ public sealed class GiftTests : IDisposable
     }
 
     [Fact]
+    public void ItemCardsAreNotGivenTwice()
+    {
+        var entry = _saves.Create(GameVersion.Pt, "Platinum.sav");
+        ((SAV4)entry.Sav).IsMysteryGiftUnlocked = true;
+        var card = new PGT { GiftType = GiftType4.Item, ItemID = Tickets.ItemAzureFlute };
+        Assert.True(card.IsItem);
+        Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
+        var again = GiftService.InjectCard(entry.Sav, card); // still waiting at the delivery man
+        Assert.False(again.Ok);
+        Assert.Contains("waiting", again.Message);
+
+        var fresh = _saves.Create(GameVersion.Pt, "Platinum2.sav");
+        ((SAV4)fresh.Sav).IsMysteryGiftUnlocked = true;
+        var bag = fresh.Sav.Inventory;
+        bag.Pouches.First(p => p.Items.Length > 0 && p.GiveItem(bag, (ushort)card.ItemID, 1) > 0);
+        bag.CopyTo(fresh.Sav);
+        var had = GiftService.InjectCard(fresh.Sav, card);
+        Assert.False(had.Ok);
+        Assert.Contains("already have", had.Message);
+
+        // ordinary items can come again
+        Assert.True(GiftService.InjectCard(fresh.Sav, new PGT { GiftType = GiftType4.Item, ItemID = 1 }).Ok); // Master Ball
+        Assert.True(GiftService.InjectCard(fresh.Sav, new PGT { GiftType = GiftType4.Item, ItemID = 1 }).Ok);
+    }
+
+    [Fact]
     public void Gen5CardSurvivesReEncryption()
     {
         var entry = _saves.Create(GameVersion.B2, "Black2.sav");
