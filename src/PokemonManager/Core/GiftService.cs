@@ -136,8 +136,12 @@ public static class GiftService
 
             if (gift is PCD pcd)
             {
-                if (pcdSlot < 0 || pgtSlot < 0)
-                    return OpResult.Fail("The Mystery Gift album is full. Pick up or delete a card in-game first.");
+                if (pgtSlot < 0)
+                    return OpResult.Fail("All 8 pending-gift slots are full. Pick some up from the delivery man first.");
+                // A full album (3 cards) throws its oldest card away, as the player would in-game: the cards are only
+                // keepsakes, the gifts wait in their own slots.
+                if (pcdSlot < 0)
+                    pcdSlot = DropOldest(album, Enumerable.Range(0, count).Where(i => album[i] is PCD).ToList());
                 album[pcdSlot] = pcd.Clone();
                 album[pgtSlot] = pcd.Gift.Clone();
             }
@@ -156,7 +160,15 @@ public static class GiftService
                 return OpResult.Fail($"{Names.Game(sav)} stores a different kind of card than this file.");
             int slot = Array.FindIndex(album, g => g.IsEmpty && g.Type == gift.Type);
             if (slot < 0)
-                return OpResult.Fail("The Mystery Gift album is full. Delete a card in-game first.");
+            {
+                // A full album throws the oldest card whose gift was already picked up away (Gen 5+ cards carry
+                // their gift, so one not picked up yet would be lost with it).
+                var slots = Enumerable.Range(0, count).Where(i => album[i].Type == gift.Type).ToList();
+                int used = slots.FindIndex(i => album[i].GiftUsed);
+                if (used < 0)
+                    return OpResult.Fail("The Mystery Gift album is full of gifts not picked up yet. Pick one up in-game first.");
+                slot = DropOldest(album, slots, used);
+            }
             var copy = gift.Clone();
             copy.GiftUsed = false;
             album[slot] = copy;
@@ -175,6 +187,17 @@ public static class GiftService
             _ => "Pick it up from the delivery person (Pokémon Center / Poké Mart, depending on the game).",
         };
         return OpResult.Success($"Added \"{Describe(gift)}\" to the Mystery Gift album.\n{where}");
+    }
+
+    /// <summary>
+    /// Throws away the card at <paramref name="slots"/>[<paramref name="at"/>] (the oldest by default): the cards
+    /// after it move up, keeping the album in the order they arrived, and the last of the slots is returned, empty.
+    /// </summary>
+    private static int DropOldest(DataMysteryGift[] album, List<int> slots, int at = 0)
+    {
+        for (int k = at; k < slots.Count - 1; k++)
+            album[slots[k]] = album[slots[k + 1]];
+        return slots[^1];
     }
 
     /// <summary>
