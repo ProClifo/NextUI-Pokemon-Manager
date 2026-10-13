@@ -133,13 +133,20 @@ public sealed class TransferTests : IDisposable
             Directory.CreateDirectory(dir);
             var other = Path.Combine(dir, "X.gba.20240101-000000.sav");
             File.WriteAllText(other, "other");
+            // a backup from before backups had a folder per save
+            var flat = Path.Combine(dir, "X.20240101-000000.sav");
+            File.WriteAllText(flat, "flat");
+            File.SetLastWriteTimeUtc(flat, new DateTime(2024, 1, 1));
             var save = Path.Combine(Path.GetTempPath(), $"pkmgr-{Guid.NewGuid():N}", "X.sav");
             Directory.CreateDirectory(Path.GetDirectoryName(save)!);
             File.WriteAllText(save, "x");
+            var first = library.Backup(save);
+            Assert.Equal(Path.Combine(dir, "X"), Path.GetDirectoryName(first));
+            Assert.False(File.Exists(flat)); // moved into X/, then pruned as the oldest
             library.Backup(save);
-            library.Backup(save);
-            Assert.True(File.Exists(other));
-            Assert.Single(Directory.GetFiles(dir, "X.2*.sav"));
+            Assert.True(File.Exists(other)); // X.gba's backups aren't X's
+            Assert.Single(Directory.GetFiles(Path.Combine(dir, "X"), "X.2*.sav"));
+            Assert.Empty(Directory.GetFiles(dir, "X.2*.sav"));
             Directory.Delete(Path.GetDirectoryName(save)!, true);
         }
         finally

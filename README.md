@@ -13,7 +13,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
   - **Distributions**: released distributions of Pokémon that can't be obtained legally any other way in that game's language, e.g. WISHMKR Jirachi, 10 ANIV Celebi and Aura Mew in English Emerald.
   - **Events Gallery**: every file for the game, in the gallery's own folders. Copies of the same distribution (same trainer, or same name once IDs, berries and the like in parentheses are dropped) are listed once and one is picked at random. A copy that happened to be shiny isn't listed separately, since every Pokémon is regenerated for the save; only distributions that were always shiny say "Shiny"; a folder with a single distribution shows it in the folder above instead.
   - The highlighted item shows **✅ Legal** or **☠️ Illegal**.
-- **Automatic backups** before every change, in `PokemonManager/Backups`.
+- **Automatic backups** before every change, in `PokemonManager/Backups`, one folder per save.
 
 > **Status:** early release. The code is covered by automated tests on generated saves, and the ARM64 build has been run under emulation. It has **not yet been tested on real hardware**. Keep your own backup of any save you care about until it has been.
 
@@ -135,7 +135,7 @@ Close the game before editing. Afterwards, **start the game fresh from the menu,
 SDCARD/
 ├── Saves/                     ← NextUI's saves; scanned automatically
 └── PokemonManager/
-    ├── Backups/               ← automatic backups (last 20 per save)
+    ├── Backups/               ← automatic backups, a folder per save (last 999 each)
     └── rom-check-cache.txt    ← cached ROM checks
 ```
 

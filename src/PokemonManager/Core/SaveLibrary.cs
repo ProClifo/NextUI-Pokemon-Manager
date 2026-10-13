@@ -26,7 +26,7 @@ public sealed class SaveEntry(string path, SaveFile sav)
 /// <summary>
 /// Finds, loads and writes save files. Every write is preceded by a timestamped backup.
 /// </summary>
-public sealed class SaveLibrary(string backupDir, int backupsToKeep = 20)
+public sealed class SaveLibrary(string backupDir, int backupsToKeep = 999)
 {
     // Extensions used by the emulators NextUI ships (gpSP/mGBA/Gambatte/DraStic) and common dumps.
     private static readonly HashSet<string> SaveExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -94,29 +94,50 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 20)
         return backup;
     }
 
+    /// <summary>
+    /// Copies the save into its own folder, Backups/&lt;save name&gt;/&lt;save name&gt;.&lt;time&gt;&lt;ext&gt;, keeping the newest
+    /// <c>backupsToKeep</c>. A folder per save keeps each one small: FAT32 cards fit only about 10,000 long file
+    /// names in one folder, and only this save's backups are listed to prune them.
+    /// </summary>
     public string Backup(string path)
     {
-        Directory.CreateDirectory(BackupDir);
         var name = System.IO.Path.GetFileNameWithoutExtension(path);
         var ext = System.IO.Path.GetExtension(path);
+        var dir = System.IO.Path.Combine(BackupDir, name);
+        Directory.CreateDirectory(dir);
+        MoveFlatBackups(name, ext, dir);
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        var dest = System.IO.Path.Combine(BackupDir, $"{name}.{stamp}{ext}");
+        var dest = System.IO.Path.Combine(dir, $"{name}.{stamp}{ext}");
         for (int i = 1; File.Exists(dest); i++)
-            dest = System.IO.Path.Combine(BackupDir, $"{name}.{stamp}-{i}{ext}");
+            dest = System.IO.Path.Combine(dir, $"{name}.{stamp}-{i}{ext}");
         File.Copy(path, dest);
-        Prune(name, ext);
+        Prune(name, ext, dir);
         return dest;
     }
 
-    private void Prune(string name, string ext)
+    // only this save's own backups: "X.sav" mustn't take "X.gba.<stamp>.sav"'s
+    private static IEnumerable<string> OwnBackups(string dir, string name, string ext)
+    {
+        var own = new System.Text.RegularExpressions.Regex(
+            $@"^{System.Text.RegularExpressions.Regex.Escape(name)}\.\d{{8}}-\d{{6}}(-\d+)?{System.Text.RegularExpressions.Regex.Escape(ext)}$");
+        return Directory.GetFiles(dir, $"{name}.*{ext}").Where(f => own.IsMatch(System.IO.Path.GetFileName(f)));
+    }
+
+    /// <summary>Moves this save's backups from older versions, which kept them all in Backups itself, into its folder.</summary>
+    private void MoveFlatBackups(string name, string ext, string dir)
+    {
+        foreach (var f in OwnBackups(BackupDir, name, ext))
+        {
+            try { File.Move(f, System.IO.Path.Combine(dir, System.IO.Path.GetFileName(f)), overwrite: false); }
+            catch (IOException) { /* best effort */ }
+        }
+    }
+
+    private void Prune(string name, string ext, string dir)
     {
         if (backupsToKeep <= 0)
             return;
-        // only this save's own backups: "X.sav" mustn't take "X.gba.<stamp>.sav"'s
-        var own = new System.Text.RegularExpressions.Regex(
-            $@"^{System.Text.RegularExpressions.Regex.Escape(name)}\.\d{{8}}-\d{{6}}(-\d+)?{System.Text.RegularExpressions.Regex.Escape(ext)}$");
-        var old = Directory.GetFiles(BackupDir, $"{name}.*{ext}")
-            .Where(f => own.IsMatch(System.IO.Path.GetFileName(f)))
+        var old = OwnBackups(dir, name, ext)
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .Skip(backupsToKeep);
         foreach (var f in old)
