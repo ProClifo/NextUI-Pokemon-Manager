@@ -1142,14 +1142,11 @@ public sealed class App
 
     // ---------------------------------------------------------------- gifts & events
 
-    private void InjectGen3(SaveEntry entry, Gen3EventFile file)
+    private void InjectGen3(SaveEntry entry, Gen3EventFile file, string name)
     {
         if (entry.Sav is not SAV3 sav3)
             return;
-        var question = $"Inject {file.DisplayName} into {Names.Game(sav3)}?";
-        if (file.Kind is Gen3EventKind.WonderCard or Gen3EventKind.MysteryEvent && Gen3Events.HasEventScript(sav3))
-            question += "\n\nThis replaces the event already waiting in the game.";
-        if (!_ui.Confirm(question, "INJECT", "CANCEL"))
+        if (!_ui.Confirm($"Inject {name} into {Names.Game(sav3)}?", "INJECT", "CANCEL"))
             return;
 
         var result = Gen3Events.Inject(sav3, file);
@@ -1162,10 +1159,9 @@ public sealed class App
         if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message(file.Kind switch
             {
-                Gen3EventKind.WonderCard => "The WONDER CARD has arrived!",
-                Gen3EventKind.WonderNews => "The WONDER NEWS has arrived!",
-                Gen3EventKind.MysteryEvent => "The MYSTERY EVENT has arrived!",
-                _ => "The e-CARD has arrived!",
+                Gen3EventKind.WonderCard or Gen3EventKind.WonderNews => "Mystery Gift received!",
+                Gen3EventKind.MysteryEvent => "Mystery Event received!",
+                _ => "e-Card received!",
             });
     }
 
@@ -1173,7 +1169,7 @@ public sealed class App
     /// Puts a Mystery Gift card into the save's album, to be picked up from the delivery man in-game as if it had
     /// come over Wi-Fi. Its Pokémon only ever arrive that way, never straight into the PC.
     /// </summary>
-    private void GiftActions(SaveEntry entry, MysteryGift gift)
+    private void GiftActions(SaveEntry entry, MysteryGift gift, string name)
     {
         var sav = entry.Sav;
         if (gift is not DataMysteryGift data || !GiftService.SupportsAlbum(sav))
@@ -1181,7 +1177,7 @@ public sealed class App
             _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, so this card can't be added.");
             return;
         }
-        if (!_ui.Confirm($"{GiftService.Describe(gift)}\n\nAdd it to the Mystery Gift album? Pick it up from the delivery man in-game.", "ADD", "CANCEL"))
+        if (!_ui.Confirm($"Inject {name} into {Names.Game(sav)}?", "INJECT", "CANCEL"))
             return;
         var result = GiftService.InjectCard(sav, data);
         if (!result.Ok)
@@ -1191,7 +1187,7 @@ public sealed class App
             return;
         }
         if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
-            _ui.Message("The WONDER CARD has arrived!");
+            _ui.Message("Mystery Gift received!");
     }
 
     // ---------------------------------------------------------------- events, distributions, gallery
@@ -1319,22 +1315,15 @@ public sealed class App
 
     private void GiveTicket(SaveEntry entry, TicketChoice ticket)
     {
-        if (!ticket.Legal)
-        {
-            var source = ticket.File is { } f ? $"Use \"{StripItemPrefix(f.Title)}\" anyway?" : "Add it anyway?";
-            if (!_ui.Confirm(
-                    $"PKHeX flags Pokémon met through the {ticket.Ticket.Name} in {Names.Game(entry.Sav)} as illegal: " +
-                    $"the event never ran in this game.\n\n{source}", "USE IT", "CANCEL"))
-                return;
-        }
+        // (an illegal one says so in the menu)
         if (ticket.File is { } file)
         {
-            GiveGalleryFile(entry, file);
+            GiveGalleryFile(entry, file, ticket.Ticket.Name);
             return;
         }
         if (entry.Sav is not SAV3E emerald)
             return;
-        if (!_ui.Confirm($"Inject the Eon Ticket into {Names.Game(emerald)}?", "INJECT", "CANCEL"))
+        if (!_ui.Confirm($"Inject {ticket.Ticket.Name} into {Names.Game(emerald)}?", "INJECT", "CANCEL"))
             return;
         var result = Gen3Events.GiveEonTicketByRecordMixing(emerald);
         if (!result.Ok)
@@ -1486,16 +1475,10 @@ public sealed class App
     private string GalleryLabel(GalleryTree.Item item)
         => _settings.GalleryAllLanguages && item.Language is { } language ? $"{item.Title} - {language}" : item.Title;
 
-    /// <summary>"Item AuroraTicket (UK)" -> "Aurora Ticket (UK)".</summary>
-    private static string StripItemPrefix(string title)
+    /// <param name="name">What it's called in the question (the menu's name for it), else the gallery's.</param>
+    private void GiveGalleryFile(SaveEntry entry, GalleryEntry file, string? name = null)
     {
-        if (title.StartsWith("Item ", StringComparison.Ordinal))
-            title = title[5..];
-        return title.Replace("AuroraTicket", "Aurora Ticket").Replace("MysticTicket", "Mystic Ticket");
-    }
-
-    private void GiveGalleryFile(SaveEntry entry, GalleryEntry file)
-    {
+        name ??= GalleryNames.DisplayTitle(file.Title);
         var gift = _gallery.Load(file);
         if (gift is null)
         {
@@ -1505,15 +1488,15 @@ public sealed class App
         if (gift.Pokemon is not null)
             GiveEventPokemon(entry, file);
         else if (gift.Card is { } card)
-            GiftActions(entry, card);
+            GiftActions(entry, card, name);
         else if (gift.Gen3 is { } g3)
         {
             if (entry.Sav is not SAV3 sav3 || !Gen3Events.IsApplicable(sav3, g3))
             {
-                _ui.Message($"{StripItemPrefix(file.Title)} can't be added to {Names.Game(entry.Sav)}: it's for a different game or language version.");
+                _ui.Message($"{name} can't be added to {Names.Game(entry.Sav)}: it's for a different game or language version.");
                 return;
             }
-            InjectGen3(entry, g3);
+            InjectGen3(entry, g3, name);
         }
     }
 
