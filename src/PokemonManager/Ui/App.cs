@@ -281,6 +281,13 @@ public sealed class App
             // A game with one event gets that event on its menu; a game with several gets a Mystery Gift menu.
             // Each is hidden until the game's own menu that delivered it (Mystery Gift, Mystery Event) is unlocked.
             var tickets = TicketsFor(entry).Where(t => Tickets.Locked(t, sav) is null).ToList();
+            // Emerald's Record Mixing Eon Ticket isn't a Mystery Gift: it has its own entry until it's been received.
+            if (tickets.Find(t => t.File is null) is { } eon)
+            {
+                tickets.Remove(eon);
+                if (!Gen3Events.HasEonTicket((SAV3E)sav))
+                    actions.Add((eon.Ticket.Name, LegalTag(eon.Legal), () => GiveTicket(entry, eon)));
+            }
             if (sav is SAV2 { Version: GameVersion.C } crystal)
                 actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
             else if (tickets.Count == 1)

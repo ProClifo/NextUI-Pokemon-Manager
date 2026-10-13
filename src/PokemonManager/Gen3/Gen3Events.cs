@@ -416,6 +416,9 @@ public static class Gen3Events
         return OpResult.Success(message);
     }
 
+    /// <summary>Whether Emerald already got the Eon Ticket: the Southern Island ferry is enabled (record_mixing.c sets it with the ticket).</summary>
+    public static bool HasEonTicket(SAV3E sav) => sav.GetEventFlag(FlagEnableShipSouthernIslandE);
+
     /// <summary>Whether the save holds an event script (a Wonder Card's or Mystery Event's), which an injection replaces.</summary>
     public static bool HasEventScript(SAV3 sav)
     {

@@ -376,8 +376,10 @@ public sealed class Gen3EventTests : IDisposable
         // Record Mixing (the Record Corner) only opens after visiting Mauville City.
         Assert.Contains("Mauville", Gen3Events.GiveEonTicketByRecordMixing((SAV3E)entry.Sav).Message);
         ((SAV3E)entry.Sav).SetEventFlag(0x878, true); // FLAG_VISITED_MAUVILLE_CITY
+        Assert.False(Gen3Events.HasEonTicket((SAV3E)entry.Sav));
         var result = Gen3Events.GiveEonTicketByRecordMixing((SAV3E)entry.Sav);
         Assert.True(result.Ok, result.Message);
+        Assert.True(Gen3Events.HasEonTicket((SAV3E)entry.Sav)); // its menu entry goes away
         Assert.Contains("Hall of Fame", result.Message); // the fixture hasn't beaten the game
 
         var sav = (SAV3E)_saves.Roundtrip(entry).Sav;
