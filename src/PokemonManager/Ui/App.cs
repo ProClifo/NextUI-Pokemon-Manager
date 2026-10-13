@@ -291,8 +291,12 @@ public sealed class App
                 tickets.Remove(eon);
                 actions.Add((eon.Ticket.Name, LegalTag(eon.Legal), () => GiveTicket(entry, eon)));
             }
+            // Crystal's GS Ball, until its event is enabled
             if (sav is SAV2 { Version: GameVersion.C } crystal)
-                actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
+            {
+                if (!crystal.IsEnabledGSBallMobileEvent)
+                    actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
+            }
             else if (tickets.Count == 1)
                 actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
             else if (tickets.Count > 1)
