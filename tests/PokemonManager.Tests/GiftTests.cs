@@ -51,13 +51,39 @@ public sealed class GiftTests : IDisposable
     }
 
     [Fact]
+    public void Gen4CardThrownAwayIsStillReceived()
+    {
+        var entry = _saves.Create(GameVersion.Pt, "Platinum.sav");
+        ((SAV4)entry.Sav).IsMysteryGiftUnlocked = true;
+        var card = EncounterEvent.MGDB_G4.First(g => g.IsEntity && !g.IsEgg && g.Species != 0 && g.CardID != 0);
+        Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
+
+        // collected and thrown away in-game: the album and the delivery queue are empty again
+        var storage = ((IMysteryGiftStorageProvider)entry.Sav).MysteryGiftStorage;
+        for (int i = 0; i < storage.GiftCountMax; i++)
+        {
+            var g = storage.GetMysteryGift(i);
+            if (!g.IsEmpty)
+                storage.SetMysteryGift(i, g is PCD ? new PCD() : new PGT());
+        }
+        Assert.Equal(GiftService.AlreadyInjected, GiftService.InjectCard(entry.Sav, card).Message);
+    }
+
+    [Fact]
     public void Gen5AlbumTurnsAwayAThirteenthCard()
     {
         var entry = _saves.Create(GameVersion.B2, "Black2.sav");
+        // a blank save's album was never encrypted, so its received records read as noise; a real game clears them
+        var block = (MysteryBlock5)((IMysteryGiftStorageProvider)entry.Sav).MysteryGiftStorage;
+        block.ClearReceivedFlags();
+        block.EndAccess();
         var cards = EncounterEvent.MGDB_G5.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0 && g.CardID != 0)
             .DistinctBy(g => g.CardID).Take(13).ToList();
         foreach (var card in cards.Take(12))
-            Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
+        {
+            var r = GiftService.InjectCard(entry.Sav, card);
+            Assert.True(r.Ok, $"{card.CardID}: {r.Message}");
+        }
         Assert.Equal(GiftService.AlbumFull, GiftService.InjectCard(entry.Sav, cards[12]).Message);
     }
 

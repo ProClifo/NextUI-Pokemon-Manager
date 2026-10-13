@@ -29,6 +29,8 @@ public sealed class App
     private SavePlacement? _placement;
     private int _mainSelected;
     private SavePlacement Placement => _placement ??= new SavePlacement(_paths.SaveListsFile, _paths.OfficialSavesFile, _paths.SdRoot);
+    private DollRecord? _dollRecord;
+    private DollRecord _dolls => _dollRecord ??= new DollRecord(_paths.ReceivedDollsFile);
     private VanillaRoms.Index? _romIndex;
     private readonly GameBackgrounds _backgrounds;
     private readonly (int Width, int Height)? _screen =
@@ -1346,9 +1348,11 @@ public sealed class App
         var list = GalleryLists.Distributions(_gallery, profile)
             .Where(e => EventPokemon.CanGive(_gallery, e, entry.Sav))
             .Select(e => (e.Title, Tag: (string?)"Legal", Run: (Action)(() => GiveGalleryFile(entry, e)))).ToList();
-        // Ruby/Sapphire/Emerald also get the Regi dolls, which no normal play hands out (decorations can't be illegal).
+        // Ruby/Sapphire/Emerald also get the Regi dolls, which no normal play hands out (decorations can't be illegal),
+        // each once, as the Mystery Event gave them.
         if (entry.Sav is SAV3RS or SAV3E)
-            list.AddRange(Gen3Events.RegiDolls.Select(d => (d.Name, Tag: (string?)null, Run: (Action)(() => GiveDoll(entry, d.Id)))));
+            list.AddRange(Gen3Events.RegiDolls.Where(d => !DollReceived(entry, d.Id))
+                .Select(d => (d.Name, Tag: (string?)null, Run: (Action)(() => GiveDoll(entry, d.Id)))));
         if (list.Count == 0)
         {
             _ui.Message($"Every Pokémon the gallery has for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)} can be obtained without an event. See the Events Gallery for all distributions.");
@@ -1366,8 +1370,16 @@ public sealed class App
         }
     }
 
+    private bool DollReceived(SaveEntry entry, byte doll)
+        => Gen3Events.HasDoll((SAV3)entry.Sav, doll) || _dolls.Has(SaveLibrary.FolderName(entry.Sav), doll);
+
     private void GiveDoll(SaveEntry entry, byte doll)
     {
+        if (DollReceived(entry, doll))
+        {
+            _ui.Message(GiftService.AlreadyInjected);
+            return;
+        }
         var sav = (SAV3)entry.Sav;
         if (TradeRules.CheckDistribution(sav) is { Ok: false } noDex)
         {
@@ -1385,7 +1397,17 @@ public sealed class App
             return;
         }
         if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
+        {
+            try
+            {
+                _dolls.Add(SaveLibrary.FolderName(sav), doll);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Console.Error.WriteLine($"couldn't record the {name}: {ex.Message}");
+            }
             _ui.Message($"The {name.ToUpperInvariant()} has arrived in your PC!");
+        }
     }
 
     private void GalleryMenu(SaveEntry entry)
@@ -1479,6 +1501,12 @@ public sealed class App
     private void GiveGalleryFile(SaveEntry entry, GalleryEntry file, string? name = null)
     {
         name ??= GalleryNames.DisplayTitle(file.Title);
+        // a ticket the game already has (the item and its event's flag) isn't given again
+        if (Tickets.ForEntry(file) is { } ticket && Tickets.Received(new TicketChoice(ticket, file, true), entry.Sav))
+        {
+            _ui.Message(GiftService.AlreadyInjected);
+            return;
+        }
         var gift = _gallery.Load(file);
         if (gift is null)
         {

@@ -124,6 +124,10 @@ public static class GiftService
         // As the real games did: a card that's already there, or a full album, is turned away.
         if (IsInjected(album, gift))
             return OpResult.Fail(AlreadyInjected);
+        // ...and so is one the game has a record of receiving, even if its card was thrown away since
+        if (storage is IMysteryGiftFlags received && gift.CardID > 0 && gift.CardID < received.MysteryGiftReceivedFlagMax
+            && received.GetMysteryGiftReceivedFlag(gift.CardID))
+            return OpResult.Fail(AlreadyInjected);
 
         if (storage is MysteryBlock4 block4)
         {

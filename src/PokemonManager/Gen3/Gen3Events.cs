@@ -365,6 +365,10 @@ public static class Gen3Events
     /// Players without the event got the dolls from the Mauville old man's trades after Record Mixing, so the
     /// save must have visited Mauville City (FLAG_VISITED_MAUVILLE_CITY: R/S 0x818, E 0x878).
     /// </summary>
+    /// <summary>Whether the doll is in the save's doll inventory (placed ones included).</summary>
+    public static bool HasDoll(SAV3 sav, byte doll)
+        => sav is not SAV3FRLG && sav.Large.Slice(sav is SAV3E ? 0x2798 : 0x2704, DollSlots).Contains(doll);
+
     public static OpResult GiveDoll(SAV3 sav, byte doll)
     {
         if (sav is SAV3FRLG)

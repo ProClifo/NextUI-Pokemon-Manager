@@ -40,6 +40,7 @@ public sealed class AppPaths
     public string SaveNamesFile => Path.Combine(DataDir, "save-names.txt");
     public string OfficialSavesFile => Path.Combine(DataDir, "official-saves.txt"); // before save-lists.txt
     public string SaveListsFile => Path.Combine(DataDir, "save-lists.txt");
+    public string ReceivedDollsFile => Path.Combine(DataDir, "received-dolls.txt");
     public string RomCheckCache => Path.Combine(DataDir, "rom-check-cache.txt");
 
     public void EnsureCreated()
