@@ -296,7 +296,7 @@ public sealed class App
                 actions.Add(("Celebi", LegalTag(true), () => GiveGameBoyEvent(entry, "Celebi", GiftService.Celebi)));
             if (sav.Generation >= 3)
                 actions.Add(("Distributions", null, () => DistributionsMenu(entry)));
-            actions.Add(("Gallery", null, () => GalleryMenu(entry)));
+            actions.Add(("Events Gallery", null, () => GalleryMenu(entry)));
             // Ruby/Sapphire/Emerald, once Record Mixing (Mauville City) is open
             if (Decorations.Supported(sav) && Decorations.RecordMixingUnlocked((SAV3)sav))
                 actions.Add(("Decorations", null, () => DecorationsMenu(entry)));
@@ -1300,7 +1300,7 @@ public sealed class App
             list.AddRange(Gen3Events.RegiDolls.Select(d => (d.Name, Tag: (string?)null, Run: (Action)(() => GiveDoll(entry, d.Id)))));
         if (list.Count == 0)
         {
-            _ui.Message($"Every Pokémon the gallery has for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)} can be obtained without an event. See the Gallery for all distributions.");
+            _ui.Message($"Every Pokémon the gallery has for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)} can be obtained without an event. See the Events Gallery for all distributions.");
             return;
         }
         int selected = 0;
@@ -1347,7 +1347,7 @@ public sealed class App
             .ToList();
         if (files.Count == 0)
         {
-            _ui.Message($"The gallery has nothing for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}.");
+            _ui.Message($"The Events Gallery has nothing for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}.");
             return;
         }
         GalleryFolder(entry, files, "", profile);
@@ -1365,7 +1365,7 @@ public sealed class App
             // Language folders say nothing once the list is filtered to one language.
             var path = string.Join('/', view.Path.Split('/', StringSplitOptions.RemoveEmptyEntries)
                 .Where(p => _settings.GalleryAllLanguages || !GalleryLanguage.Tags.Contains(p)));
-            var title = path.Length == 0 ? "Gallery" : $"Gallery: {path}";
+            var title = path.Length == 0 ? "Events Gallery" : $"Events Gallery: {path}";
             var tags = view.Folders.Select(_ => (string?)null)
                 .Concat(view.Items.Select(i => (string?)LegalTag(i.Copies.Any(f => IsLegalFor(f, profile))))).ToList();
             var choice = _ui.Choose(title, labels, selected, tags: tags);
@@ -1642,7 +1642,7 @@ public sealed class App
         "A backup is written to PokemonManager/Backups before every change.\n" +
         "\n" +
         "Each game's menu has Mystery Gift (every ticket the game has, like the Aurora Ticket, once the game's Mystery Gift is unlocked), Distributions (Pokémon " +
-        "you can only get from an event; Red/Blue/Yellow have Mew instead) and the Gallery (every event file for that game and language, from Project " +
+        "you can only get from an event; Red/Blue/Yellow have Mew instead) and the Events Gallery (every event file for that game and language, from Project " +
         "Pokémon's EventsGallery). Items are marked Legal or Illegal. Info shows the save's details.\n" +
         "\n" +
         SaveStateWarning;
