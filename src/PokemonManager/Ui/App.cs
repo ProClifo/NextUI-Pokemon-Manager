@@ -1282,7 +1282,7 @@ public sealed class App
             return;
         }
         if (TryWrite(entry, out _))
-            _ui.Message("The EON TICKET has arrived!");
+            _ui.Message("Eon Ticket is now in your bag!");
     }
 
     private void DistributionsMenu(SaveEntry entry)
