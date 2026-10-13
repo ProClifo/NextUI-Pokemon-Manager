@@ -53,15 +53,13 @@ public sealed class GiftTests : IDisposable
     }
 
     [Fact]
-    public void Gen5FullAlbumKeepsGiftsNotPickedUp()
+    public void Gen5FullAlbumDropsAPickedUpCardFirst()
     {
         var entry = _saves.Create(GameVersion.B2, "Black2.sav");
         var cards = EncounterEvent.MGDB_G5.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0)
             .DistinctBy(g => g.CardID).Take(13).ToList();
         foreach (var card in cards.Take(12))
             Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
-        Assert.False(GiftService.InjectCard(entry.Sav, cards[12]).Ok); // nothing picked up yet
-
         var storage = ((IMysteryGiftStorageProvider)entry.Sav).MysteryGiftStorage;
         var picked = storage.GetMysteryGift(3);
         picked.GiftUsed = true;
@@ -70,6 +68,22 @@ public sealed class GiftTests : IDisposable
         var ids = Enumerable.Range(0, 12).Select(i => storage.GetMysteryGift(i).CardID).ToList();
         Assert.DoesNotContain(cards[3].CardID, ids);
         Assert.Equal(cards[12].CardID, ids[^1]);
+    }
+
+    [Fact]
+    public void Gen4FullDeliveryQueueDropsTheOldestGift()
+    {
+        var entry = _saves.Create(GameVersion.Pt, "Platinum.sav");
+        ((SAV4)entry.Sav).IsMysteryGiftUnlocked = true;
+        var cards = EncounterEvent.MGDB_G4.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0)
+            .DistinctBy(g => g.CardID).Take(9).ToList();
+        foreach (var card in cards)
+            Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
+        var storage = ((IMysteryGiftStorageProvider)entry.Sav).MysteryGiftStorage;
+        var pending = Enumerable.Range(0, storage.GiftCountMax).Select(storage.GetMysteryGift).OfType<PGT>().Where(g => !g.IsEmpty).ToList();
+        Assert.Equal(8, pending.Count);
+        Assert.Equal(cards[8].Species, pending[^1].Species);
+        Assert.DoesNotContain(pending, g => g.Species == cards[0].Species && g.Level == cards[0].Level);
     }
 
     [Fact]

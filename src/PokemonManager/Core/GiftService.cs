@@ -134,12 +134,13 @@ public static class GiftService
                 if (album[i] is PGT && pgtSlot < 0) pgtSlot = i;
             }
 
+            // A full album (3 cards) or delivery queue (8 gifts) drops its oldest: a gift dropped before it was picked
+            // up comes back by injecting its card again.
+            var pgtSlots = Enumerable.Range(0, count).Where(i => album[i] is PGT).ToList();
+            if (pgtSlot < 0)
+                pgtSlot = DropOldest(album, pgtSlots);
             if (gift is PCD pcd)
             {
-                if (pgtSlot < 0)
-                    return OpResult.Fail("All 8 pending-gift slots are full. Pick some up from the delivery man first.");
-                // A full album (3 cards) throws its oldest card away, as the player would in-game: the cards are only
-                // keepsakes, the gifts wait in their own slots.
                 if (pcdSlot < 0)
                     pcdSlot = DropOldest(album, Enumerable.Range(0, count).Where(i => album[i] is PCD).ToList());
                 album[pcdSlot] = pcd.Clone();
@@ -147,8 +148,6 @@ public static class GiftService
             }
             else if (gift is PGT pgt)
             {
-                if (pgtSlot < 0)
-                    return OpResult.Fail("All 8 pending-gift slots are full. Pick some up from the delivery man first.");
                 album[pgtSlot] = pgt.Clone();
             }
             MysteryBlock4.UpdateSlotPGT(album, sav is SAV4HGSS);
@@ -161,13 +160,11 @@ public static class GiftService
             int slot = Array.FindIndex(album, g => g.IsEmpty && g.Type == gift.Type);
             if (slot < 0)
             {
-                // A full album throws the oldest card whose gift was already picked up away (Gen 5+ cards carry
-                // their gift, so one not picked up yet would be lost with it).
+                // A full album throws away the oldest card whose gift was already picked up, else the oldest (its
+                // gift comes back by injecting the card again).
                 var slots = Enumerable.Range(0, count).Where(i => album[i].Type == gift.Type).ToList();
                 int used = slots.FindIndex(i => album[i].GiftUsed);
-                if (used < 0)
-                    return OpResult.Fail("The Mystery Gift album is full of gifts not picked up yet. Pick one up in-game first.");
-                slot = DropOldest(album, slots, used);
+                slot = DropOldest(album, slots, Math.Max(used, 0));
             }
             var copy = gift.Clone();
             copy.GiftUsed = false;
