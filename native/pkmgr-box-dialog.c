@@ -85,15 +85,19 @@ static void dialog_draw(SDL_Surface *screen, JSON_Object *o, SDL_Surface *bg, SD
     const char *title = json_object_get_string(o, "title");
     if (title && font.medium)
     {
-        SDL_Surface *text = TTF_RenderUTF8_Blended(font.medium, title, (SDL_Color){255, 255, 255, 255});
+        // white on a black pill over a background, else in the list text colour, as minui-list draws titles
+        SDL_Surface *text = TTF_RenderUTF8_Blended(font.medium, title, bg ? (SDL_Color){255, 255, 255, 255} : dialog_text(false));
         int iw = icon ? icon->w + SCALE1(BUTTON_PADDING) / 2 : 0;
         int pw = SCALE1(BUTTON_PADDING * 2) + iw + (text ? text->w : 0);
         SDL_Rect pill = {SCALE1(PADDING), SCALE1(PADDING), pw, SCALE1(PILL_SIZE)};
+        if (bg)
+        {
 #ifdef DESKTOP
-        SDL_FillRect(screen, &pill, SDL_MapRGB(screen->format, 0, 0, 0));
+            SDL_FillRect(screen, &pill, SDL_MapRGB(screen->format, 0, 0, 0));
 #else
-        GFX_blitPill(ASSET_BLACK_PILL, screen, &pill);
+            GFX_blitPill(ASSET_BLACK_PILL, screen, &pill);
 #endif
+        }
         int x = pill.x + SCALE1(BUTTON_PADDING);
         if (icon)
         {
