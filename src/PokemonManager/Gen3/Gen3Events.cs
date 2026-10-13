@@ -361,14 +361,10 @@ public static class Gen3Events
 
     /// <summary>
     /// Adds a doll decoration to Ruby/Sapphire/Emerald as a Mystery Event's adddecoration did (DecorationAdd: the
-    /// first empty slot of the doll inventory). One of each is enough, so a doll the player has isn't added again.
+    /// first empty slot of the doll inventory), as many times as wanted.
     /// Players without the event got the dolls from the Mauville old man's trades after Record Mixing, so the
     /// save must have visited Mauville City (FLAG_VISITED_MAUVILLE_CITY: R/S 0x818, E 0x878).
     /// </summary>
-    /// <summary>Whether the doll is in the save's doll inventory (placed ones included).</summary>
-    public static bool HasDoll(SAV3 sav, byte doll)
-        => sav is not SAV3FRLG && sav.Large.Slice(sav is SAV3E ? 0x2798 : 0x2704, DollSlots).Contains(doll);
-
     public static OpResult GiveDoll(SAV3 sav, byte doll)
     {
         if (sav is SAV3FRLG)
@@ -377,8 +373,6 @@ public static class Gen3Events
         if (!sav.GetEventFlag(sav is SAV3E ? FlagVisitedMauvilleE : FlagVisitedMauvilleRS))
             return OpResult.Fail($"Visit Mauville City first: the {name} was traded by the old man there.");
         var dolls = sav.Large.Slice(sav is SAV3E ? 0x2798 : 0x2704, DollSlots);
-        if (dolls.Contains(doll))
-            return OpResult.Fail($"You already have the {name}.");
         int free = dolls.IndexOf((byte)0);
         if (free < 0)
             return OpResult.Fail("There's no more room for dolls in your PC.");
