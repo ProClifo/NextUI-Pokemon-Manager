@@ -127,6 +127,41 @@ public static class Tickets
         _ => GiftService.MysteryGiftLocked(sav),
     };
 
+    /// <summary>
+    /// Whether the save already received the ticket properly: it has the item (in the bag, or Gen 3's PC to
+    /// withdraw it from) and what the event's own delivery set, which the game checks alongside the item.
+    /// Gen 3: the ferry's FLAG_ENABLE_SHIP_* (pokeemerald/pokefirered flags.h; the Wonder Card scripts set them).
+    /// Gen 4: the distribution event var holding its magic number (pokeplatinum system_vars.c, set by the
+    /// delivery man in scrcmd_mystery_gift.c; HeartGold/SoulSilver's Enigma Stone the same, var 0x4043). Steven
+    /// takes the Enigma Stone at the Pewter Museum (scr_seq_T03R0101), so the event's progress (var 0x4083)
+    /// counts too. Black/White: just the Liberty Pass, as they have no decompilation to say more.
+    /// </summary>
+    public static bool Received(TicketChoice ticket, SaveFile sav) => (ticket.Ticket.Key, sav) switch
+    {
+        ("eonticket", SAV3 gen3) => Gen3Events.HasEonTicket(gen3),
+        ("auroraticket", SAV3 gen3) => Gen3Ticket(gen3, ItemAuroraTicket, gen3 is SAV3E ? 0x8D5 : 0x84B),
+        ("mysticticket", SAV3 gen3) => Gen3Ticket(gen3, ItemMysticTicket, gen3 is SAV3E ? 0x8E0 : 0x84A),
+        ("oldseamap", SAV3E e) => Gen3Ticket(e, ItemOldSeaMap, 0x8D6),
+        ("membercard", SAV4Sinnoh s4) => Gen4Ticket(s4, ItemMemberCard, 0x43, 0x1209),
+        ("oaksletter", SAV4Sinnoh s4) => Gen4Ticket(s4, ItemOaksLetter, 0x44, 0x1112),
+        ("azureflute", SAV4Sinnoh s4) => Gen4Ticket(s4, ItemAzureFlute, 0x45, 0x1123),
+        ("secretkey", SAV4Sinnoh s4) => Gen4Ticket(s4, ItemSecretKey, 0x46, 0x1103),
+        ("enigmastone", SAV4HGSS hgss) => hgss.GetWork(0x43) == 0x06F2 && (HasItem(hgss, ItemEnigmaStone) || hgss.GetWork(0x83) >= 1),
+        ("libertypass", SAV5 gen5) => HasItem(gen5, ItemLibertyPass),
+        _ => false,
+    };
+
+    internal const int ItemAuroraTicket = 371, ItemMysticTicket = 370, ItemOldSeaMap = 376; // Gen 3 item IDs
+    internal const int ItemOaksLetter = 452, ItemMemberCard = 454, ItemAzureFlute = 455, ItemSecretKey = 467, ItemEnigmaStone = 536;
+    internal const int ItemLibertyPass = 574;
+
+    private static bool Gen3Ticket(SAV3 sav, int item, int flag) => sav.GetEventFlag(flag) && HasItem(sav, item);
+
+    private static bool Gen4Ticket(SAV4 sav, int item, int work, int magic) => sav.GetWork(work) == magic && HasItem(sav, item);
+
+    private static bool HasItem(SaveFile sav, int item)
+        => sav.Inventory.Pouches.Any(p => p.Type is InventoryType.KeyItems or InventoryType.PCItems && p.HasItem((ushort)item));
+
     /// <summary>0 = an official distribution for this game and language; higher = less legitimate.</summary>
     private static int Rank(GalleryEntry e, GameProfile profile)
     {
