@@ -969,7 +969,14 @@ public sealed class App
         if (!_settings.SaveStateDeletion || !_settings.SaveStateWarning || _paths.SdRoot is not { } sd)
             return true;
         if (!entries.Any(e => FindSaveStates(sd, e) is var (states, draStic) && (states.Count > 0 || draStic)))
+        {
+            // for reports of a missing warning: where the states were looked for
+            foreach (var e in entries)
+                foreach (var rom in RomIndex.FindRoms(e.Path))
+                    foreach (var root in _paths.RomRoots)
+                        Console.Error.WriteLine($"save state: none for {rom} (emulator {SaveStates.EmuName(root, rom) ?? "?"}, roms {root})");
             return true;
+        }
         const string message = "This will delete your current save state.\nContinue?";
         string[] answers = ["Yes, don't warn me again", "Yes", "No"];
         var title = string.Join(" & ", entries.Select(e => Names.Game(e.Sav)).Distinct());
