@@ -107,7 +107,7 @@ public static class GiftService
     public static OpResult InjectCard(SaveFile sav, DataMysteryGift gift)
     {
         if (sav is not IMysteryGiftStorageProvider provider)
-            return OpResult.Fail($"{Names.Game(sav)} has no Mystery Gift album. Use \"Add to PC box\" instead.");
+            return OpResult.Fail($"{Names.Game(sav)} has no Mystery Gift album.");
         if (!gift.IsCardCompatible(sav, out var why))
             return OpResult.Fail($"This gift isn't compatible with {Names.Game(sav)}. {why}".Trim());
         if (gift is PCD { IsLockCapsule: true })
@@ -153,7 +153,7 @@ public static class GiftService
         else
         {
             if (!album.Any(g => g.Type == gift.Type))
-                return OpResult.Fail($"{Names.Game(sav)} stores a different kind of card than this file. Use \"Send the Pokémon to your party\" instead.");
+                return OpResult.Fail($"{Names.Game(sav)} stores a different kind of card than this file.");
             int slot = Array.FindIndex(album, g => g.IsEmpty && g.Type == gift.Type);
             if (slot < 0)
                 return OpResult.Fail("The Mystery Gift album is full. Delete a card in-game first.");
