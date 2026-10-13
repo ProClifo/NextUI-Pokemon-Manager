@@ -394,7 +394,7 @@ public sealed class Gen3EventTests : IDisposable
     }
 
     [Fact]
-    public void RubySapphireHaveTheEonTicketOnceTheFerryFlagIsSet()
+    public void RubySapphireHaveTheEonTicketWithTheTicketAndTheFerryFlag()
     {
         var sav = (SAV3)_saves.Create(GameVersion.R, "EonR.sav").Sav;
         Assert.False(Gen3Events.HasEonTicket(sav));
@@ -405,6 +405,10 @@ public sealed class Gen3EventTests : IDisposable
         Assert.False(Gen3Events.HasEonTicket(sav));
         sav.SetEventFlag(0x853, true); // FLAG_SYS_HAS_EON_TICKET
         Assert.True(Gen3Events.HasEonTicket(sav)); // its menu entry goes away
+        // Nor does the flag alone: the ferry wants the ticket too.
+        var blank = (SAV3)_saves.Create(GameVersion.S, "EonS.sav").Sav;
+        blank.SetEventFlag(0x853, true);
+        Assert.False(Gen3Events.HasEonTicket(blank));
     }
 
     [Fact]

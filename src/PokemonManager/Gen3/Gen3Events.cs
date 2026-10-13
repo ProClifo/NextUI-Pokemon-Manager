@@ -418,12 +418,14 @@ public static class Gen3Events
     }
 
     /// <summary>
-    /// Whether the save already got the Eon Ticket, by the flag the Southern Island ferry checks: Emerald's
-    /// FLAG_ENABLE_SHIP_SOUTHERN_ISLAND (record_mixing.c sets it with the ticket), Ruby/Sapphire's
-    /// FLAG_SYS_HAS_EON_TICKET (the e-Card's script sets it when Dad hands the ticket over).
+    /// Whether the save already got the Eon Ticket: both what the Southern Island ferry checks, the ticket (in the
+    /// bag, or the PC to withdraw it from) and the flag: Emerald's FLAG_ENABLE_SHIP_SOUTHERN_ISLAND (record_mixing.c
+    /// sets it with the ticket), Ruby/Sapphire's FLAG_SYS_HAS_EON_TICKET (the e-Card's script sets it when Dad
+    /// hands the ticket over). Either one missing means the ferry won't sail, and giving the ticket again fixes it.
     /// </summary>
     public static bool HasEonTicket(SAV3 sav)
-        => sav.GetEventFlag(sav is SAV3E ? FlagEnableShipSouthernIslandE : FlagSysHasEonTicketRS);
+        => sav.GetEventFlag(sav is SAV3E ? FlagEnableShipSouthernIslandE : FlagSysHasEonTicketRS)
+            && sav.Inventory.Pouches.Any(p => p.Type is InventoryType.KeyItems or InventoryType.PCItems && p.HasItem(ItemEonTicket));
 
     /// <summary>Whether the save holds an event script (a Wonder Card's or Mystery Event's), which an injection replaces.</summary>
     public static bool HasEventScript(SAV3 sav)
