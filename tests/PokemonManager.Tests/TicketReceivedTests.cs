@@ -109,7 +109,15 @@ public sealed class TicketReceivedTests : IDisposable
     [InlineData(GameVersion.HG, "enigmastone", true)]
     [InlineData(GameVersion.B, "libertypass", true)]
     [InlineData(GameVersion.FR, "mysticticket", true)]
-    [InlineData(GameVersion.E, "oldseamap", true)]
+    // The Faraway Island Mew only in Japanese Emerald, Birth Island Deoxys in every other language's.
+    [InlineData(GameVersion.E, "oldseamap", false)]
+    [InlineData(GameVersion.E, "auroraticket", true)]
     public void TicketsAreIllegalOnlyWhenTheirPokemonIs(GameVersion version, string key, bool legal)
         => Assert.Equal(legal, Tickets.PokemonLegal(key, BlankSaveFile.Get(version, "ASH", LanguageID.German)));
+
+    [Theory]
+    [InlineData("oldseamap", true)]
+    [InlineData("auroraticket", false)]
+    public void JapaneseEmeraldIsTheOtherWayRound(string key, bool legal)
+        => Assert.Equal(legal, Tickets.PokemonLegal(key, BlankSaveFile.Get(GameVersion.E, "サトシ", LanguageID.Japanese)));
 }

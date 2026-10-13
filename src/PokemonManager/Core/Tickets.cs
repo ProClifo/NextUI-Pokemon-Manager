@@ -172,18 +172,19 @@ public static class Tickets
         ["libertypass"] = [Species.Victini],
     };
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string, GameVersion), bool> LegalCache = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string, GameVersion, int), bool> LegalCache = new();
 
     /// <summary>
-    /// Whether PKHeX accepts the Pokémon a ticket leads to in this game: it has an in-game encounter for one of
-    /// them in the save's game (Darkrai and Shaymin only in Platinum, Arceus at the Hall of Origin never). The
-    /// ticket's own language doesn't matter: PKHeX treats the islands' Pokémon as ordinary catches.
+    /// Whether PKHeX accepts the Pokémon a ticket leads to as this game would make it: an in-game encounter for one
+    /// of them in the save's game, caught in the save's language. Darkrai and Shaymin only came to Platinum, Arceus
+    /// at the Hall of Origin never; the Faraway Island Mew only to Japanese Emerald (the Old Sea Map was Japan's) and
+    /// Birth Island Deoxys only to other languages' Emerald.
     /// </summary>
     public static bool PokemonLegal(string key, SaveFile sav)
     {
         if (!TicketPokemon.TryGetValue(key, out var species))
             return true; // nothing caught through it
-        return LegalCache.GetOrAdd((key, sav.Version), _ =>
+        return LegalCache.GetOrAdd((key, sav.Version, sav.Language), _ =>
         {
             var versions = Enum.GetValues<GameVersion>().Where(v => v != sav.Version && sav.Version.Contains(v)).DefaultIfEmpty(sav.Version).ToArray();
             foreach (var s in species)
@@ -191,9 +192,23 @@ public static class Tickets
                 var template = sav.BlankPKM;
                 template.Species = (ushort)s;
                 // the fixed encounters (EncounterStatic3/4/5): islands, legendary rooms and event gifts
-                if (EncounterMovesetGenerator.GenerateEncounters(template, sav, ReadOnlyMemory<ushort>.Empty, versions)
-                    .Any(e => e.GetType().Name.StartsWith("EncounterStatic", StringComparison.Ordinal)))
-                    return true;
+                foreach (var e in EncounterMovesetGenerator.GenerateEncounters(template, sav, ReadOnlyMemory<ushort>.Empty, versions)
+                             .Where(e => e.GetType().Name.StartsWith("EncounterStatic", StringComparison.Ordinal)))
+                {
+                    try
+                    {
+                        // as caught in this game: its language, and the species' name in it
+                        var pk = e.ConvertToPKM(sav);
+                        pk.Language = sav.Language;
+                        pk.ClearNickname();
+                        pk.RefreshChecksum();
+                        if (new LegalityAnalysis(pk).Valid)
+                            return true;
+                    }
+                    catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or IndexOutOfRangeException)
+                    {
+                    }
+                }
             }
             return false;
         });

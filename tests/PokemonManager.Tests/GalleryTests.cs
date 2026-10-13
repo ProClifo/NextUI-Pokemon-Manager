@@ -230,11 +230,10 @@ public sealed class GalleryTests : IDisposable
         // Emerald's Eon Ticket comes by Record Mixing (no file).
         Assert.Equal(["Eon Ticket", "Aurora Ticket", "Old Sea Map"], tickets.Select(t => t.Ticket.Name));
         Assert.Null(tickets[0].File);
-        // Legal or not goes by the Pokémon they lead to, which PKHeX accepts from Emerald's islands whichever
-        // card or language the ticket came from.
-        Assert.All(tickets, t => Assert.True(t.Legal));
+        // Legal or not goes by the Pokémon they lead to as this game catches them: the Faraway Island Mew is
+        // only legal from a Japanese Emerald.
+        Assert.Equal([true, true, false], tickets.Select(t => t.Legal));
         Assert.Empty(Tickets.For(gallery, profile with { Games = ["R"] }, sav)); // no Eon Ticket file in this gallery
-        Assert.True(Tickets.For(gallery, profile with { Language = "JPN" }, sav)[1].Legal);
 
         // Each ticket stays hidden until the menu that delivered it is unlocked: Mystery Gift for the Wonder
         // Cards, Record Mixing for Emerald's Eon Ticket.
