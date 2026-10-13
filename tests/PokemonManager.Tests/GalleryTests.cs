@@ -1,5 +1,6 @@
 using PKHeX.Core;
 using PokemonManager.Core;
+using PokemonManager.Gen3;
 using Xunit;
 
 namespace PokemonManager.Tests;
@@ -228,6 +229,18 @@ public sealed class GalleryTests : IDisposable
         // English Gen 3 Wonder Cards work in every non-Japanese game, and count as official there.
         Assert.True(Tickets.For(gallery, profile with { Language = "GER" }, sav)[1].Legal);
         Assert.False(Tickets.For(gallery, profile with { Language = "JPN" }, sav)[1].Legal);
+
+        // Each ticket stays hidden until the menu that delivered it is unlocked: Mystery Gift for the Wonder
+        // Cards, Record Mixing for Emerald's Eon Ticket.
+        var e = (SAV3E)sav;
+        e.SetEventFlag(Gen3Events.FlagMysteryGiftEnableE, false);
+        e.SetEventFlag(0x878, false);
+        Assert.All(tickets, t => Assert.NotNull(Tickets.Locked(t, e)));
+        e.SetEventFlag(Gen3Events.FlagMysteryGiftEnableE, true);
+        Assert.NotNull(Tickets.Locked(tickets[0], e));
+        Assert.Null(Tickets.Locked(tickets[1], e));
+        e.SetEventFlag(0x878, true);
+        Assert.Null(Tickets.Locked(tickets[0], e));
 
         var distributions = GalleryLists.Distributions(gallery, profile);
         Assert.Equal("WISHMKR Jirachi", Assert.Single(distributions).Title);

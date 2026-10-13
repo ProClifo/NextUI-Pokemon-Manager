@@ -92,10 +92,13 @@ public static class GiftService
     /// questionnaire (scripts_jubilife_tv_3f.s: CheckIsMysteryGiftPhrase, UnlockMysteryGift). HeartGold/SoulSilver
     /// unlock it with the Pokédex, and Gen 5 has it from the start.
     /// </summary>
-    public static string? MysteryGiftLocked(SaveFile sav)
-        => sav is SAV4Sinnoh s4 && !s4.IsMysteryGiftUnlocked
-            ? $"Unlock Mystery Gift in {Names.Game(sav)} first: fill in the questionnaire at Jubilife TV with \"EVERYONE HAPPY\" \"WI-FI CONNECTION\"."
-            : null;
+    public static string? MysteryGiftLocked(SaveFile sav) => sav switch
+    {
+        SAV4Sinnoh { IsMysteryGiftUnlocked: false } =>
+            $"Unlock Mystery Gift in {Names.Game(sav)} first: fill in the questionnaire at Jubilife TV with \"EVERYONE HAPPY\" \"WI-FI CONNECTION\".",
+        SAV4HGSS when !TradeRules.HasPokedex(sav) => $"{Names.Game(sav)} unlocks Mystery Gift once you've received the Pokédex.",
+        _ => null,
+    };
 
     /// <summary>
     /// Places a Wonder Card into the save's album so it can be picked up in-game from the delivery person,

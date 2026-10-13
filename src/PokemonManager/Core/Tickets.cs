@@ -10,7 +10,7 @@ public sealed record Ticket(string Name, string Key, string[] Games);
 /// The gallery file used to give a ticket to one save, and whether that's a legitimate distribution. No file
 /// means Emerald's Eon Ticket, which is given the way Record Mixing did (see <see cref="Gen3Events.GiveEonTicketByRecordMixing"/>).
 /// </summary>
-public sealed record TicketChoice(Ticket Ticket, GalleryEntry? File, bool Legal);
+public sealed record TicketChoice(Ticket Ticket, GalleryEntry? File, bool Legal, Gen3EventKind? Gen3Kind = null);
 
 /// <summary>
 /// The event tickets each game has. Every ticket a game has is offered, legitimate or not: when no official
@@ -55,7 +55,7 @@ public static class Tickets
     public static IEnumerable<ushort> Unreachable(GalleryArchive gallery, int generation, string language)
         => Unlocked(gallery, generation, language, distributed: false);
 
-    /// <summary>Ticket-only Pokémon whose ticket was distributed in this generation and language (Events has it).</summary>
+    /// <summary>Ticket-only Pokémon whose ticket was distributed in this generation and language (Mystery Gift has it).</summary>
     public static IEnumerable<ushort> Reachable(GalleryArchive gallery, int generation, string language)
         => Unlocked(gallery, generation, language, distributed: true);
 
@@ -97,7 +97,7 @@ public static class Tickets
             {
                 if (gallery.Load(entry) is { } gift && Works(gift, sav))
                 {
-                    result.Add(new TicketChoice(ticket, entry, Legal: rank == 0));
+                    result.Add(new TicketChoice(ticket, entry, Legal: rank == 0, gift.Gen3?.Kind));
                     found = true;
                     break;
                 }
@@ -114,6 +114,18 @@ public static class Tickets
         }
         return result;
     }
+
+    /// <summary>
+    /// Why the save can't receive the ticket yet, or null: the game's menu that delivered it must be unlocked
+    /// in-game (Mystery Gift; Ruby/Sapphire's and Japanese Emerald's Mystery Event), and Emerald's Record Mixing
+    /// Eon Ticket needs Record Mixing.
+    /// </summary>
+    public static string? Locked(TicketChoice ticket, SaveFile sav) => sav switch
+    {
+        SAV3 gen3 when ticket.File is null => Decorations.RecordMixingUnlocked(gen3) ? null : "Visit Mauville City first to open Record Mixing.",
+        SAV3 gen3 => Gen3Events.MenuLocked(gen3, ticket.Gen3Kind ?? Gen3EventKind.WonderCard),
+        _ => GiftService.MysteryGiftLocked(sav),
+    };
 
     /// <summary>0 = an official distribution for this game and language; higher = less legitimate.</summary>
     private static int Rank(GalleryEntry e, GameProfile profile)

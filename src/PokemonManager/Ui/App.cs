@@ -278,14 +278,15 @@ public sealed class App
             var sav = entry.Sav;
             Legality.For(sav); // legality reports in this save's menus are for this game and trainer
             var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
-            // A game with one event gets that event on its menu; a game with several gets an Events menu.
-            var tickets = TicketsFor(entry);
+            // A game with one event gets that event on its menu; a game with several gets a Mystery Gift menu.
+            // Each is hidden until the game's own menu that delivered it (Mystery Gift, Mystery Event) is unlocked.
+            var tickets = TicketsFor(entry).Where(t => Tickets.Locked(t, sav) is null).ToList();
             if (sav is SAV2 { Version: GameVersion.C } crystal)
                 actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
             else if (tickets.Count == 1)
                 actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
             else if (tickets.Count > 1)
-                actions.Add(("Events", null, () => EventsMenu(entry, tickets)));
+                actions.Add(("Mystery Gift", null, () => EventsMenu(entry, tickets)));
             // Gen 1/2's event-only Pokémon get their own entries (Gen 1/2's other distributions are in the Gallery):
             // Mew in Gen 1 (and Korean Gen 2, which can't link with Gen 1), Celebi in Gen 2 outside Japan, where the
             // GS Ball never ran on cartridges.
@@ -1245,7 +1246,7 @@ public sealed class App
         int selected = 0;
         while (true)
         {
-            var choice = _ui.Choose("Events", tickets.Select(t => t.Ticket.Name).ToList(), selected, tags: tickets.Select(t => (string?)LegalTag(t.Legal)).ToList());
+            var choice = _ui.Choose("Mystery Gift", tickets.Select(t => t.Ticket.Name).ToList(), selected, tags: tickets.Select(t => (string?)LegalTag(t.Legal)).ToList());
             if (choice is null)
                 return;
             selected = choice.Value;
@@ -1640,7 +1641,7 @@ public sealed class App
         "Saves are read from the SD card's Saves folder.\n" +
         "A backup is written to PokemonManager/Backups before every change.\n" +
         "\n" +
-        "Each game's menu has Events (every ticket the game has, like the Aurora Ticket), Distributions (Pokémon " +
+        "Each game's menu has Mystery Gift (every ticket the game has, like the Aurora Ticket, once the game's Mystery Gift is unlocked), Distributions (Pokémon " +
         "you can only get from an event; Red/Blue/Yellow have Mew instead) and the Gallery (every event file for that game and language, from Project " +
         "Pokémon's EventsGallery). Items are marked Legal or Illegal. Info shows the save's details.\n" +
         "\n" +
