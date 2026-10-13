@@ -730,6 +730,28 @@ public sealed class App
         return ActionReasons.Evolve(pk, partner) is null && !(slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null);
     }
 
+    /// <summary>A question in lines the highlight skips, then YES / NO with NO highlighted. True for YES.</summary>
+    private bool AskYesNo(string question, string title)
+    {
+        var lines = new List<string>();
+        var line = "";
+        foreach (var word in question.Split(' '))
+        {
+            if (line.Length > 0 && line.Length + 1 + word.Length > 26)
+            {
+                lines.Add(line);
+                line = word;
+            }
+            else
+                line = line.Length == 0 ? word : $"{line} {word}";
+        }
+        if (line.Length > 0)
+            lines.Add(line);
+        var items = lines.Concat(["YES", "NO"]).ToList();
+        var choice = _ui.Choose(title, items, items.Count - 1, unselectable: items.Select((_, i) => i < lines.Count).ToList());
+        return choice == items.Count - 2;
+    }
+
     /// <returns>True if the source slot no longer holds this Pokémon.</returns>
     private bool TransferFlow(SaveEntry source, SlotRef from, TransferMode mode)
     {
@@ -752,6 +774,11 @@ public sealed class App
             _ui.Message(check.Message);
             return false;
         }
+
+        // A newer generation's game can't send it back (Pal Park and Poké Transfer only go forward)
+        if (source.Sav.Generation >= 3 && dest.Sav.Generation > source.Sav.Generation && !AskYesNo(
+                "WARNING: This game cannot send your Pokémon back. Continue?", SaveName(dest)))
+            return false;
 
         // Picking the game is the confirmation: it's done at once, then "<NICKNAME> was sent to <PLAYER>."
         var result = TransferService.Transfer(source, from, dest, mode, _settings.AllowIllegalTransfers, out var placedAt);
