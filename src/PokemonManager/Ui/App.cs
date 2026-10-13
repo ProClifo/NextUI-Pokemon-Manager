@@ -960,13 +960,15 @@ public sealed class App
     }
 
     /// <summary>
-    /// Before a change is written: with Save State Deletion and Save State Warning on, asks first (No by default). "Yes, don't warn me again" turns Save State Warning off. On No the
+    /// Before a change is written: with Save State Deletion and Save State Warning on, and a save state that writing
+    /// would delete, asks first (No by default). "Yes, don't warn me again" turns Save State Warning off. On No the
     /// saves are put back as they are on disk, and false is returned.
     /// </summary>
     private bool ConfirmStateLoss(params SaveEntry[] entries)
     {
-        // asked before every change, whether or not a save state is there right now
-        if (!_settings.SaveStateDeletion || !_settings.SaveStateWarning)
+        if (!_settings.SaveStateDeletion || !_settings.SaveStateWarning || _paths.SdRoot is not { } sd)
+            return true;
+        if (!entries.Any(e => FindSaveStates(sd, e) is var (states, draStic) && (states.Count > 0 || draStic)))
             return true;
         const string message = "This will delete your current save state.\nContinue?";
         string[] answers = ["Yes, don't warn me again", "Yes", "No"];
