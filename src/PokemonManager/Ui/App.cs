@@ -487,6 +487,8 @@ public sealed class App
             _ui.Message(result.Message);
             return;
         }
+        if (!ConfirmStateLoss(dest, entry))
+            return;
         // The receiving game first: if the sender then fails, the decoration is duplicated, not lost.
         if (!TryWrite(dest, out _))
         {
@@ -817,6 +819,11 @@ public sealed class App
         if (TradeRules.UnlockNationalDexByTrade(source.Sav, dest.Sav) is { } unlocked)
             message += $" {Names.Game(unlocked)} received the National Pokédex.";
 
+        if (!ConfirmStateLoss(mode == TransferMode.Move ? new[] { dest, source } : new[] { dest }))
+        {
+            source.Reload();
+            return false;
+        }
         // Write the destination first: if the source write then fails, nothing is lost (only duplicated).
         if (!TryWrite(dest, out var destBackup))
         {
@@ -927,11 +934,7 @@ public sealed class App
     {
         if (_settings.SaveStateDeletion || _paths.SdRoot is not { } sd)
             return;
-        var states = RomIndex.FindRoms(entry.Path)
-            .SelectMany(rom => _paths.RomRoots.Select(root => (rom, root)))
-            .Where(r => SaveStates.HasSelected(sd, r.root, r.rom))
-            .ToList();
-        bool draStic = entry.Sav.Generation >= 4 && SaveStates.HasDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"));
+        var (states, draStic) = FindSaveStates(sd, entry);
         if (states.Count == 0 && !draStic)
             return;
         if (_ui.Confirm($"{Names.Game(entry.Sav)} has a save state it would resume from, which keeps the old clock.\n" +
@@ -944,13 +947,53 @@ public sealed class App
         }
     }
 
+    /// <summary>The save states resuming this save's game would load: NextUI's selected slot, DraStic's auto state.</summary>
+    private (List<(string Rom, string Root)> States, bool DraStic) FindSaveStates(string sd, SaveEntry entry)
+    {
+        var states = RomIndex.FindRoms(entry.Path)
+            .SelectMany(rom => _paths.RomRoots.Select(root => (rom, root)))
+            .Where(r => SaveStates.HasSelected(sd, r.root, r.rom))
+            .ToList();
+        bool draStic = entry.Sav.Generation >= 4 && SaveStates.HasDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"));
+        return (states, draStic);
+    }
+
+    /// <summary>
+    /// Before a change is written: with Save State Deletion and Save State Warning on, and a save state that writing
+    /// would delete, asks first (No by default). "Yes, don't warn me again" turns Save State Warning off. On No the
+    /// saves are put back as they are on disk, and false is returned.
+    /// </summary>
+    private bool ConfirmStateLoss(params SaveEntry[] entries)
+    {
+        if (!_settings.SaveStateDeletion || !_settings.SaveStateWarning || _paths.SdRoot is not { } sd)
+            return true;
+        if (!entries.Any(e => FindSaveStates(sd, e) is var (states, draStic) && (states.Count > 0 || draStic)))
+            return true;
+        const string message = "This will delete your current save state.\nContinue?";
+        string[] answers = ["Yes, don't warn me again", "Yes", "No"];
+        var title = string.Join(" & ", entries.Select(e => Names.Game(e.Sav)).Distinct());
+        int? pick = _boxViewer.Choose(title, message, answers, 2);
+        if (pick is null)
+            pick = _ui.Choose(message.Replace("\n", " "), answers.ToList(), 2);
+        if (pick == 0)
+        {
+            _settings.SaveStateWarning = false;
+            _settings.Save(_paths.SettingsFile);
+        }
+        if (pick is 0 or 1)
+            return true;
+        foreach (var e in entries)
+            e.Reload();
+        return false;
+    }
+
     private void SetClock(SaveEntry entry, string? rtcPath, int weekday, int hour, int minute)
     {
         var now = ClockNow(entry.Sav);
         Console.Error.WriteLine($"clock: set {hour:00}:{minute:00} at device {now:yyyy-MM-dd HH:mm:ss} (.NET local {DateTime.Now:HH:mm:ss}, " +
             $"UTC {DateTime.UtcNow:HH:mm:ss}, TZ={Environment.GetEnvironmentVariable("TZ") ?? "-"})");
         var rtc = GameClock.Set(entry.Sav, now, weekday, hour, minute);
-        if (!TryWrite(entry, out _))
+        if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
             return;
         OfferResumeStateDeletion(entry);
         if (rtc is not null && rtcPath is not null)
@@ -1006,7 +1049,7 @@ public sealed class App
             _ui.Message(result.Message);
             return false;
         }
-        if (!TryWrite(entry, out _))
+        if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
             return false;
         Console.Error.WriteLine($"evolve: {result.Message}");
         // the species as the game writes it (KADABRA in Gen 1-4, Kadabra in Gen 5)
@@ -1058,6 +1101,8 @@ public sealed class App
             _ui.Message(result.Message);
             return false;
         }
+        if (!ConfirmStateLoss(partner.Save, entry))
+            return false;
         // A swap: if the second write fails, the partner's save is put back from its backup, or its Pokémon is lost.
         if (!TryWrite(partner.Save, out var partnerBackup))
         {
@@ -1102,7 +1147,7 @@ public sealed class App
             _ui.Message(result.Message);
             return;
         }
-        if (TryWrite(entry, out _))
+        if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message(file.Kind switch
             {
                 Gen3EventKind.WonderCard => "The WONDER CARD has arrived!",
@@ -1136,7 +1181,7 @@ public sealed class App
             _ui.Message(result.Message);
             return;
         }
-        if (TryWrite(entry, out _))
+        if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message(actions[choice.Value].Pokemon ? result.Message : "The WONDER CARD has arrived!");
     }
 
@@ -1290,7 +1335,7 @@ public sealed class App
             _ui.Message(result.Message);
             return;
         }
-        if (TryWrite(entry, out _))
+        if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message("Eon Ticket is now in your bag!");
     }
 
@@ -1342,7 +1387,7 @@ public sealed class App
             _ui.Message(result.Message);
             return;
         }
-        if (TryWrite(entry, out _))
+        if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message($"The {name.ToUpperInvariant()} has arrived in your PC!");
     }
 
@@ -1498,7 +1543,7 @@ public sealed class App
         if (!inject)
             return;
         slot.Set(sav, pk);
-        if (TryWrite(entry, out _))
+        if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message(Names.Arrived(pk));
     }
 
@@ -1533,7 +1578,7 @@ public sealed class App
         if (!_ui.Confirm(question, "ENABLE", "CANCEL"))
             return;
         sav.EnableGSBallMobileEvent();
-        if (TryWrite(entry, out _))
+        if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message("The GS BALL event has been enabled!");
     }
 
@@ -1547,7 +1592,7 @@ public sealed class App
         string[] onOff = ["Disabled", "Enabled"];
         var names = new List<string>
         {
-            "Illegal Transfers", "Official ROMs Only", "PC Box View", "Save State Deletion",
+            "Illegal Transfers", "Official ROMs Only", "PC Box View", "Save State Deletion", "Save State Warning",
             "Gallery: All Languages", "Gallery: Unreleased Files", "Show Welcome Screen Again", "Reset to Default",
         };
         int welcome = names.Count - 2, reset = names.Count - 1;
@@ -1557,7 +1602,7 @@ public sealed class App
             bool[] current =
             [
                 _settings.AllowIllegalTransfers, _settings.OnlyOfficialRoms, _settings.PcBoxView, _settings.SaveStateDeletion,
-                _settings.GalleryAllLanguages, _settings.GalleryUnreleased,
+                _settings.SaveStateWarning, _settings.GalleryAllLanguages, _settings.GalleryUnreleased,
             ];
             var options = names.Select((_, i) => i < current.Length ? onOff : []).ToList();
             var values = names.Select((_, i) => i < current.Length && current[i] ? 1 : 0).ToList();
@@ -1588,10 +1633,10 @@ public sealed class App
                     "Show saves from ROM hacks and other unofficial ROMs too? PKHeX may misread a hack's save, " +
                     "and editing it can corrupt it. Backups are still made before every change.", "SHOW ALL", "CANCEL"))
                 result.Values[1] = 1;
-            if (On(5) && !_settings.GalleryUnreleased && !_ui.Confirm(
+            if (On(6) && !_settings.GalleryUnreleased && !_ui.Confirm(
                     "Unreleased files are debug and test data that were never distributed. PKHeX flags their " +
                     "Pokémon as illegal, and some may not work in-game. Show them in the gallery?", "SHOW", "CANCEL"))
-                result.Values[5] = 0;
+                result.Values[6] = 0;
 
             _settings.AllowIllegalTransfers = On(0);
             if (_settings.OnlyOfficialRoms != On(1))
@@ -1599,8 +1644,9 @@ public sealed class App
             _settings.OnlyOfficialRoms = On(1);
             _settings.PcBoxView = On(2);
             _settings.SaveStateDeletion = On(3);
-            _settings.GalleryAllLanguages = On(4);
-            _settings.GalleryUnreleased = On(5);
+            _settings.SaveStateWarning = On(4);
+            _settings.GalleryAllLanguages = On(5);
+            _settings.GalleryUnreleased = On(6);
             if (result.Selected == welcome)
                 _settings.SeenWelcome = false;
             _settings.Save(_paths.SettingsFile);

@@ -13,6 +13,7 @@
 #define PADDING 10
 #define PILL_SIZE 30
 #define BUTTON_PADDING 12
+#define BUTTON_MARGIN 5
 static int desktop_scale = 2;
 #define SCALE1(a) ((a) * desktop_scale)
 #define CPU_SPEED_MENU 0

@@ -201,20 +201,49 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
     /// </summary>
     public bool? YesNo(string title, string message, BoxScene.ArtImage? icon, string? background)
     {
+        var json = new System.Text.Json.Nodes.JsonObject { ["title"] = title, ["message"] = message, ["selected"] = 1 };
+        if (icon is not null)
+        {
+            json["icon"] = icon.Sheet;
+            json["icon_rect"] = new System.Text.Json.Nodes.JsonArray(icon.X, icon.Y, icon.W, icon.H);
+        }
+        if (background is not null && File.Exists(background))
+            json["background"] = background;
+        return RunDialog(json, out _) switch { 0 => true, 2 => false, _ => null };
+    }
+
+    /// <summary>
+    /// A question with its answers one above the other (pkmgr-box --dialog with "answers"), up/down to pick,
+    /// <paramref name="selected"/> highlighted first. The answer's index, -1 for B, null when the viewer couldn't
+    /// show it.
+    /// </summary>
+    public int? Choose(string title, string message, IReadOnlyList<string> answers, int selected)
+    {
+        var json = new System.Text.Json.Nodes.JsonObject
+        {
+            ["title"] = title,
+            ["message"] = message,
+            ["answers"] = new System.Text.Json.Nodes.JsonArray(answers.Select(a => (System.Text.Json.Nodes.JsonNode?)a).ToArray()),
+            ["selected"] = selected,
+        };
+        return RunDialog(json, out var output) switch
+        {
+            0 when int.TryParse(output.Trim(), out var picked) && picked >= 0 && picked < answers.Count => picked,
+            2 => -1,
+            _ => null,
+        };
+    }
+
+    /// <summary>Runs pkmgr-box --dialog; its exit code (null when it couldn't run) and what it printed.</summary>
+    private int? RunDialog(System.Text.Json.Nodes.JsonObject json, out string output)
+    {
+        output = "";
         if (FindOnPath(Tool) is null)
             return null;
         try
         {
             Directory.CreateDirectory(tempDir);
             var path = Path.Combine(tempDir, "dialog.json");
-            var json = new System.Text.Json.Nodes.JsonObject { ["title"] = title, ["message"] = message, ["selected"] = 1 };
-            if (icon is not null)
-            {
-                json["icon"] = icon.Sheet;
-                json["icon_rect"] = new System.Text.Json.Nodes.JsonArray(icon.X, icon.Y, icon.W, icon.H);
-            }
-            if (background is not null && File.Exists(background))
-                json["background"] = background;
             File.WriteAllText(path, json.ToJsonString());
             var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             psi.ArgumentList.Add("--dialog");
@@ -222,12 +251,15 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             using var p = Process.Start(psi);
             if (p is null)
                 return null;
-            p.OutputDataReceived += static (_, _) => { };
+            var stdout = new System.Text.StringBuilder();
+            p.OutputDataReceived += (_, e) => { if (e.Data is { } line) lock (stdout) stdout.AppendLine(line); };
             p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
             p.BeginOutputReadLine();
             p.BeginErrorReadLine();
             p.WaitForExit();
-            return p.ExitCode switch { 0 => true, 2 => false, _ => null };
+            lock (stdout)
+                output = stdout.ToString();
+            return p.ExitCode;
         }
         catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
         {

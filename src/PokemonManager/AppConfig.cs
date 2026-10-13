@@ -86,6 +86,11 @@ public sealed class AppSettings
     /// that would undo the change: the game has to start from its save (on by default).
     /// </summary>
     public bool SaveStateDeletion { get; set; } = true;
+    /// <summary>
+    /// Ask before a change deletes a save state (with Save State Deletion on); turned off by answering
+    /// "Yes, don't warn me again" (on by default).
+    /// </summary>
+    public bool SaveStateWarning { get; set; } = true;
 
     /// <summary>Puts every setting back to its default ("Reset to Default"); the welcome screen stays seen.</summary>
     public void ResetToDefaults()
@@ -97,6 +102,7 @@ public sealed class AppSettings
         GalleryAllLanguages = defaults.GalleryAllLanguages;
         GalleryUnreleased = defaults.GalleryUnreleased;
         SaveStateDeletion = defaults.SaveStateDeletion;
+        SaveStateWarning = defaults.SaveStateWarning;
     }
 
     public static AppSettings Load(string path)
@@ -119,6 +125,7 @@ public sealed class AppSettings
                 case "gallery_all_languages": s.GalleryAllLanguages = on; break;
                 case "gallery_unreleased": s.GalleryUnreleased = on; break;
                 case "save_state_deletion": s.SaveStateDeletion = on; break;
+                case "save_state_warning": s.SaveStateWarning = on; break;
             }
         }
         return s;
@@ -137,6 +144,7 @@ public sealed class AppSettings
                 $"gallery_all_languages={GalleryAllLanguages.ToString().ToLowerInvariant()}",
                 $"gallery_unreleased={GalleryUnreleased.ToString().ToLowerInvariant()}",
                 $"save_state_deletion={SaveStateDeletion.ToString().ToLowerInvariant()}",
+                $"save_state_warning={SaveStateWarning.ToString().ToLowerInvariant()}",
             ]);
         }
         catch (IOException)

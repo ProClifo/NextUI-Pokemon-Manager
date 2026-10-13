@@ -2,6 +2,8 @@
 // of the screen. dialog.json: {"title", "icon", "icon_rect": [x, y, w, h], "message" ("\n" breaks lines),
 // "background", "yes", "no", "selected": 0 YES / 1 NO}. Left/right pick, A answers, B is NO.
 // Exit code 0 for YES, 2 for NO (EXIT_BACK), 1 when it couldn't run.
+// With "answers": ["...", ...] (up to 4) they're listed one above the other instead, up/down to pick, "selected"
+// the one highlighted first; A prints the picked answer's index and exits 0, B exits 2.
 
 // The selection pill and the text colours: NextUI's theme on the device, white and black on a desktop.
 #ifdef DESKTOP
@@ -71,6 +73,36 @@ static SDL_Surface *dialog_icon(const char *path, JSON_Array *rect, int max_h)
     return out;
 }
 
+#define DIALOG_MAX_ANSWERS 4
+
+// The answers: "answers" when given (stacked), else YES and NO (side by side). Returns how many.
+static int dialog_answers(JSON_Object *o, const char *labels[DIALOG_MAX_ANSWERS], bool *stacked)
+{
+    JSON_Array *a = json_object_get_array(o, "answers");
+    int n = a ? (int)json_array_get_count(a) : 0;
+    if (n > DIALOG_MAX_ANSWERS)
+        n = DIALOG_MAX_ANSWERS;
+    *stacked = n > 0;
+    for (int i = 0; i < n; i++)
+        labels[i] = json_array_get_string(a, (size_t)i) ? json_array_get_string(a, (size_t)i) : "";
+    if (n > 0)
+        return n;
+    labels[0] = json_object_get_string(o, "yes") ? json_object_get_string(o, "yes") : "YES";
+    labels[1] = json_object_get_string(o, "no") ? json_object_get_string(o, "no") : "NO";
+    return 2;
+}
+
+static void dialog_answer(SDL_Surface *screen, const char *label, SDL_Rect r, bool selected)
+{
+    dialog_pill(screen, r, selected);
+    SDL_Surface *text = font.large ? TTF_RenderUTF8_Blended(font.large, label, dialog_text(selected)) : NULL;
+    if (text)
+    {
+        SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){r.x + (r.w - text->w) / 2, r.y + (r.h - text->h) / 2, text->w, text->h});
+        SDL_FreeSurface(text);
+    }
+}
+
 static void dialog_draw(SDL_Surface *screen, JSON_Object *o, SDL_Surface *bg, SDL_Surface *icon, int selected)
 {
     SDL_FillRect(screen, NULL, dialog_backdrop(screen));
@@ -116,9 +148,15 @@ static void dialog_draw(SDL_Surface *screen, JSON_Object *o, SDL_Surface *bg, SD
     int lines = 1;
     for (const char *p = message ? message : ""; *p; p++)
         lines += *p == '\n';
-    int answers_h = SCALE1(PILL_SIZE);
-    int block = lines * line_h + SCALE1(PADDING * 2) + answers_h;
-    int y = (screen->h - block) / 2;
+    const char *labels[DIALOG_MAX_ANSWERS];
+    bool stacked;
+    int count = dialog_answers(o, labels, &stacked);
+    // stacked answers sit pill against pill, like a list's rows, and closer under the message
+    int answers_h = SCALE1(PILL_SIZE), step = answers_h, gap_above = SCALE1(stacked ? PADDING : PADDING * 2);
+    int block = lines * line_h + gap_above + (stacked ? count * step : answers_h);
+    // centred between the title and the button hints
+    int top = SCALE1(PADDING + PILL_SIZE), bottom = screen->h - SCALE1(PADDING + PILL_SIZE);
+    int y = top + (bottom - top - block) / 2;
     if (message && font.large)
     {
         char line[256];
@@ -137,30 +175,30 @@ static void dialog_draw(SDL_Surface *screen, JSON_Object *o, SDL_Surface *bg, SD
             p = end ? end + 1 : p + len;
         }
     }
-    y += lines * line_h + SCALE1(PADDING * 2);
-    // YES and NO side by side, the chosen one in the selection pill
-    const char *labels[2] = {json_object_get_string(o, "yes") ? json_object_get_string(o, "yes") : "YES",
-                             json_object_get_string(o, "no") ? json_object_get_string(o, "no") : "NO"};
-    int widths[2] = {0, 0}, gap = SCALE1(PADDING * 2);
-    for (int i = 0; i < 2; i++)
+    y += lines * line_h + gap_above;
+    int widths[DIALOG_MAX_ANSWERS] = {0}, gap = SCALE1(PADDING * 2);
+    for (int i = 0; i < count; i++)
     {
         int tw = 0;
         if (font.large)
             TTF_SizeUTF8(font.large, labels[i], &tw, NULL);
         widths[i] = tw + SCALE1(BUTTON_PADDING * 4);
     }
-    int x = (screen->w - widths[0] - gap - widths[1]) / 2;
-    for (int i = 0; i < 2; i++)
+    if (stacked)
     {
-        SDL_Rect r = {x, y, widths[i], answers_h};
-        dialog_pill(screen, r, i == selected);
-        SDL_Surface *text = font.large ? TTF_RenderUTF8_Blended(font.large, labels[i], dialog_text(i == selected)) : NULL;
-        if (text)
+        // one above the other, each centred
+        for (int i = 0; i < count; i++)
+            dialog_answer(screen, labels[i], (SDL_Rect){(screen->w - widths[i]) / 2, y + i * step, widths[i], answers_h}, i == selected);
+    }
+    else
+    {
+        // YES and NO side by side, the chosen one in the selection pill
+        int x = (screen->w - widths[0] - gap - widths[1]) / 2;
+        for (int i = 0; i < 2; i++)
         {
-            SDL_BlitSurface(text, NULL, screen, &(SDL_Rect){r.x + (r.w - text->w) / 2, r.y + (r.h - text->h) / 2, text->w, text->h});
-            SDL_FreeSurface(text);
+            dialog_answer(screen, labels[i], (SDL_Rect){x, y, widths[i], answers_h}, i == selected);
+            x += widths[i] + gap;
         }
-        x += widths[i] + gap;
     }
     GFX_blitButtonGroup((char *[]){"B", "BACK", "A", "SELECT", NULL}, 1, screen, 1);
 }
@@ -181,12 +219,19 @@ static int dialog_run(const char *path, const char *screenshot, const char *stat
     InitSettings();
     SDL_Surface *bg = json_object_get_string(o, "background") ? IMG_Load(json_object_get_string(o, "background")) : NULL;
     SDL_Surface *icon = dialog_icon(json_object_get_string(o, "icon"), json_object_get_array(o, "icon_rect"), SCALE1(PILL_SIZE - 4));
-    int selected = json_object_has_value(o, "selected") ? (int)json_object_get_number(o, "selected") : 1;
+    const char *labels[DIALOG_MAX_ANSWERS];
+    bool stacked;
+    int count = dialog_answers(o, labels, &stacked);
+    int selected = json_object_has_value(o, "selected") ? (int)json_object_get_number(o, "selected") : count - 1;
+    if (selected < 0 || selected >= count)
+        selected = count - 1;
 #ifdef DESKTOP
     if (screenshot)
     {
         if (state_name && strcmp(state_name, "yes") == 0)
             selected = 0;
+        else if (state_name && state_name[0] >= '0' && state_name[0] < '0' + count)
+            selected = state_name[0] - '0';
         dialog_draw(screen, o, bg, icon, selected);
         IMG_SavePNG(screen, screenshot);
         return EXIT_PICKED;
@@ -202,14 +247,26 @@ static int dialog_run(const char *path, const char *screenshot, const char *stat
         GFX_startFrame();
         PWR_update(&dirty, &show_setting, NULL, NULL);
         PAD_poll();
-        if (PAD_justRepeated(BTN_LEFT) || PAD_justRepeated(BTN_RIGHT))
+        if (!stacked && (PAD_justRepeated(BTN_LEFT) || PAD_justRepeated(BTN_RIGHT)))
         {
             selected = 1 - selected;
             dirty = 1;
         }
+        else if (stacked && (PAD_justRepeated(BTN_UP) || PAD_justRepeated(BTN_DOWN)))
+        {
+            selected = (selected + (PAD_justRepeated(BTN_UP) ? count - 1 : 1)) % count;
+            dirty = 1;
+        }
         else if (PAD_justReleased(BTN_A))
         {
-            result = selected == 0 ? EXIT_PICKED : EXIT_BACK;
+            if (stacked)
+            {
+                printf("%d\n", selected);
+                fflush(stdout);
+                result = EXIT_PICKED;
+            }
+            else
+                result = selected == 0 ? EXIT_PICKED : EXIT_BACK;
             quitting = true;
         }
         else if (PAD_justReleased(BTN_B))
