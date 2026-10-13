@@ -214,6 +214,7 @@ public sealed class GalleryTests : IDisposable
             write("Unreleased/Gen 3/ENG/RSEFL - Debug Mew (ENG).pk3", Bytes(TestSaves.Make(sav, Species.Mew, 10)));
             write("Unreleased/Gen 3/ENG/Wondercards/E - Item Old Sea Map (debug)(ENG).wc3", Gen3EventTests.MakeWonderCard("OLD SEA MAP"));
             write("Released/Gen 4/hex extracted cards/ENG/x.pcd", new byte[856]);
+            write("Released/Gen 4/Palparked from Gen 3/USA/JEREMY/RSEFL - JEREMY Staryu (ENG).pk4", new byte[136]);
         });
 
         var zip = Path.Combine(_saves.Dir, "gallery.zip");

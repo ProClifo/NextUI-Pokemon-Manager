@@ -326,7 +326,9 @@ public static class GalleryBuilder
     public const string EventOnlyName = "eventonly.tsv";
     public const string FilesPrefix = "files/";
 
-    private static readonly string[] SkippedFolders = ["hex extracted cards", "Wondercard Fulls"];
+    // "Palparked from Gen 3": a few Gen 3 events as they were after Pal Park. Gen 4 games get Gen 3 events the same
+    // way, from a Gen 3 game, so they're left out rather than listed as Gen 4 events.
+    private static readonly string[] SkippedFolders = ["hex extracted cards", "Wondercard Fulls", "Palparked from Gen 3"];
 
     /// <summary>
     /// Bundles every file PKHeX can read. Released Pokémon files that PKHeX's legality check rejects are
