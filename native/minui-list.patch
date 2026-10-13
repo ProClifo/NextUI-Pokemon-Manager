@@ -1,5 +1,5 @@
 diff --git a/minui-list.c b/minui-list.c
-index 4639bb1..77f1a14 100644
+index 4639bb1..1b20e7d 100644
 --- a/minui-list.c
 +++ b/minui-list.c
 @@ -195,6 +195,13 @@ static SDL_Color theme_kb_key_text(bool focused)
@@ -758,14 +758,13 @@ index 4639bb1..77f1a14 100644
          .initial_selected = -1,
          .scroll_anim_selected = -1,
          .scroll_anim_option = -1,
-@@ -4312,7 +4721,9 @@ int main(int argc, char *argv[])
+@@ -4312,7 +4721,8 @@ int main(int argc, char *argv[])
                  GFX_blitHardwareHints(screen, state.show_brightness_setting);
                  break;
              case BOTTOM_LEFT_SLEEP:
 -                GFX_blitButtonGroup((char *[]){BTN_SLEEP == BTN_POWER ? "POWER" : "MENU", "SLEEP", NULL}, 0, screen, 0);
-+                // the highlighted item's status (features.status) takes the sleep hint's place
-+                if (!draw_status_pill(screen, &state))
-+                    GFX_blitButtonGroup((char *[]){BTN_SLEEP == BTN_POWER ? "POWER" : "MENU", "SLEEP", NULL}, 0, screen, 0);
++                // no POWER/SLEEP hint in Pokémon Manager: the highlighted item's status (features.status), if any
++                draw_status_pill(screen, &state);
                  break;
              case BOTTOM_LEFT_NONE:
                  break;
