@@ -731,7 +731,7 @@ public sealed class App
     }
 
     /// <summary>A question in lines the highlight skips, then YES / NO with NO highlighted. True for YES.</summary>
-    private bool AskYesNo(string question, string title)
+    private bool AskYesNo(string question, string title, string? titleImage = null, (int X, int Y, int W, int H)? titleImageRect = null)
     {
         var lines = new List<string>();
         var line = "";
@@ -748,7 +748,8 @@ public sealed class App
         if (line.Length > 0)
             lines.Add(line);
         var items = lines.Concat(["YES", "NO"]).ToList();
-        var choice = _ui.Choose(title, items, items.Count - 1, unselectable: items.Select((_, i) => i < lines.Count).ToList());
+        var choice = _ui.Choose(title, items, items.Count - 1, titleImage: titleImage, titleImageRect: titleImageRect,
+            unselectable: items.Select((_, i) => i < lines.Count).ToList());
         return choice == items.Count - 2;
     }
 
@@ -776,9 +777,15 @@ public sealed class App
         }
 
         // A newer generation's game can't send it back (Pal Park and Poké Transfer only go forward)
-        if (source.Sav.Generation >= 3 && dest.Sav.Generation > source.Sav.Generation && !AskYesNo(
-                "WARNING: This game cannot send your Pokémon back. Continue?", SaveName(dest)))
-            return false;
+        if (source.Sav.Generation >= 3 && dest.Sav.Generation > source.Sav.Generation)
+        {
+            // headed "<icon> Ruby → Platinum", like the game list
+            var icon = _boxViewer.Icon(source.Sav, pk);
+            var title = $"{SaveName(source)} → {SaveName(dest)}";
+            if (!AskYesNo("WARNING: This action is irreversible. Continue?", icon is null ? title : "\t\t" + title,
+                    icon?.Sheet, icon is null ? null : (icon.X, icon.Y, icon.W, icon.H)))
+                return false;
+        }
 
         // Picking the game is the confirmation: it's done at once, then "<NICKNAME> was sent to <PLAYER>."
         var result = TransferService.Transfer(source, from, dest, mode, _settings.AllowIllegalTransfers, out var placedAt);
