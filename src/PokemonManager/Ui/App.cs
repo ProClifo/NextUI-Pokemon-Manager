@@ -1345,8 +1345,8 @@ public sealed class App
             .Where(e => EventPokemon.CanGive(_gallery, e, entry.Sav))
             .Select(e => (e.Title, Tag: (string?)"Legal", Run: (Action)(() => GiveGalleryFile(entry, e)))).ToList();
         // Ruby/Sapphire/Emerald also get the Regi dolls, which no normal play hands out (decorations can't be illegal),
-        // as many as wanted.
-        if (entry.Sav is SAV3RS or SAV3E)
+        // as many as wanted, once Record Mixing is open (Mauville City visited)
+        if (entry.Sav is SAV3RS or SAV3E && Decorations.RecordMixingUnlocked((SAV3)entry.Sav))
             list.AddRange(Gen3Events.RegiDolls.Select(d => (d.Name, Tag: (string?)null, Run: (Action)(() => GiveDoll(entry, d.Id)))));
         if (list.Count == 0)
         {
