@@ -1,8 +1,22 @@
 diff --git a/minui-list.c b/minui-list.c
-index 4639bb1..17f7464 100644
+index 4639bb1..77f1a14 100644
 --- a/minui-list.c
 +++ b/minui-list.c
-@@ -206,6 +206,7 @@ enum list_result_t
+@@ -195,6 +195,13 @@ static SDL_Color theme_kb_key_text(bool focused)
+ #endif
+ }
+ 
++// draw_status_pill draws the highlighted item's features.status image in a pill at the bottom left, where the
++// button hints go. Returns false when the item has none.
++static SDL_Surface *status_surface = NULL;
++static char status_loaded[1024] = "";
++struct AppState;
++static bool draw_status_pill(SDL_Surface *dst, struct AppState *state);
++
+ SDL_Surface *screen = NULL;
+ 
+ enum list_result_t
+@@ -206,6 +213,7 @@ enum list_result_t
      ExitCodeActionButton = 4,
      ExitCodeInactionButton = 5,
      ExitCodeStartButton = 6,
@@ -10,7 +24,7 @@ index 4639bb1..17f7464 100644
      ExitCodeParseError = 10,
      ExitCodeSerializeError = 11,
      ExitCodeTimeout = 124,
-@@ -332,6 +333,13 @@ struct ListItem
+@@ -332,6 +340,15 @@ struct ListItem
      char image_active_path[1024];
      // the cached, pre-scaled image surface (NULL when nothing is loaded)
      SDL_Surface *image_surface;
@@ -21,10 +35,12 @@ index 4639bb1..17f7464 100644
 +    SDL_Surface *icon_surface;
 +    // whether loading icon_path was tried
 +    bool icon_loaded;
++    // an image shown in the bottom-left pill while the item is highlighted (features.status, e.g. "✅ Legal")
++    char status_path[1024];
  };
  
  // ListState holds the state of the list
-@@ -361,6 +369,9 @@ struct ListState
+@@ -361,6 +378,9 @@ struct ListState
  
      // whether or not any items in the list have options
      bool has_options;
@@ -34,7 +50,7 @@ index 4639bb1..17f7464 100644
  };
  
  // Fonts holds the fonts for the list
-@@ -396,6 +407,12 @@ struct AppState
+@@ -396,6 +416,12 @@ struct AppState
      char action_button[1024];
      // the text to display on the Action button
      char action_text[1024];
@@ -47,7 +63,7 @@ index 4639bb1..17f7464 100644
      // the background image to display
      char background_image[1024];
      // the background color to display
-@@ -418,6 +435,8 @@ struct AppState
+@@ -418,6 +444,8 @@ struct AppState
      bool always_show_confirm;
      // whether to disable sleep
      bool disable_auto_sleep;
@@ -56,7 +72,7 @@ index 4639bb1..17f7464 100644
      // whether alphabetic scroll (L1/R1 letter jumping) is enabled
      bool alphabetic_scroll;
      // whether the inline filter keyboard feature is allowed at all
-@@ -462,6 +481,11 @@ struct AppState
+@@ -462,6 +490,11 @@ struct AppState
      char title[1024];
      // the title alignment ('left', 'center', 'right')
      char title_alignment[1024];
@@ -68,7 +84,7 @@ index 4639bb1..17f7464 100644
      // the location to write the value to
      char write_location[1024];
      // the value to write (selected, state)
-@@ -635,6 +659,9 @@ static void ListItem_InitImage(struct ListItem *item)
+@@ -635,6 +668,9 @@ static void ListItem_InitImage(struct ListItem *item)
      item->resolved_path[0] = '\0';
      item->image_active_path[0] = '\0';
      item->image_surface = NULL;
@@ -78,7 +94,7 @@ index 4639bb1..17f7464 100644
  }
  
  // ListItem_UpsertVariant sets or replaces the path for a resolution key in the
-@@ -980,6 +1007,7 @@ struct ListState *ListState_New(const char *filename, const char *format, const
+@@ -980,6 +1016,7 @@ struct ListState *ListState_New(const char *filename, const char *format, const
  
      state->items = malloc(sizeof(struct ListItem) * item_count);
      state->has_options = false;
@@ -86,7 +102,7 @@ index 4639bb1..17f7464 100644
  
      if (!use_object_form)
      {
-@@ -1066,6 +1094,8 @@ struct ListState *ListState_New(const char *filename, const char *format, const
+@@ -1066,6 +1103,8 @@ struct ListState *ListState_New(const char *filename, const char *format, const
                  state->items[i].options[j] = option ? strdup(option) : "";
              }
  
@@ -95,7 +111,7 @@ index 4639bb1..17f7464 100644
              if (options_count > 0)
              {
                  state->has_options = true;
-@@ -1469,6 +1499,12 @@ struct ListState *ListState_New(const char *filename, const char *format, const
+@@ -1469,6 +1508,18 @@ struct ListState *ListState_New(const char *filename, const char *format, const
              // build the right-hand-side image variants for this item from
              // features.images
              ListItem_ReadImages(&state->items[i], json_object_get_object(item, "features"));
@@ -105,10 +121,16 @@ index 4639bb1..17f7464 100644
 +                strncpy(state->items[i].icon_path, icon, sizeof(state->items[i].icon_path) - 1);
 +                state->items[i].icon_path[sizeof(state->items[i].icon_path) - 1] = '\0';
 +            }
++            const char *status = json_object_get_string(json_object_get_object(item, "features"), "status");
++            if (status != NULL)
++            {
++                strncpy(state->items[i].status_path, status, sizeof(state->items[i].status_path) - 1);
++                state->items[i].status_path[sizeof(state->items[i].status_path) - 1] = '\0';
++            }
              state->items[i].has_image = state->items[i].image_variant_count > 0;
          }
      }
-@@ -1947,7 +1983,7 @@ void handle_input(struct AppState *state)
+@@ -1947,7 +1998,7 @@ void handle_input(struct AppState *state)
      bool is_cancel_button_pressed = false;
      bool is_confirm_button_pressed = false;
      bool is_enable_button_pressed = false;
@@ -117,7 +139,7 @@ index 4639bb1..17f7464 100644
      {
          if (strcmp(state->action_button, "A") == 0)
          {
-@@ -2024,6 +2060,16 @@ void handle_input(struct AppState *state)
+@@ -2024,6 +2075,16 @@ void handle_input(struct AppState *state)
          }
      }
  
@@ -134,7 +156,7 @@ index 4639bb1..17f7464 100644
      if (is_action_button_pressed && !state->list_state->items[state->list_state->visible[state->list_state->selected]].features.hide_action)
      {
          state->redraw = 0;
-@@ -2070,13 +2116,7 @@ void handle_input(struct AppState *state)
+@@ -2070,13 +2131,7 @@ void handle_input(struct AppState *state)
          return;
      }
  
@@ -149,7 +171,7 @@ index 4639bb1..17f7464 100644
  
      if (PAD_justRepeated(BTN_UP))
      {
-@@ -2087,7 +2127,8 @@ void handle_input(struct AppState *state)
+@@ -2087,7 +2142,8 @@ void handle_input(struct AppState *state)
          else
          {
              state->list_state->selected -= 1;
@@ -159,7 +181,7 @@ index 4639bb1..17f7464 100644
              {
                  state->list_state->selected -= 1;
                  if (state->list_state->selected < 0)
-@@ -2125,7 +2166,9 @@ void handle_input(struct AppState *state)
+@@ -2125,7 +2181,9 @@ void handle_input(struct AppState *state)
          else
          {
              state->list_state->selected += 1;
@@ -170,7 +192,7 @@ index 4639bb1..17f7464 100644
              {
                  state->list_state->selected += 1;
                  if (state->list_state->selected >= state->list_state->visible_count)
-@@ -2156,7 +2199,7 @@ void handle_input(struct AppState *state)
+@@ -2156,7 +2214,7 @@ void handle_input(struct AppState *state)
      else if (PAD_justRepeated(BTN_LEFT))
      {
          // if the state has options, cycle through the options
@@ -179,7 +201,7 @@ index 4639bb1..17f7464 100644
          {
              if (!state->list_state->items[state->list_state->visible[state->list_state->selected]].features.disabled)
              {
-@@ -2219,7 +2262,7 @@ void handle_input(struct AppState *state)
+@@ -2219,7 +2277,7 @@ void handle_input(struct AppState *state)
      else if (PAD_justRepeated(BTN_RIGHT))
      {
          // if the state has options, cycle through the options
@@ -188,7 +210,7 @@ index 4639bb1..17f7464 100644
          {
              if (!state->list_state->items[state->list_state->visible[state->list_state->selected]].features.disabled)
              {
-@@ -2471,6 +2514,80 @@ void ensure_item_image(struct ListItem *item, const char *effective, int max_w,
+@@ -2471,6 +2529,80 @@ void ensure_item_image(struct ListItem *item, const char *effective, int max_w,
      item->image_surface = scaled;
  }
  
@@ -269,7 +291,7 @@ index 4639bb1..17f7464 100644
  // draw_background draws the background of the list
  bool draw_background(SDL_Surface *screen, struct AppState *state)
  {
-@@ -2755,6 +2872,109 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2755,6 +2887,109 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          char truncated_title_text[256];
          int title_width = GFX_truncateText(state->fonts.medium, state->title, truncated_title_text, title_available_width, SCALE1(BUTTON_PADDING * 2));
  
@@ -379,7 +401,7 @@ index 4639bb1..17f7464 100644
          // compute the x position of the title based on the alignment
          int title_x_pos;
          const char *title_alignment = state->title_alignment[0] != '\0' ? state->title_alignment : "left";
-@@ -2801,15 +3021,42 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2801,15 +3036,42 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          }
  
          // draw the title
@@ -431,7 +453,7 @@ index 4639bb1..17f7464 100644
      }
  
      // the rest of the function is just for drawing your app to the screen
-@@ -2888,6 +3135,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2888,6 +3150,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          // resolve the row text color from its state (selected/disabled/muted).
          // ListTheme_RowTextRole captures the precedence; theme_row_text_color maps
          // the role to the greyscale palette or, on -nextui builds, the theme colors.
@@ -443,7 +465,7 @@ index 4639bb1..17f7464 100644
          SDL_Color text_color = theme_row_text_color(ListTheme_RowTextRole(
              j == selected_row,
              state->list_state->items[i].features.disabled,
-@@ -2911,13 +3163,27 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2911,13 +3178,27 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              char image_effective[1024];
              image_effective_path(image_item, state->fallback_image, image_effective, sizeof(image_effective));
              ensure_item_image(image_item, image_effective, screen->w / IMAGE_MAX_WIDTH_DIVISOR, SCALE1(PILL_SIZE - 4));
@@ -472,7 +494,7 @@ index 4639bb1..17f7464 100644
          char truncated_display_text[256];
          int text_width = GFX_truncateText(state->fonts.large, display_text, truncated_display_text, available_width, SCALE1(BUTTON_PADDING * 2));
  
-@@ -2942,7 +3208,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2942,7 +3223,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
                  int value_width = 0;
                  TTF_SizeUTF8(state->fonts.large, display_selected_text, &value_width, NULL);
                  int value_left = screen->w - value_width - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
@@ -481,7 +503,7 @@ index 4639bb1..17f7464 100644
                  if (value_viewport < scroll_viewport)
                  {
                      scroll_viewport = value_viewport;
-@@ -2965,11 +3231,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2965,11 +3246,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              }
          }
  
@@ -495,7 +517,7 @@ index 4639bb1..17f7464 100644
          }
  
          if (j == selected_row)
-@@ -3086,6 +3352,19 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3086,6 +3367,19 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              text_x_pos = SCALE1(PADDING + BUTTON_PADDING);
          }
  
@@ -515,7 +537,7 @@ index 4639bb1..17f7464 100644
          int text_y_pos = SCALE1(PADDING + (j * PILL_SIZE) + initial_list_y_padding + 4);
          SDL_Rect pos = {
              text_x_pos,
-@@ -3146,6 +3425,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3146,6 +3440,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          int initial_cube_x_pos = text_x_pos + text_surface_width;
  
          // draw the selected option text
@@ -524,7 +546,7 @@ index 4639bb1..17f7464 100644
          if (strcmp(display_selected_text, "") != 0)
          {
              initial_cube_x_pos = screen->w - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
-@@ -3155,11 +3436,57 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3155,11 +3451,57 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
                      (state->list_state->items[i].features.disabled || state->list_state->items[i].features.unselectable)
                          ? LIST_TEXT_MUTED
                          : LIST_TEXT_NORMAL);
@@ -587,7 +609,7 @@ index 4639bb1..17f7464 100644
              }
          }
  
-@@ -3188,10 +3515,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3188,10 +3530,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
  
          // draw the per-item right-hand image, vertically centered in the row and
          // anchored to the right edge (left of the hardware group on the top row)
@@ -601,7 +623,7 @@ index 4639bb1..17f7464 100644
              if (in_top_row_no_title)
              {
                  image_right_edge -= (ow + SCALE1(PADDING));
-@@ -3262,7 +3591,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3262,7 +3606,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          }
          else if (strcmp(state->action_button, "") != 0 && !state->list_state->items[state->list_state->visible[state->list_state->selected]].features.hide_action)
          {
@@ -615,7 +637,7 @@ index 4639bb1..17f7464 100644
          }
      }
  
-@@ -3485,6 +3819,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3485,6 +3834,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
      {
          OPT_SCREEN_RESOLUTION = 1000,
          OPT_FALLBACK_IMAGE,
@@ -628,7 +650,7 @@ index 4639bb1..17f7464 100644
          OPT_ALLOW_FILTER,
          OPT_FILTER_BUTTON,
          OPT_DISPLAY_FILTER_KEYBOARD,
-@@ -3519,6 +3859,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3519,6 +3874,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          {"alphabetic-scroll", no_argument, 0, 'S'},
          {"screen-resolution", required_argument, 0, OPT_SCREEN_RESOLUTION},
          {"fallback-image", required_argument, 0, OPT_FALLBACK_IMAGE},
@@ -641,7 +663,7 @@ index 4639bb1..17f7464 100644
          {"allow-filter", required_argument, 0, OPT_ALLOW_FILTER},
          {"filter-button", required_argument, 0, OPT_FILTER_BUTTON},
          {"display-filter-keyboard", required_argument, 0, OPT_DISPLAY_FILTER_KEYBOARD},
-@@ -3571,13 +3917,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3571,13 +3932,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
              state->show_hardware_group = 0;
              break;
          case 'l':
@@ -658,7 +680,7 @@ index 4639bb1..17f7464 100644
              break;
          case 'K':
              strncpy(state->item_key, optarg, sizeof(state->item_key) - 1);
-@@ -3615,6 +3961,26 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3615,6 +3976,26 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          case OPT_FALLBACK_IMAGE:
              strncpy(state->fallback_image, optarg, sizeof(state->fallback_image) - 1);
              break;
@@ -685,7 +707,7 @@ index 4639bb1..17f7464 100644
          case OPT_ALLOW_FILTER:
              if (strcmp(optarg, "true") == 0)
              {
-@@ -3832,7 +4198,7 @@ int write_output(struct AppState *state)
+@@ -3832,7 +4213,7 @@ int write_output(struct AppState *state)
  {
      if (strcmp(state->write_value, "selected") == 0)
      {
@@ -694,7 +716,41 @@ index 4639bb1..17f7464 100644
          {
              return state->exit_code;
          }
-@@ -4090,6 +4456,7 @@ int main(int argc, char *argv[])
+@@ -4061,6 +4442,33 @@ int write_output(struct AppState *state)
+ }
+ 
+ // main is the entry point for the app
++static bool draw_status_pill(SDL_Surface *dst, struct AppState *state)
++{
++    if (state->list_state == NULL || state->list_state->selected < 0)
++        return false;
++    struct ListItem *item = &state->list_state->items[state->list_state->visible[state->list_state->selected]];
++    if (item->status_path[0] == '\0')
++        return false;
++    if (strcmp(status_loaded, item->status_path) != 0)
++    {
++        if (status_surface)
++            SDL_FreeSurface(status_surface);
++        status_surface = IMG_Load(item->status_path);
++        strncpy(status_loaded, item->status_path, sizeof(status_loaded) - 1);
++    }
++    if (status_surface == NULL)
++        return false;
++    int h = SCALE1(PILL_SIZE), w = status_surface->w + SCALE1(BUTTON_MARGIN * 2 + BUTTON_PADDING);
++    SDL_Rect pill = {SCALE1(PADDING), dst->h - SCALE1(PADDING) - h, w, h};
++#ifdef PLATFORM_NEXTUI
++    GFX_blitPillColor(ASSET_WHITE_PILL, dst, &pill, THEME_COLOR2, RGB_WHITE);
++#else
++    GFX_blitPill(ASSET_DARK_GRAY_PILL, dst, &pill);
++#endif
++    SDL_BlitSurface(status_surface, NULL, dst, &(SDL_Rect){pill.x + (w - status_surface->w) / 2, pill.y + (h - status_surface->h) / 2, status_surface->w, status_surface->h});
++    return true;
++}
++
+ int main(int argc, char *argv[])
+ {
+     // Initialize app state
+@@ -4090,6 +4498,7 @@ int main(int argc, char *argv[])
          .show_brightness_setting = 0,
          .always_show_confirm = false,
          .disable_auto_sleep = false,
@@ -702,3 +758,14 @@ index 4639bb1..17f7464 100644
          .initial_selected = -1,
          .scroll_anim_selected = -1,
          .scroll_anim_option = -1,
+@@ -4312,7 +4721,9 @@ int main(int argc, char *argv[])
+                 GFX_blitHardwareHints(screen, state.show_brightness_setting);
+                 break;
+             case BOTTOM_LEFT_SLEEP:
+-                GFX_blitButtonGroup((char *[]){BTN_SLEEP == BTN_POWER ? "POWER" : "MENU", "SLEEP", NULL}, 0, screen, 0);
++                // the highlighted item's status (features.status) takes the sleep hint's place
++                if (!draw_status_pill(screen, &state))
++                    GFX_blitButtonGroup((char *[]){BTN_SLEEP == BTN_POWER ? "POWER" : "MENU", "SLEEP", NULL}, 0, screen, 0);
+                 break;
+             case BOTTOM_LEFT_NONE:
+                 break;

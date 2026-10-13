@@ -109,8 +109,8 @@ public sealed class MinUi : IUi
             var row = new JsonObject { ["name"] = string.IsNullOrWhiteSpace(items[i]) ? "-" : items[i] };
             if (images is null && tags is not null && i < tags.Count && tags[i] is { Length: > 0 } legal && LabelIcon(legal) is { } label)
             {
-                // Legal / Illegal: a "✅ Legal" thumbnail at the right of every item, outside the highlight
-                row["features"] = new JsonObject { ["images"] = new JsonObject { ["default"] = label } };
+                // Legal / Illegal: "✅ Legal" in the bottom-left pill, next to the button hints, for the highlighted item
+                row["features"] = new JsonObject { ["status"] = label };
             }
             else if (tags is not null && i < tags.Count && tags[i] is { Length: > 0 } tag)
             {

@@ -7,7 +7,7 @@ The fonts the menus use have no emoji, so ✅ and ☠️ are drawn as images: No
 (googlefonts/noto-emoji, Apache 2.0), scaled to the list's text height for each UI scale (minui-list's
 items are 16 px times the scale). Writes legal-<scale>x.png and illegal-<scale>x.png, and with a font (NextUI's)
 legal-label-<scale>x.png / illegal-label-<scale>x.png: the icon followed by "Legal" or "Illegal" in white, the
-thumbnail minui-list draws at the right of each item. Requires Pillow.
+status minui-list draws in its bottom-left pill for the highlighted item. Requires Pillow.
 """
 import os
 import sys
