@@ -783,7 +783,7 @@ public sealed class App
             var icon = _boxViewer.Icon(source.Sav, pk);
             var title = $"{SaveName(source)} → {SaveName(dest)}";
             // YES / NO side by side in the middle (the viewer), else as a list
-            var answer = _boxViewer.YesNo(title, "WARNING: This action is irreversible.\nContinue?", icon, _ui.Background)
+            var answer = _boxViewer.YesNo(title, "WARNING: This action is irreversible.\nContinue?", icon, null)
                 ?? AskYesNo("WARNING: This action is irreversible. Continue?", icon is null ? title : "\t\t" + title,
                     icon?.Sheet, icon is null ? null : (icon.X, icon.Y, icon.W, icon.H));
             if (!answer)
