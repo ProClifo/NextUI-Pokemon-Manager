@@ -226,12 +226,20 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             ["answers"] = new System.Text.Json.Nodes.JsonArray(answers.Select(a => (System.Text.Json.Nodes.JsonNode?)a).ToArray()),
             ["selected"] = selected,
         };
-        return RunDialog(json, out var output) switch
+        int? code = RunDialog(json, out var output);
+        if (code == 2)
+            return -1;
+        if (code != 0)
+            return null;
+        // "answer=<index>" on a line of its own, among whatever else NextUI's libraries printed
+        foreach (var line in output.Split('\n'))
         {
-            0 when int.TryParse(output.Trim(), out var picked) && picked >= 0 && picked < answers.Count => picked,
-            2 => -1,
-            _ => null,
-        };
+            var t = line.Trim();
+            if (t.StartsWith("answer=", StringComparison.Ordinal) && int.TryParse(t[7..], out var picked) && picked >= 0 && picked < answers.Count)
+                return picked;
+        }
+        Console.Error.WriteLine($"pkmgr-box --dialog: no answer in its output: {output.Trim()}");
+        return null;
     }
 
     /// <summary>Runs pkmgr-box --dialog; its exit code (null when it couldn't run) and what it printed.</summary>

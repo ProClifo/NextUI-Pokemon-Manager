@@ -3,7 +3,8 @@
 // "background", "yes", "no", "selected": 0 YES / 1 NO}. Left/right pick, A answers, B is NO.
 // Exit code 0 for YES, 2 for NO (EXIT_BACK), 1 when it couldn't run.
 // With "answers": ["...", ...] (up to 4) they're listed one above the other instead, up/down to pick, "selected"
-// the one highlighted first; A prints the picked answer's index and exits 0, B exits 2.
+// the one highlighted first; A prints "answer=<index>" (on a line of its own: NextUI's libraries print to stdout
+// too) and exits 0, B exits 2.
 
 // The selection pill and the text colours: NextUI's theme on the device, white and black on a desktop.
 #ifdef DESKTOP
@@ -261,7 +262,7 @@ static int dialog_run(const char *path, const char *screenshot, const char *stat
         {
             if (stacked)
             {
-                printf("%d\n", selected);
+                printf("\nanswer=%d\n", selected);
                 fflush(stdout);
                 result = EXIT_PICKED;
             }
