@@ -416,8 +416,17 @@ public static class Gen3Events
         return OpResult.Success(message);
     }
 
-    /// <summary>Whether Emerald already got the Eon Ticket: the Southern Island ferry is enabled (record_mixing.c sets it with the ticket).</summary>
-    public static bool HasEonTicket(SAV3E sav) => sav.GetEventFlag(FlagEnableShipSouthernIslandE);
+    /// <summary>
+    /// Whether the save already got the Eon Ticket. Emerald: the Southern Island ferry is enabled (record_mixing.c
+    /// sets it with the ticket). Ruby/Sapphire: the ticket is in Key Items or the PC (it's never used up or tossed).
+    /// </summary>
+    public static bool HasEonTicket(SAV3 sav)
+    {
+        if (sav is SAV3E e)
+            return e.GetEventFlag(FlagEnableShipSouthernIslandE);
+        var bag = sav.Inventory;
+        return bag.Pouches.Any(p => p.Type is InventoryType.KeyItems or InventoryType.PCItems && p.HasItem(ItemEonTicket));
+    }
 
     /// <summary>Whether the save holds an event script (a Wonder Card's or Mystery Event's), which an injection replaces.</summary>
     public static bool HasEventScript(SAV3 sav)

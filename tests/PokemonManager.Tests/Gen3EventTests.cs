@@ -394,6 +394,17 @@ public sealed class Gen3EventTests : IDisposable
     }
 
     [Fact]
+    public void RubySapphireHaveTheEonTicketOnceItsInTheBag()
+    {
+        var sav = (SAV3)_saves.Create(GameVersion.R, "EonR.sav").Sav;
+        Assert.False(Gen3Events.HasEonTicket(sav));
+        var bag = sav.Inventory;
+        bag.GetPouch(InventoryType.KeyItems).GiveItem(bag, Gen3Events.ItemEonTicket, 1);
+        bag.CopyTo(sav);
+        Assert.True(Gen3Events.HasEonTicket(sav)); // its menu entry goes away
+    }
+
+    [Fact]
     public void RubySapphireMysteryEventNeedsNormanBeaten()
     {
         var sav = (SAV3)_saves.Create(GameVersion.S, "Sapphire.sav").Sav;

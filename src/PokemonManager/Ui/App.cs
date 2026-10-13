@@ -280,13 +280,15 @@ public sealed class App
             var actions = new List<(string Label, string? Tag, Action Run)> { ("Pokémon", null, () => BrowseMenu(entry)) };
             // A game with one event gets that event on its menu; a game with several gets a Mystery Gift menu.
             // Each is hidden until the game's own menu that delivered it (Mystery Gift, Mystery Event) is unlocked.
-            var tickets = TicketsFor(entry).Where(t => Tickets.Locked(t, sav) is null).ToList();
-            // Emerald's Record Mixing Eon Ticket isn't a Mystery Gift: it has its own entry until it's been received.
+            // The Eon Ticket goes away once it's been received.
+            var tickets = TicketsFor(entry)
+                .Where(t => Tickets.Locked(t, sav) is null && !(t.Ticket.Key == "eonticket" && sav is SAV3 gen3 && Gen3Events.HasEonTicket(gen3)))
+                .ToList();
+            // Emerald's Record Mixing Eon Ticket isn't a Mystery Gift: it has its own entry.
             if (tickets.Find(t => t.File is null) is { } eon)
             {
                 tickets.Remove(eon);
-                if (!Gen3Events.HasEonTicket((SAV3E)sav))
-                    actions.Add((eon.Ticket.Name, LegalTag(eon.Legal), () => GiveTicket(entry, eon)));
+                actions.Add((eon.Ticket.Name, LegalTag(eon.Legal), () => GiveTicket(entry, eon)));
             }
             if (sav is SAV2 { Version: GameVersion.C } crystal)
                 actions.Add(("GS Ball", LegalTag(crystal.Japanese), () => GsBallFlow(entry)));
