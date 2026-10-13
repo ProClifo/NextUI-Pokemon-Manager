@@ -1158,24 +1158,21 @@ public sealed class App
             });
     }
 
+    /// <summary>
+    /// Puts a Mystery Gift card into the save's album, to be picked up from the delivery man in-game as if it had
+    /// come over Wi-Fi. Its Pokémon only ever arrive that way, never straight into the PC.
+    /// </summary>
     private void GiftActions(SaveEntry entry, MysteryGift gift)
     {
         var sav = entry.Sav;
-        var actions = new List<(string Label, Func<OpResult> Run, bool Pokemon)>();
-        if (gift is DataMysteryGift data && GiftService.SupportsAlbum(sav))
-            actions.Add(("Add to Mystery Gift album (pick up in-game)", () => GiftService.InjectCard(sav, data), false));
-        if (gift.IsEntity)
-            actions.Add(("Send the Pokémon to your PC", () => GiftService.Redeem(sav, gift), true));
-        if (actions.Count == 0)
+        if (gift is not DataMysteryGift data || !GiftService.SupportsAlbum(sav))
         {
-            _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, and this gift isn't a Pokémon, so it can't be added.");
+            _ui.Message($"{Names.Game(sav)} has no Mystery Gift album, so this card can't be added.");
             return;
         }
-
-        var choice = _ui.Choose(GiftService.Describe(gift), actions.Select(a => a.Label).ToList());
-        if (choice is null)
+        if (!_ui.Confirm($"{GiftService.Describe(gift)}\n\nAdd it to the Mystery Gift album? Pick it up from the delivery man in-game.", "ADD", "CANCEL"))
             return;
-        var result = actions[choice.Value].Run();
+        var result = GiftService.InjectCard(sav, data);
         if (!result.Ok)
         {
             entry.Reload();
@@ -1183,7 +1180,7 @@ public sealed class App
             return;
         }
         if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
-            _ui.Message(actions[choice.Value].Pokemon ? result.Message : "The WONDER CARD has arrived!");
+            _ui.Message("The WONDER CARD has arrived!");
     }
 
     // ---------------------------------------------------------------- events, distributions, gallery

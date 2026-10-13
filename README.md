@@ -7,7 +7,7 @@ A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing
 - **Mystery Gifts, Mystery Events and e-Reader cards**, from the built-in gallery:
   - Gen 3: Wonder Cards (`.wc3`), Wonder News (`.wn3`), Mystery Events (`.me3`, e.g. the Eon Ticket e-Card), e-Card Trainers (`.ect`) and e-Reader Berries (`.ecb`). These are the formats of the PKHeX *WC3 plugin* and suloku's *Gen III Mystery Gift Tool*, and injection produces the same save data as WC3 plugin 2.6.0 (see below).
   - Gen 4–7: Wonder Cards are placed in the in-game Mystery Gift album so you pick them up from the delivery person, as if you'd downloaded them (`.pgt .pcd .wc4 .pgf .wc6 .wc7 .wb7`...).
-  - Any generation: a gift Pokémon can be sent straight to your PC (`.wc8 .wb8 .wa8 .wc9 .wa9` included).
+  - Wonder Card Pokémon only arrive that way, from the delivery person, never straight into the PC.
 - **Event gallery built in.** The Gen 1–5 files of Project Pokémon's [EventsGallery](https://github.com/projectpokemon/EventsGallery) ship with the pak, filtered to the game and language of each save:
   - **Mystery Gift**: every ticket the game has (Aurora Ticket, Mystic Ticket, Eon Ticket, Old Sea Map, Member Card, Oak's Letter, Secret Key, Azure Flute, Enigma Stone, Liberty Pass), marked Legal or Illegal, shown once the game's own Mystery Gift (Mystery Event in Ruby/Sapphire) is unlocked. A game with one event shows it directly: Ruby/Sapphire get *Eon Ticket*, Crystal *GS Ball*.
   - **Distributions**: released distributions of Pokémon that can't be obtained legally any other way in that game's language, e.g. WISHMKR Jirachi, 10 ANIV Celebi and Aura Mew in English Emerald.
@@ -153,7 +153,7 @@ By default Pokémon only move the way the real games allowed, and only once each
 | Gen 4 → Gen 5 | Poké Transfer | The Gen 5 game has the National Pokédex (documented, not decompiled); no Eggs; no Gen 4 HM moves. |
 | Gen 1/2 → Gen 3+, anything backwards | — | Not possible in the games. |
 
-Imported files follow the receiving side of these rules: Game Boy games need their link room open, and Emerald and FireRed/LeafGreen need the National Pokédex for Pokémon outside their regional Pokédex. Distributions (the Distributions and Events Gallery menus, Mew, and Wonder Card Pokémon sent straight to your PC) don't: the real distributions didn't need the National Pokédex. They only need the Pokédex itself, read from the games' own flags (Gen 1 `EVENT_GOT_POKEDEX`, Gen 2 the event Mr. Pokémon's house sets with `ENGINE_POKEDEX`, Gen 3 `FLAG_SYS_POKEDEX_GET`, Gen 4 the Pokédex block's `pokedexObtained`); Black/White have no decompilation, so there a Pokédex with anything caught counts. Pal Park's once-a-day and six-Pokémon limits aren't applied.
+Imported files follow the receiving side of these rules: Game Boy games need their link room open, and Emerald and FireRed/LeafGreen need the National Pokédex for Pokémon outside their regional Pokédex. Distributions (the Distributions and Events Gallery menus, and Mew) don't: the real distributions didn't need the National Pokédex. They only need the Pokédex itself, read from the games' own flags (Gen 1 `EVENT_GOT_POKEDEX`, Gen 2 the event Mr. Pokémon's house sets with `ENGINE_POKEDEX`, Gen 3 `FLAG_SYS_POKEDEX_GET`, Gen 4 the Pokédex block's `pokedexObtained`); Black/White have no decompilation, so there a Pokédex with anything caught counts. Pal Park's once-a-day and six-Pokémon limits aren't applied.
 
 Rules the app always enforces:
 
