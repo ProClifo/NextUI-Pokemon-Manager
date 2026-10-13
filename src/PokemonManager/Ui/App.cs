@@ -1642,16 +1642,6 @@ public sealed class App
                 continue;
             }
 
-            if (On(0) && !_settings.AllowIllegalTransfers && !_ui.Confirm(
-                    "Illegal transfers let you move Pokémon in ways the real games never allowed: between any " +
-                    "generations (Gen 4 back to Gen 3, Gen 2 up to Gen 3...) and without the games' requirements, such as " +
-                    "having the National Pokédex. Those Pokémon are usually flagged as illegal. Turn on?", "TURN ON", "CANCEL"))
-                result.Values[0] = 0;
-            if (On(5) && !_settings.GalleryUnreleased && !_ui.Confirm(
-                    "Unreleased files are debug and test data that were never distributed. PKHeX flags their " +
-                    "Pokémon as illegal, and some may not work in-game. Show them in the gallery?", "SHOW", "CANCEL"))
-                result.Values[5] = 0;
-
             _settings.AllowIllegalTransfers = On(0);
             _settings.PcBoxView = On(1);
             _settings.SaveStateDeletion = On(2);
