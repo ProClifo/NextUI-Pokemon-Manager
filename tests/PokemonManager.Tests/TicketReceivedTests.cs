@@ -120,4 +120,12 @@ public sealed class TicketReceivedTests : IDisposable
     [InlineData("auroraticket", false)]
     public void JapaneseEmeraldIsTheOtherWayRound(string key, bool legal)
         => Assert.Equal(legal, Tickets.PokemonLegal(key, BlankSaveFile.Get(GameVersion.E, "サトシ", LanguageID.Japanese)));
+
+    [Theory]
+    // Japanese FireRed/LeafGreen did get the Aurora Ticket (only Emerald's Deoxys event skipped Japan).
+    [InlineData(GameVersion.FR, "auroraticket")]
+    [InlineData(GameVersion.LG, "mysticticket")]
+    [InlineData(GameVersion.E, "mysticticket")]
+    public void JapaneseGamesKeepTheirTickets(GameVersion version, string key)
+        => Assert.True(Tickets.PokemonLegal(key, BlankSaveFile.Get(version, "サトシ", LanguageID.Japanese)));
 }

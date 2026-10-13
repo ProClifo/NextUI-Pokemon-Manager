@@ -199,8 +199,8 @@ public static class Tickets
                     {
                         // as caught in this game: its language, and the species' name in it
                         var pk = e.ConvertToPKM(sav);
-                        pk.Language = sav.Language;
-                        pk.ClearNickname();
+                        if (pk.Language != sav.Language)
+                            InLanguage(pk, sav);
                         pk.RefreshChecksum();
                         if (new LegalityAnalysis(pk).Valid)
                             return true;
@@ -212,6 +212,26 @@ public static class Tickets
             }
             return false;
         });
+    }
+
+    /// <summary>
+    /// Makes a Pokémon PKHeX generated in another language (it makes the Faraway Island Mew Japanese, Birth Island
+    /// Deoxys English) as this save's game would have: its language, the species' name in it, the save's trainer,
+    /// with Gen 3's name buffers laid out as the game leaves them (PKHeX's EncounterStatic3: Japanese names end in
+    /// zeros and the trainer name is 0xFF-filled over 6 bytes instead of 7).
+    /// </summary>
+    private static void InLanguage(PKM pk, SaveFile sav)
+    {
+        pk.Language = sav.Language;
+        if (pk is PK3)
+        {
+            pk.NicknameTrash.Clear();
+            var ot = pk.OriginalTrainerTrash;
+            ot.Clear();
+            ot[..Math.Min(ot.Length, sav.Language == (int)LanguageID.Japanese ? 6 : 7)].Fill(0xFF);
+        }
+        pk.ClearNickname();
+        pk.OriginalTrainerName = sav.OT;
     }
 
     /// <summary>The ticket a gallery file gives, if it's one.</summary>
