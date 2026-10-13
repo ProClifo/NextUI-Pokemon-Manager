@@ -83,9 +83,9 @@ public sealed class AppSettings
     public bool GalleryUnreleased { get; set; }
     /// <summary>
     /// Delete the ROM's save state in its selected slot whenever a save is changed, so NextUI can't resume a state
-    /// that would undo the change: the game has to start from its save (off by default).
+    /// that would undo the change: the game has to start from its save (on by default).
     /// </summary>
-    public bool SaveStateDeletion { get; set; }
+    public bool SaveStateDeletion { get; set; } = true;
 
     /// <summary>Puts every setting back to its default ("Reset to Default"); the welcome screen stays seen.</summary>
     public void ResetToDefaults()

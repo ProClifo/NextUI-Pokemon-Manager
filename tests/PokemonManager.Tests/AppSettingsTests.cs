@@ -10,7 +10,7 @@ public class AppSettingsTests
         var settings = new AppSettings
         {
             AllowIllegalTransfers = true, OnlyOfficialRoms = false, PcBoxView = false, SeenWelcome = true,
-            GalleryAllLanguages = true, GalleryUnreleased = true, SaveStateDeletion = true,
+            GalleryAllLanguages = true, GalleryUnreleased = true, SaveStateDeletion = false,
         };
         settings.ResetToDefaults();
 
@@ -23,4 +23,7 @@ public class AppSettingsTests
         Assert.Equal(defaults.SaveStateDeletion, settings.SaveStateDeletion);
         Assert.True(settings.SeenWelcome);
     }
+
+    [Fact]
+    public void SaveStateDeletionIsOnByDefault() => Assert.True(new AppSettings().SaveStateDeletion);
 }
