@@ -321,7 +321,8 @@ public static class Gen3Events
     internal const int FlagMysteryGiftEnableE = 0x8DB;     // FLAG_SYS_MYSTERY_GIFT_ENABLE
     internal const int FlagMysteryGiftEnableFRLG = 0x839;  // FLAG_SYS_MYSTERY_GIFT_ENABLED
 
-    internal const int FlagBadge05RS = 0x80B;              // FLAG_BADGE05_GET: Norman's Balance Badge
+    internal const int FlagBadge05RS = 0x80B;
+    internal const int FlagSysHasEonTicketRS = 0x853;      // FLAG_SYS_HAS_EON_TICKET              // FLAG_BADGE05_GET: Norman's Balance Badge
 
     /// <summary>
     /// Why this save can't receive the event yet: the game's own menu for it must be unlocked in-game first.
@@ -417,16 +418,12 @@ public static class Gen3Events
     }
 
     /// <summary>
-    /// Whether the save already got the Eon Ticket. Emerald: the Southern Island ferry is enabled (record_mixing.c
-    /// sets it with the ticket). Ruby/Sapphire: the ticket is in Key Items or the PC (it's never used up or tossed).
+    /// Whether the save already got the Eon Ticket, by the flag the Southern Island ferry checks: Emerald's
+    /// FLAG_ENABLE_SHIP_SOUTHERN_ISLAND (record_mixing.c sets it with the ticket), Ruby/Sapphire's
+    /// FLAG_SYS_HAS_EON_TICKET (the e-Card's script sets it when Dad hands the ticket over).
     /// </summary>
     public static bool HasEonTicket(SAV3 sav)
-    {
-        if (sav is SAV3E e)
-            return e.GetEventFlag(FlagEnableShipSouthernIslandE);
-        var bag = sav.Inventory;
-        return bag.Pouches.Any(p => p.Type is InventoryType.KeyItems or InventoryType.PCItems && p.HasItem(ItemEonTicket));
-    }
+        => sav.GetEventFlag(sav is SAV3E ? FlagEnableShipSouthernIslandE : FlagSysHasEonTicketRS);
 
     /// <summary>Whether the save holds an event script (a Wonder Card's or Mystery Event's), which an injection replaces.</summary>
     public static bool HasEventScript(SAV3 sav)

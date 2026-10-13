@@ -394,13 +394,16 @@ public sealed class Gen3EventTests : IDisposable
     }
 
     [Fact]
-    public void RubySapphireHaveTheEonTicketOnceItsInTheBag()
+    public void RubySapphireHaveTheEonTicketOnceTheFerryFlagIsSet()
     {
         var sav = (SAV3)_saves.Create(GameVersion.R, "EonR.sav").Sav;
         Assert.False(Gen3Events.HasEonTicket(sav));
+        // The item alone doesn't sail the ferry, so it doesn't count.
         var bag = sav.Inventory;
         bag.GetPouch(InventoryType.KeyItems).GiveItem(bag, Gen3Events.ItemEonTicket, 1);
         bag.CopyTo(sav);
+        Assert.False(Gen3Events.HasEonTicket(sav));
+        sav.SetEventFlag(0x853, true); // FLAG_SYS_HAS_EON_TICKET
         Assert.True(Gen3Events.HasEonTicket(sav)); // its menu entry goes away
     }
 
