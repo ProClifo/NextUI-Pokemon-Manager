@@ -1614,7 +1614,7 @@ public sealed class App
         var names = new List<string>
         {
             "Illegal Transfers", "PC Box View", "Save State Deletion", "Save State Warning",
-            "Gallery: All Languages", "Gallery: Unreleased Files", "Show Welcome Screen Again", "Reset to Default",
+            "Gallery: All Languages", "Gallery: Unreleased Files", "Reset to Default",
         };
         // shown under the list for the highlighted setting, as in NextUI's in-game menu
         string[] descriptions =
@@ -1625,10 +1625,9 @@ public sealed class App
             "Ask before a change deletes a save state.",
             "List Events Gallery files in every language,\nnot just the game's.",
             "Add debug and test files that were never\ndistributed to the Events Gallery.",
-            "Show the welcome screen next time.",
             "Put every setting back to how it was\nwhen the pak was installed.",
         ];
-        int welcome = names.Count - 2, reset = names.Count - 1;
+        int reset = names.Count - 1;
         int selected = 0;
         while (true)
         {
@@ -1668,10 +1667,8 @@ public sealed class App
             _settings.SaveStateWarning = On(3);
             _settings.GalleryAllLanguages = On(4);
             _settings.GalleryUnreleased = On(5);
-            if (result.Selected == welcome && !leaving)
-                _settings.SeenWelcome = false;
             _settings.Save(_paths.SettingsFile);
-            if (leaving || (shown is null && result.Selected != welcome && result.Selected != reset))
+            if (leaving || shown is null)
                 return; // saved
         }
     }
