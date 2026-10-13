@@ -170,9 +170,9 @@ public sealed class App
         _profiles.Clear();
         _tickets.Clear();
         // Only saves with their game's ROM (same file name), in games that have got as far as receiving the
-        // Pokédex, are shown at all; "N ROM hacks" lists only those whose ROM isn't an official release.
+        // Pokédex, are shown at all; "N others" lists those whose ROM isn't an official release.
         all.RemoveAll(s => RomIndex.FindRoms(s.Path).Count == 0 || !TradeRules.HasPokedex(s.Sav));
-        if (_settings.OnlyOfficialRoms && all.Count != 0)
+        if (all.Count != 0)
         {
             _ui.Busy("Checking ROMs are official...\n(The first check of each ROM can take a while.)");
             List<OfficialRomFilter.Hidden> unofficial;
@@ -1592,7 +1592,7 @@ public sealed class App
         string[] onOff = ["Disabled", "Enabled"];
         var names = new List<string>
         {
-            "Illegal Transfers", "Official ROMs Only", "PC Box View", "Save State Deletion", "Save State Warning",
+            "Illegal Transfers", "PC Box View", "Save State Deletion", "Save State Warning",
             "Gallery: All Languages", "Gallery: Unreleased Files", "Show Welcome Screen Again", "Reset to Default",
         };
         int welcome = names.Count - 2, reset = names.Count - 1;
@@ -1601,7 +1601,7 @@ public sealed class App
         {
             bool[] current =
             [
-                _settings.AllowIllegalTransfers, _settings.OnlyOfficialRoms, _settings.PcBoxView, _settings.SaveStateDeletion,
+                _settings.AllowIllegalTransfers, _settings.PcBoxView, _settings.SaveStateDeletion,
                 _settings.SaveStateWarning, _settings.GalleryAllLanguages, _settings.GalleryUnreleased,
             ];
             var options = names.Select((_, i) => i < current.Length ? onOff : []).ToList();
@@ -1615,10 +1615,7 @@ public sealed class App
             {
                 if (_ui.Confirm("Put every setting back to how it was when the pak was installed?", "RESET", "CANCEL"))
                 {
-                    bool official = _settings.OnlyOfficialRoms;
                     _settings.ResetToDefaults();
-                    if (_settings.OnlyOfficialRoms != official)
-                        _saves = null; // rescan with the default rule
                     _settings.Save(_paths.SettingsFile);
                 }
                 continue;
@@ -1629,24 +1626,17 @@ public sealed class App
                     "generations (Gen 4 back to Gen 3, Gen 2 up to Gen 3...) and without the games' requirements, such as " +
                     "having the National Pokédex. Those Pokémon are usually flagged as illegal. Turn on?", "TURN ON", "CANCEL"))
                 result.Values[0] = 0;
-            if (!On(1) && _settings.OnlyOfficialRoms && !_ui.Confirm(
-                    "Show saves from ROM hacks and other unofficial ROMs too? PKHeX may misread a hack's save, " +
-                    "and editing it can corrupt it. Backups are still made before every change.", "SHOW ALL", "CANCEL"))
-                result.Values[1] = 1;
-            if (On(6) && !_settings.GalleryUnreleased && !_ui.Confirm(
+            if (On(5) && !_settings.GalleryUnreleased && !_ui.Confirm(
                     "Unreleased files are debug and test data that were never distributed. PKHeX flags their " +
                     "Pokémon as illegal, and some may not work in-game. Show them in the gallery?", "SHOW", "CANCEL"))
-                result.Values[6] = 0;
+                result.Values[5] = 0;
 
             _settings.AllowIllegalTransfers = On(0);
-            if (_settings.OnlyOfficialRoms != On(1))
-                _saves = null; // rescan with the new rule
-            _settings.OnlyOfficialRoms = On(1);
-            _settings.PcBoxView = On(2);
-            _settings.SaveStateDeletion = On(3);
-            _settings.SaveStateWarning = On(4);
-            _settings.GalleryAllLanguages = On(5);
-            _settings.GalleryUnreleased = On(6);
+            _settings.PcBoxView = On(1);
+            _settings.SaveStateDeletion = On(2);
+            _settings.SaveStateWarning = On(3);
+            _settings.GalleryAllLanguages = On(4);
+            _settings.GalleryUnreleased = On(5);
             if (result.Selected == welcome)
                 _settings.SeenWelcome = false;
             _settings.Save(_paths.SettingsFile);
