@@ -1,0 +1,82 @@
+name: Bug report
+description: Something went wrong in Pokémon Manager
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing! Pokémon Manager backs up a save before every change, so a broken save can be restored from `PokemonManager/Backups` on your SD card.
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      description: The handheld you're using.
+      placeholder: e.g. Anbernic RG35XX SP, TrimUI Brick
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Pokémon Manager version
+      description: "**Update** on the pak's main menu shows it, or see `Tools/<platform>/Pokemon Manager.pak/res/release.txt`."
+      placeholder: e.g. v0.2.23
+    validations:
+      required: true
+  - type: input
+    id: nextui
+    attributes:
+      label: NextUI version
+      placeholder: e.g. NextUI 6.5.0
+  - type: input
+    id: game
+    attributes:
+      label: Game(s) and language
+      description: Every game involved, e.g. both games of a transfer. Say if it's a ROM hack.
+      placeholder: e.g. Emerald (English) → Platinum (German)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where did it happen?
+      options:
+        - Saves list
+        - PC boxes / summary
+        - Transfer
+        - Evolve
+        - Mystery Gift / Eon Ticket
+        - Distributions
+        - Events Gallery
+        - Decorations
+        - Info (details, clock, trainer card)
+        - Settings
+        - Update
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, step by step, what you expected, and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Paste the pak's log, or attach it: `.userdata/<platform>/logs/Pokemon Manager.txt` on your SD card. It's rewritten each time the pak starts, so copy it right after the problem.
+      render: text
+  - type: textarea
+    id: save
+    attributes:
+      label: Save file
+      description: |
+        If a save is involved, attach it (zip it first: GitHub won't take a `.sav`), and the backup from before the change from `PokemonManager/Backups/<game - trainer - ID>/`. Saves contain your trainer name and ID.
+  - type: checkboxes
+    id: states
+    attributes:
+      label: Save states
+      options:
+        - label: I started the game fresh from the menu after the change, not from a save state or auto-resume.
