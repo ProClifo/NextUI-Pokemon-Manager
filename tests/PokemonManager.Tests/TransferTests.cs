@@ -124,6 +124,16 @@ public sealed class TransferTests : IDisposable
     }
 
     [Fact]
+    public void BackupFolderIsNamedAfterGameTrainerAndId()
+    {
+        var sav = BlankSaveFile.Get(GameVersion.E, "MAY", LanguageID.English);
+        sav.DisplayTID = 12345;
+        Assert.Equal("Emerald - MAY - 12345", SaveLibrary.FolderName(sav));
+        var gb = BlankSaveFile.Get(GameVersion.RD, "A/B", LanguageID.English);
+        Assert.DoesNotContain('/', SaveLibrary.FolderName(gb));
+    }
+
+    [Fact]
     public void PruningKeepsOtherSavesBackups()
     {
         var dir = Path.Combine(Path.GetTempPath(), "pkmgr-prune-" + Guid.NewGuid().ToString("N"));

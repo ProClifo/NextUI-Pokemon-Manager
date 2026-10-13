@@ -86,7 +86,7 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 999)
     /// <returns>The path of the backup that was made.</returns>
     public string Write(SaveEntry entry)
     {
-        var backup = Backup(entry.Path);
+        var backup = Backup(entry.Path, FolderName(entry.Sav));
         var data = entry.Sav.Write();
         var tmp = entry.Path + ".pkmgr.tmp";
         File.WriteAllBytes(tmp, data.ToArray());
@@ -95,15 +95,16 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 999)
     }
 
     /// <summary>
-    /// Copies the save into its own folder, Backups/&lt;save name&gt;/&lt;save name&gt;.&lt;time&gt;&lt;ext&gt;, keeping the newest
-    /// <c>backupsToKeep</c>. A folder per save keeps each one small: FAT32 cards fit only about 10,000 long file
-    /// names in one folder, and only this save's backups are listed to prune them.
+    /// Copies the save into its own folder in Backups, named after the game, trainer and trainer ID
+    /// ("Emerald - MAY - 12345"; <paramref name="folder"/>, else the file's name), keeping the newest
+    /// <c>backupsToKeep</c> of this file's backups. A folder per save keeps each one small: FAT32 cards fit only
+    /// about 10,000 long file names in one folder, and only this folder is listed to prune them.
     /// </summary>
-    public string Backup(string path)
+    public string Backup(string path, string? folder = null)
     {
         var name = System.IO.Path.GetFileNameWithoutExtension(path);
         var ext = System.IO.Path.GetExtension(path);
-        var dir = System.IO.Path.Combine(BackupDir, name);
+        var dir = System.IO.Path.Combine(BackupDir, folder ?? name);
         Directory.CreateDirectory(dir);
         MoveFlatBackups(name, ext, dir);
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
@@ -113,6 +114,16 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 999)
         File.Copy(path, dest);
         Prune(name, ext, dir);
         return dest;
+    }
+
+    /// <summary>"Game - TRAINER - 12345", made safe for a FAT32/exFAT folder name.</summary>
+    public static string FolderName(SaveFile sav)
+    {
+        var parts = new[] { Names.Game(sav), sav.OT.Trim(), $"{sav.DisplayTID:D5}" }.Where(p => p.Length > 0);
+        var name = string.Join(" - ", parts);
+        var invalid = new HashSet<char>(System.IO.Path.GetInvalidFileNameChars()) { '"', '*', ':', '<', '>', '?', '\\', '|', '/' };
+        name = new string(name.Select(c => invalid.Contains(c) || char.IsControl(c) ? '_' : c).ToArray()).TrimEnd('.', ' ');
+        return name.Length == 0 ? "Save" : name;
     }
 
     // only this save's own backups: "X.sav" mustn't take "X.gba.<stamp>.sav"'s
