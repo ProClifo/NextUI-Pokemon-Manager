@@ -88,7 +88,10 @@ public static class TradeEvolution
     /// Evolves the Pokémon in <paramref name="slot"/>. The held item is consumed if it was the required one.
     /// Changes are made in memory only.
     /// </summary>
-    public static OpResult Evolve(SaveFile sav, SlotRef slot, TradeEvolutionOption option)
+    /// <param name="gameLanguage">The game's language (a LanguageID): Gen 1-3 Pokémon without a nickname take
+    /// the new species' name as that game names it (EvolutionRenameMon compares against, and renames from, the
+    /// cartridge's own name table). 0: the Pokémon's own language.</param>
+    public static OpResult Evolve(SaveFile sav, SlotRef slot, TradeEvolutionOption option, int gameLanguage = 0)
     {
         var pk = slot.Get(sav).Clone();
         if (pk.Species == 0 || pk.IsEgg)
@@ -97,7 +100,13 @@ public static class TradeEvolution
             return OpResult.Fail($"{Names.Summary(pk)} is holding an Everstone, which stops it from evolving.");
 
         var before = Names.Species(pk.Species);
+        var oldSpecies = pk.Species;
         bool keepNickname = pk.IsNicknamed;
+        int language = gameLanguage != 0 ? gameLanguage : pk.Language;
+        // Gen 1/2 Pokémon store no language (PKHeX reads them as English) and Gen 3 has no nickname flag: the
+        // game's own names decide whether it was nicknamed
+        if (pk.Format <= 3 && gameLanguage != 0)
+            keepNickname = pk.Nickname != SpeciesName.GetSpeciesNameGeneration(oldSpecies, language, (byte)pk.Format);
 
         pk.Species = option.Species;
         pk.Form = option.Form;
@@ -113,7 +122,9 @@ public static class TradeEvolution
             int index = pk.AbilityNumber switch { 2 => 1, 4 => 2, _ => 0 };
             pk.RefreshAbility(index);
         }
-        if (!keepNickname)
+        if (!keepNickname && pk.Format <= 3 && gameLanguage != 0)
+            pk.Nickname = SpeciesName.GetSpeciesNameGeneration(pk.Species, language, (byte)pk.Format);
+        else if (!keepNickname)
             pk.SetDefaultNickname();
         pk.ResetPartyStats();
         pk.RefreshChecksum();

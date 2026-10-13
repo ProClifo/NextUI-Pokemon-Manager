@@ -68,6 +68,13 @@ public static class UiStrings
         },
     };
 
+    /// <summary>The LanguageID of a language code (en, de, ja...).</summary>
+    public static int LanguageId(string code) => (int)(code switch
+    {
+        "fr" => LanguageID.French, "de" => LanguageID.German, "it" => LanguageID.Italian, "es" => LanguageID.Spanish,
+        "ja" => LanguageID.Japanese, "ko" => LanguageID.Korean, _ => LanguageID.English,
+    });
+
     private static Words For(string code) => Table.TryGetValue(code, out var w) ? w : Table["en"];
 
     /// <summary>The viewer's "strings" object for a language code.</summary>

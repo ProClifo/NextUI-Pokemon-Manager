@@ -950,7 +950,9 @@ public sealed class App
             return false;
 
         var nickname = pk.Nickname;
-        var result = TradeEvolution.Evolve(entry.Sav, slot, option);
+        // names as the game itself writes them, in its own language
+        int gameLanguage = UiStrings.LanguageId(UiStrings.Code(ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, entry.Sav));
+        var result = TradeEvolution.Evolve(entry.Sav, slot, option, gameLanguage);
         if (!result.Ok)
         {
             entry.Reload();
@@ -962,7 +964,7 @@ public sealed class App
         Console.Error.WriteLine($"evolve: {result.Message}");
         // the species as the game writes it (KADABRA in Gen 1-4, Kadabra in Gen 5)
         var evolvedPk = slot.Get(entry.Sav);
-        var species = SpeciesName.GetSpeciesNameGeneration(evolvedPk.Species, evolvedPk.Language, entry.Sav.Generation);
+        var species = SpeciesName.GetSpeciesNameGeneration(evolvedPk.Species, gameLanguage, entry.Sav.Generation);
         // each game's own words and line breaks ("\f" a new page); the species in the game's language
         evolvedText = UiStrings.Evolved("en", entry.Sav.Generation, nickname, species);
         if (!confirmed)

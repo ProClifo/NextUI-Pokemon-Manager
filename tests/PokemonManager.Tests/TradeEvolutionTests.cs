@@ -33,6 +33,27 @@ public sealed class TradeEvolutionTests : IDisposable
     }
 
     [Theory]
+    [InlineData(GameVersion.RD)]
+    [InlineData(GameVersion.E)]
+    public void UnnicknamedPokemonTakeTheGamesOwnName(GameVersion version)
+    {
+        // in a German game an unnicknamed Kadabra becomes SIMSALA (German for Alakazam), not the English name
+        // PKHeX would give a Gen 1/2 Pokémon (they store no language)
+        var entry = _saves.Create(version, $"de-{version}.sav");
+        var slot = new SlotRef(0, 0);
+        var kadabra = TestSaves.Make(entry.Sav, Species.Kadabra, 40);
+        byte gen = (byte)kadabra.Format;
+        if (gen == 3)
+            kadabra.Language = (int)LanguageID.German;
+        kadabra.Nickname = SpeciesName.GetSpeciesNameGeneration((ushort)Species.Kadabra, (int)LanguageID.German, gen);
+        slot.Set(entry.Sav, kadabra);
+
+        var option = Assert.Single(TradeEvolution.GetOptions(slot.Get(entry.Sav)));
+        Assert.True(TradeEvolution.Evolve(entry.Sav, slot, option, (int)LanguageID.German).Ok);
+        Assert.Equal(SpeciesName.GetSpeciesNameGeneration((ushort)Species.Alakazam, (int)LanguageID.German, gen), slot.Get(entry.Sav).Nickname);
+    }
+
+    [Theory]
     [InlineData(GameVersion.E, Species.Onix, Species.Steelix, "Metal Coat")]
     [InlineData(GameVersion.HG, Species.Seadra, Species.Kingdra, "Dragon Scale")]
     [InlineData(GameVersion.C, Species.Scyther, Species.Scizor, "Metal Coat")]
