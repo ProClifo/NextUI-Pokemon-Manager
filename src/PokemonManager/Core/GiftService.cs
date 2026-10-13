@@ -121,11 +121,9 @@ public static class GiftService
         for (int i = 0; i < count; i++)
             album[i] = storage.GetMysteryGift(i);
 
-        // An event key item (Member Card, Azure Flute, Liberty Pass...) the save already has, or that's already waiting to be
-        // picked up, isn't given twice: the real games turned a card they already had away, and the delivery man
-        // would hand a second copy out. Ordinary items can come again, as from different distributions.
-        if (gift.IsItem && AlreadyHas(sav, album, gift.ItemID) is { } had)
-            return OpResult.Fail(had);
+        // As the real games did: a card that's already there, or a full album, is turned away.
+        if (IsInjected(album, gift))
+            return OpResult.Fail(AlreadyInjected);
 
         if (storage is MysteryBlock4 block4)
         {
@@ -139,16 +137,10 @@ public static class GiftService
                 if (album[i] is PCD && pcdSlot < 0) pcdSlot = i;
                 if (album[i] is PGT && pgtSlot < 0) pgtSlot = i;
             }
-
-            // A full album (3 cards) or delivery queue (8 gifts) drops its oldest: a gift dropped before it was picked
-            // up comes back by injecting its card again.
-            var pgtSlots = Enumerable.Range(0, count).Where(i => album[i] is PGT).ToList();
-            if (pgtSlot < 0)
-                pgtSlot = DropOldest(album, pgtSlots);
+            if (pgtSlot < 0 || (gift is PCD && pcdSlot < 0))
+                return OpResult.Fail(AlbumFull);
             if (gift is PCD pcd)
             {
-                if (pcdSlot < 0)
-                    pcdSlot = DropOldest(album, Enumerable.Range(0, count).Where(i => album[i] is PCD).ToList());
                 album[pcdSlot] = pcd.Clone();
                 album[pgtSlot] = pcd.Gift.Clone();
             }
@@ -165,13 +157,7 @@ public static class GiftService
                 return OpResult.Fail($"{Names.Game(sav)} stores a different kind of card than this file.");
             int slot = Array.FindIndex(album, g => g.IsEmpty && g.Type == gift.Type);
             if (slot < 0)
-            {
-                // A full album throws away the oldest card whose gift was already picked up, else the oldest (its
-                // gift comes back by injecting the card again).
-                var slots = Enumerable.Range(0, count).Where(i => album[i].Type == gift.Type).ToList();
-                int used = slots.FindIndex(i => album[i].GiftUsed);
-                slot = DropOldest(album, slots, Math.Max(used, 0));
-            }
+                return OpResult.Fail(AlbumFull);
             var copy = gift.Clone();
             copy.GiftUsed = false;
             album[slot] = copy;
@@ -192,31 +178,18 @@ public static class GiftService
         return OpResult.Success($"Added \"{Describe(gift)}\" to the Mystery Gift album.\n{where}");
     }
 
-    /// <summary>The DS games' event key items (Gen 4/5 item IDs).</summary>
-    private static readonly HashSet<int> EventKeyItems =
-        [Tickets.ItemMemberCard, Tickets.ItemOaksLetter, Tickets.ItemAzureFlute, Tickets.ItemSecretKey, Tickets.ItemEnigmaStone, Tickets.ItemLibertyPass];
-
-    private static string? AlreadyHas(SaveFile sav, DataMysteryGift[] album, int item)
-    {
-        if (!EventKeyItems.Contains(item))
-            return null;
-        var name = GameInfo.Strings.Item.Count > item ? GameInfo.Strings.Item[item] : "item";
-        if (sav.Inventory.Pouches.Any(p => p.HasItem((ushort)item)))
-            return $"You already have the {name}.";
-        // Gen 4 gifts wait in their own slots (PGT); later cards carry theirs until it's picked up
-        bool waiting = album.Any(g => !g.IsEmpty && g.IsItem && g.ItemID == item && (g is PGT || (g is not PCD && !g.GiftUsed)));
-        return waiting ? $"The {name} is already waiting to be picked up." : null;
-    }
+    public const string AlbumFull = "Your Mystery Gift album is full.";
+    public const string AlreadyInjected = "This Wonder Card is already injected.";
 
     /// <summary>
-    /// Throws away the card at <paramref name="slots"/>[<paramref name="at"/>] (the oldest by default): the cards
-    /// after it move up, keeping the album in the order they arrived, and the last of the slots is returned, empty.
+    /// Whether the card is already in the album (by its card ID), or for a Gen 4 gift without a card, whether the
+    /// same gift is already waiting for the delivery man.
     /// </summary>
-    private static int DropOldest(DataMysteryGift[] album, List<int> slots, int at = 0)
+    private static bool IsInjected(DataMysteryGift[] album, DataMysteryGift gift)
     {
-        for (int k = at; k < slots.Count - 1; k++)
-            album[slots[k]] = album[slots[k + 1]];
-        return slots[^1];
+        if (gift is PGT pgt)
+            return album.OfType<PGT>().Any(g => !g.IsEmpty && g.Data.SequenceEqual(pgt.Data));
+        return gift.CardID != 0 && album.Any(g => !g.IsEmpty && g is not PGT && g.Type == gift.Type && g.CardID == gift.CardID);
     }
 
     /// <summary>

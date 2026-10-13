@@ -98,6 +98,7 @@ public sealed class Gen3EventTests : IDisposable
 
         var result = Gen3Events.Inject(sav, file);
         Assert.True(result.Ok, result.Message);
+        Assert.Equal(GiftService.AlreadyInjected, Gen3Events.Inject(sav, file).Message); // the same card again
 
         entry = _saves.Roundtrip(entry);
         sav = (SAV3)entry.Sav;

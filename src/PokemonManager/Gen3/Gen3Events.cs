@@ -176,6 +176,9 @@ public static class Gen3Events
         var card = new WonderCard3(data.AsMemory(0, cardSize));
         if (card.CardID == 0)
             return OpResult.Fail("This Wonder Card has no event flag set, so the game would reject it.");
+        // the same card already waiting in the game's one Wonder Card slot
+        if (block.GetWonderCard(sav.Japanese) is var current && current.CardID == card.CardID)
+            return OpResult.Fail(GiftService.AlreadyInjected);
         if (!card.IsChecksumValid())
         {
             card.FixChecksum();

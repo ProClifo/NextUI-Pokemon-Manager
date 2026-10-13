@@ -37,79 +37,28 @@ public sealed class GiftTests : IDisposable
     }
 
     [Fact]
-    public void Gen4FullAlbumThrowsTheOldestCardAway()
+    public void Gen4AlbumTurnsAwayRepeatsAndAFourthCard()
     {
         var entry = _saves.Create(GameVersion.Pt, "Platinum.sav");
         ((SAV4)entry.Sav).IsMysteryGiftUnlocked = true;
-        var cards = EncounterEvent.MGDB_G4.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0)
+        var cards = EncounterEvent.MGDB_G4.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0 && g.CardID != 0)
             .DistinctBy(g => g.CardID).Take(4).ToList();
-        foreach (var card in cards)
-            Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
-
-        var storage = ((IMysteryGiftStorageProvider)entry.Sav).MysteryGiftStorage;
-        var album = Enumerable.Range(0, storage.GiftCountMax).Select(storage.GetMysteryGift)
-            .OfType<PCD>().Where(c => !c.IsEmpty).Select(c => c.CardID).ToList();
-        Assert.Equal(cards.Skip(1).Select(c => c.CardID), album); // the first one went, the rest kept their order
+        Assert.True(GiftService.InjectCard(entry.Sav, cards[0]).Ok);
+        Assert.Equal(GiftService.AlreadyInjected, GiftService.InjectCard(entry.Sav, cards[0]).Message);
+        Assert.True(GiftService.InjectCard(entry.Sav, cards[1]).Ok);
+        Assert.True(GiftService.InjectCard(entry.Sav, cards[2]).Ok);
+        Assert.Equal(GiftService.AlbumFull, GiftService.InjectCard(entry.Sav, cards[3]).Message); // 3 cards
     }
 
     [Fact]
-    public void Gen5FullAlbumDropsAPickedUpCardFirst()
+    public void Gen5AlbumTurnsAwayAThirteenthCard()
     {
         var entry = _saves.Create(GameVersion.B2, "Black2.sav");
-        var cards = EncounterEvent.MGDB_G5.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0)
+        var cards = EncounterEvent.MGDB_G5.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0 && g.CardID != 0)
             .DistinctBy(g => g.CardID).Take(13).ToList();
         foreach (var card in cards.Take(12))
             Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
-        var storage = ((IMysteryGiftStorageProvider)entry.Sav).MysteryGiftStorage;
-        var picked = storage.GetMysteryGift(3);
-        picked.GiftUsed = true;
-        storage.SetMysteryGift(3, picked);
-        Assert.True(GiftService.InjectCard(entry.Sav, cards[12]).Ok);
-        var ids = Enumerable.Range(0, 12).Select(i => storage.GetMysteryGift(i).CardID).ToList();
-        Assert.DoesNotContain(cards[3].CardID, ids);
-        Assert.Equal(cards[12].CardID, ids[^1]);
-    }
-
-    [Fact]
-    public void Gen4FullDeliveryQueueDropsTheOldestGift()
-    {
-        var entry = _saves.Create(GameVersion.Pt, "Platinum.sav");
-        ((SAV4)entry.Sav).IsMysteryGiftUnlocked = true;
-        var cards = EncounterEvent.MGDB_G4.Where(g => g.IsEntity && !g.IsEgg && g.Species != 0)
-            .DistinctBy(g => g.CardID).Take(9).ToList();
-        foreach (var card in cards)
-            Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
-        var storage = ((IMysteryGiftStorageProvider)entry.Sav).MysteryGiftStorage;
-        var pending = Enumerable.Range(0, storage.GiftCountMax).Select(storage.GetMysteryGift).OfType<PGT>().Where(g => !g.IsEmpty).ToList();
-        Assert.Equal(8, pending.Count);
-        Assert.Equal(cards[8].Species, pending[^1].Species);
-        Assert.DoesNotContain(pending, g => g.Species == cards[0].Species && g.Level == cards[0].Level);
-    }
-
-    [Fact]
-    public void ItemCardsAreNotGivenTwice()
-    {
-        var entry = _saves.Create(GameVersion.Pt, "Platinum.sav");
-        ((SAV4)entry.Sav).IsMysteryGiftUnlocked = true;
-        var card = new PGT { GiftType = GiftType4.Item, ItemID = Tickets.ItemAzureFlute };
-        Assert.True(card.IsItem);
-        Assert.True(GiftService.InjectCard(entry.Sav, card).Ok);
-        var again = GiftService.InjectCard(entry.Sav, card); // still waiting at the delivery man
-        Assert.False(again.Ok);
-        Assert.Contains("waiting", again.Message);
-
-        var fresh = _saves.Create(GameVersion.Pt, "Platinum2.sav");
-        ((SAV4)fresh.Sav).IsMysteryGiftUnlocked = true;
-        var bag = fresh.Sav.Inventory;
-        bag.Pouches.First(p => p.Items.Length > 0 && p.GiveItem(bag, (ushort)card.ItemID, 1) > 0);
-        bag.CopyTo(fresh.Sav);
-        var had = GiftService.InjectCard(fresh.Sav, card);
-        Assert.False(had.Ok);
-        Assert.Contains("already have", had.Message);
-
-        // ordinary items can come again
-        Assert.True(GiftService.InjectCard(fresh.Sav, new PGT { GiftType = GiftType4.Item, ItemID = 1 }).Ok); // Master Ball
-        Assert.True(GiftService.InjectCard(fresh.Sav, new PGT { GiftType = GiftType4.Item, ItemID = 1 }).Ok);
+        Assert.Equal(GiftService.AlbumFull, GiftService.InjectCard(entry.Sav, cards[12]).Message);
     }
 
     [Fact]
