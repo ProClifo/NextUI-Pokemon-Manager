@@ -110,7 +110,7 @@ public sealed class MinUi : IUi
             if (images is null && tags is not null && i < tags.Count && tags[i] is { Length: > 0 } legal && LabelIcon(legal) is { } label)
             {
                 // Legal / Illegal: "✅ Legal" in the bottom-left pill, next to the button hints, for the highlighted item
-                row["features"] = new JsonObject { ["status"] = label };
+                row["features"] = new JsonObject { ["status"] = label, ["status_hue"] = legal == "Legal" ? 120 : 0 };
             }
             else if (tags is not null && i < tags.Count && tags[i] is { Length: > 0 } tag)
             {
