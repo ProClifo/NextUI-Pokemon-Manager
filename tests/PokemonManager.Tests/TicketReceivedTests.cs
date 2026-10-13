@@ -97,4 +97,19 @@ public sealed class TicketReceivedTests : IDisposable
         Give(sav, Tickets.ItemLibertyPass);
         Assert.True(Tickets.Received(Choice("libertypass"), sav));
     }
+
+    [Theory]
+    // Darkrai and Shaymin only ever came to Platinum; Arceus at the Hall of Origin never came at all.
+    [InlineData(GameVersion.Pt, "membercard", true)]
+    [InlineData(GameVersion.D, "membercard", false)]
+    [InlineData(GameVersion.Pt, "oaksletter", true)]
+    [InlineData(GameVersion.P, "oaksletter", false)]
+    [InlineData(GameVersion.Pt, "azureflute", false)]
+    [InlineData(GameVersion.Pt, "secretkey", true)] // only changes Rotom's form
+    [InlineData(GameVersion.HG, "enigmastone", true)]
+    [InlineData(GameVersion.B, "libertypass", true)]
+    [InlineData(GameVersion.FR, "mysticticket", true)]
+    [InlineData(GameVersion.E, "oldseamap", true)]
+    public void TicketsAreIllegalOnlyWhenTheirPokemonIs(GameVersion version, string key, bool legal)
+        => Assert.Equal(legal, Tickets.PokemonLegal(key, BlankSaveFile.Get(version, "ASH", LanguageID.German)));
 }

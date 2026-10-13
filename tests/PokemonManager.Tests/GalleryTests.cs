@@ -216,19 +216,16 @@ public sealed class GalleryTests : IDisposable
         using var gallery = new GalleryArchive(zip);
         var profile = new GameProfile(3, ["E"], "ENG");
 
-        // Every ticket Emerald has a file for, the unofficial Old Sea Map included but marked illegal.
+        // Every ticket Emerald has a file for, the unofficial Old Sea Map's debug card included.
         var tickets = Tickets.For(gallery, profile, sav);
-        // Emerald's Eon Ticket comes by Record Mixing (no file); with no Ruby/Sapphire ticket in this
-        // gallery it counts as undistributed.
+        // Emerald's Eon Ticket comes by Record Mixing (no file).
         Assert.Equal(["Eon Ticket", "Aurora Ticket", "Old Sea Map"], tickets.Select(t => t.Ticket.Name));
         Assert.Null(tickets[0].File);
-        Assert.False(tickets[0].Legal);
-        Assert.True(tickets[1].Legal);
-        Assert.False(tickets[2].Legal);
+        // Legal or not goes by the Pokémon they lead to, which PKHeX accepts from Emerald's islands whichever
+        // card or language the ticket came from.
+        Assert.All(tickets, t => Assert.True(t.Legal));
         Assert.Empty(Tickets.For(gallery, profile with { Games = ["R"] }, sav)); // no Eon Ticket file in this gallery
-        // English Gen 3 Wonder Cards work in every non-Japanese game, and count as official there.
-        Assert.True(Tickets.For(gallery, profile with { Language = "GER" }, sav)[1].Legal);
-        Assert.False(Tickets.For(gallery, profile with { Language = "JPN" }, sav)[1].Legal);
+        Assert.True(Tickets.For(gallery, profile with { Language = "JPN" }, sav)[1].Legal);
 
         // Each ticket stays hidden until the menu that delivered it is unlocked: Mystery Gift for the Wonder
         // Cards, Record Mixing for Emerald's Eon Ticket.

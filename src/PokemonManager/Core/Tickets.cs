@@ -97,20 +97,16 @@ public static class Tickets
             {
                 if (gallery.Load(entry) is { } gift && Works(gift, sav))
                 {
-                    result.Add(new TicketChoice(ticket, entry, Legal: rank == 0, gift.Gen3?.Kind));
+                    result.Add(new TicketChoice(ticket, entry, Legal: PokemonLegal(ticket.Key, sav), gift.Gen3?.Kind));
                     found = true;
                     break;
                 }
             }
 
             // Emerald got the Eon Ticket by Record Mixing with Ruby/Sapphire (Ruby/Sapphire's Mystery Event script
-            // doesn't run in Emerald). That's legitimate wherever Ruby/Sapphire's ticket was distributed.
+            // doesn't run in Emerald).
             if (!found && ticket.Key == "eonticket" && sav is SAV3E && games.Contains("E"))
-            {
-                bool distributed = gallery.Entries.Any(e => e.IsEventItem && e.Released && e.Generation == 3
-                    && e.Language == profile.Language && e.Games.Contains("R") && Letters(e.Title).Contains(ticket.Key));
-                result.Add(new TicketChoice(ticket, null, distributed));
-            }
+                result.Add(new TicketChoice(ticket, null, PokemonLegal(ticket.Key, sav)));
         }
         return result;
     }
@@ -161,6 +157,51 @@ public static class Tickets
 
     private static bool HasItem(SaveFile sav, int item)
         => sav.Inventory.Pouches.Any(p => p.Type is InventoryType.KeyItems or InventoryType.PCItems && p.HasItem((ushort)item));
+
+    /// <summary>The Pokémon each ticket leads to (the Secret Key only changes Rotom's form).</summary>
+    private static readonly Dictionary<string, Species[]> TicketPokemon = new()
+    {
+        ["eonticket"] = [Species.Latias, Species.Latios],
+        ["auroraticket"] = [Species.Deoxys],
+        ["mysticticket"] = [Species.Lugia, Species.HoOh],
+        ["oldseamap"] = [Species.Mew],
+        ["membercard"] = [Species.Darkrai],
+        ["oaksletter"] = [Species.Shaymin],
+        ["azureflute"] = [Species.Arceus],
+        ["enigmastone"] = [Species.Latias, Species.Latios],
+        ["libertypass"] = [Species.Victini],
+    };
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(string, GameVersion), bool> LegalCache = new();
+
+    /// <summary>
+    /// Whether PKHeX accepts the Pokémon a ticket leads to in this game: it has an in-game encounter for one of
+    /// them in the save's game (Darkrai and Shaymin only in Platinum, Arceus at the Hall of Origin never). The
+    /// ticket's own language doesn't matter: PKHeX treats the islands' Pokémon as ordinary catches.
+    /// </summary>
+    public static bool PokemonLegal(string key, SaveFile sav)
+    {
+        if (!TicketPokemon.TryGetValue(key, out var species))
+            return true; // nothing caught through it
+        return LegalCache.GetOrAdd((key, sav.Version), _ =>
+        {
+            var versions = Enum.GetValues<GameVersion>().Where(v => v != sav.Version && sav.Version.Contains(v)).DefaultIfEmpty(sav.Version).ToArray();
+            foreach (var s in species)
+            {
+                var template = sav.BlankPKM;
+                template.Species = (ushort)s;
+                // the fixed encounters (EncounterStatic3/4/5): islands, legendary rooms and event gifts
+                if (EncounterMovesetGenerator.GenerateEncounters(template, sav, ReadOnlyMemory<ushort>.Empty, versions)
+                    .Any(e => e.GetType().Name.StartsWith("EncounterStatic", StringComparison.Ordinal)))
+                    return true;
+            }
+            return false;
+        });
+    }
+
+    /// <summary>The ticket a gallery file gives, if it's one.</summary>
+    public static Ticket? ForEntry(GalleryEntry e)
+        => e.IsEventItem ? All.FirstOrDefault(t => Letters(e.Title).Contains(t.Key)) : null;
 
     /// <summary>0 = an official distribution for this game and language; higher = less legitimate.</summary>
     private static int Rank(GalleryEntry e, GameProfile profile)

@@ -169,6 +169,7 @@ public sealed class App
         _backgroundCache.Clear();
         _profiles.Clear();
         _tickets.Clear();
+        _cardLegal.Clear();
         // Only saves with their game's ROM (same file name), in games that have got as far as receiving the
         // Pokédex, are shown at all; "N others" lists those whose ROM isn't an official release.
         all.RemoveAll(s => RomIndex.FindRoms(s.Path).Count == 0 || !TradeRules.HasPokedex(s.Sav));
@@ -1312,11 +1313,10 @@ public sealed class App
     {
         if (!ticket.Legal)
         {
-            var profile = ProfileFor(entry);
             var source = ticket.File is { } f ? $"Use \"{StripItemPrefix(f.Title)}\" anyway?" : "Add it anyway?";
             if (!_ui.Confirm(
-                    $"{ticket.Ticket.Name} was never officially distributed for {Names.Game(entry.Sav)} in {GalleryLanguage.Name(profile.Language)}. " +
-                    $"PKHeX will flag Pokémon met through it as illegal.\n\n{source}", "USE IT", "CANCEL"))
+                    $"PKHeX flags Pokémon met through the {ticket.Ticket.Name} in {Names.Game(entry.Sav)} as illegal: " +
+                    $"the event never ran in this game.\n\n{source}", "USE IT", "CANCEL"))
                 return;
         }
         if (ticket.File is { } file)
@@ -1421,7 +1421,7 @@ public sealed class App
                 .Where(p => _settings.GalleryAllLanguages || !GalleryLanguage.Tags.Contains(p)));
             var title = path.Length == 0 ? "Events Gallery" : $"Events Gallery: {path}";
             var tags = view.Folders.Select(_ => (string?)null)
-                .Concat(view.Items.Select(i => (string?)LegalTag(i.Copies.Any(f => IsLegalFor(f, profile))))).ToList();
+                .Concat(view.Items.Select(i => (string?)LegalTag(i.Copies.Any(f => IsLegalFor(f, entry))))).ToList();
             var choice = _ui.Choose(title, labels, selected, tags: tags);
             if (choice is null)
                 return;
@@ -1429,25 +1429,48 @@ public sealed class App
             if (choice < view.Folders.Count)
                 GalleryFolder(entry, files, view.Folders[choice.Value], profile);
             else
-                GiveGalleryFile(entry, PickCopy(view.Items[choice.Value - view.Folders.Count], profile));
+                GiveGalleryFile(entry, PickCopy(view.Items[choice.Value - view.Folders.Count], entry));
         }
     }
 
     /// <summary>
-    /// Released Pokémon are legal (they're regenerated for the save and checked before being added); cards are
-    /// legal when officially distributed for this game and language (English Gen 3 Wonder Cards count for every
-    /// non-Japanese game); unreleased files go by PKHeX's verdict
-    /// on the file, and unreleased cards were never distributed at all.
+    /// Illegal only when the Pokémon it gives would be: Pokémon files by PKHeX's verdict on the file (they're
+    /// regenerated for the save and checked again before being added), Pokémon cards by whether PKHeX can make a
+    /// legal one for this save, tickets by whether PKHeX accepts the Pokémon they lead to in this game. Items that
+    /// give no Pokémon (berries, decorations, news...) are legal.
     /// </summary>
-    private static bool IsLegalFor(GalleryEntry e, GameProfile profile) => e.Kind == GalleryKind.Pokemon
-        ? e.IsFileLegal
-        : e.Released && e.ForLanguage(profile.Language);
+    private bool IsLegalFor(GalleryEntry e, SaveEntry entry)
+    {
+        if (e.Kind == GalleryKind.Pokemon)
+            return e.IsFileLegal;
+        if (Tickets.ForEntry(e) is { } ticket)
+            return Tickets.PokemonLegal(ticket.Key, entry.Sav);
+        if (e.Kind != GalleryKind.Card)
+            return true;
+        var key = (entry.Path, e.Path);
+        if (!_cardLegal.TryGetValue(key, out var legal))
+        {
+            try
+            {
+                legal = EventPokemon.CanGive(_gallery, e, entry.Sav);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"couldn't check {e.Path}: {ex.Message}");
+                legal = false;
+            }
+            _cardLegal[key] = legal;
+        }
+        return legal;
+    }
+
+    private readonly Dictionary<(string Save, string File), bool> _cardLegal = [];
 
     /// <summary>One of an item's copies at random, a legal one when there is one (the copies differ only in
     /// IDs and the like, and Pokémon are regenerated for the save anyway).</summary>
-    private static GalleryEntry PickCopy(GalleryTree.Item item, GameProfile profile)
+    private GalleryEntry PickCopy(GalleryTree.Item item, SaveEntry entry)
     {
-        var legal = item.Copies.Where(f => IsLegalFor(f, profile)).ToList();
+        var legal = item.Copies.Where(f => IsLegalFor(f, entry)).ToList();
         var pool = legal.Count > 0 ? legal : item.Copies;
         return pool[Random.Shared.Next(pool.Count)];
     }
