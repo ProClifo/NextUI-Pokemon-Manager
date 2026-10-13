@@ -97,7 +97,7 @@ public sealed class App
             if (choice == rescan) { _saves = null; continue; }
             if (choice == settings) { SettingsMenu(); continue; }
             if (choice == update) { if (UpdateFlow()) return 0; continue; }
-            if (choice == help) { _ui.Message(HelpText); continue; }
+            if (choice == help) { HelpMenu(); continue; }
             SaveMenu(saves[choice.Value]);
         }
     }
@@ -1707,6 +1707,69 @@ public sealed class App
         }
         return true;
     }
+
+    /// <summary>Help: questions to pick, each answered on its own screen.</summary>
+    private void HelpMenu()
+    {
+        int selected = 0;
+        while (true)
+        {
+            var choice = _ui.Choose("Help", HelpTopics.Select(t => t.Question).ToList(), selected);
+            if (choice is null)
+                return;
+            selected = choice.Value;
+            _ui.Message(HelpTopics[choice.Value].Answer);
+        }
+    }
+
+    private static readonly (string Question, string Answer)[] HelpTopics =
+    [
+        ("What is Pokémon Manager?", HelpText),
+        ("Why isn't my save on the list?",
+            "A save is listed when its game's ROM is on the SD card with the same name (Pokemon Emerald.gba and " +
+            "Pokemon Emerald.sav), and the game has got as far as receiving the Pokédex.\n\n" +
+            "Saves from ROM hacks and other unofficial ROMs are under \"others\" at the bottom of the list. " +
+            "SELECT moves a save between the two lists."),
+        ("Why can't I transfer a Pokémon?",
+            "Pokémon move only the way the games allowed: Gen 1 and 2 trade with each other, Gen 3 games trade " +
+            "with each other, Gen 3 goes to Gen 4 by Pal Park and Gen 4 to Gen 5 by Poké Transfer. Nothing goes " +
+            "back.\n\nThe games also have to be far enough along, e.g. Pal Park and Poké Transfer need the " +
+            "National Pokédex, and Eggs can't be moved to a newer generation. When Transfer is greyed out, picking " +
+            "it says why.\n\nSettings > Illegal Transfers lifts these rules."),
+        ("Why can't I evolve a Pokémon?",
+            "Evolve is for Pokémon that evolve by trading. Some need to hold an item while they're traded, like " +
+            "Onix with the Metal Coat, and an Everstone stops it. Karrablast and Shelmet need each other, from " +
+            "another Black/White save.\n\nWhen Evolve is greyed out, picking it says why."),
+        ("Why isn't Mystery Gift showing?",
+            "It appears once the game's own Mystery Gift is unlocked:\n" +
+            "FireRed, LeafGreen, Emerald: answer a Poké Mart questionnaire with LINK TOGETHER WITH ALL.\n" +
+            "Diamond, Pearl, Platinum: answer the Jubilife TV questionnaire with EVERYONE HAPPY WI-FI CONNECTION.\n" +
+            "HeartGold, SoulSilver: get the Pokédex.\n" +
+            "Ruby, Sapphire: after beating Norman, give MYSTERY EVENT IS EXCITING as your profile in the " +
+            "Petalburg City Pokémon Center.\n\n" +
+            "Items you've received are hidden, and so is the menu once you have them all. A game with one item " +
+            "shows it by name instead."),
+        ("How do I get the gift in my game?",
+            "Start the game from its save (not a save state), then:\n" +
+            "FireRed, LeafGreen, Emerald: talk to the delivery man upstairs in any Pokémon Center.\n" +
+            "Ruby, Sapphire: talk to your dad at the Petalburg City Gym.\n" +
+            "Diamond, Pearl, Platinum, HeartGold, SoulSilver: talk to the delivery man in green in any Poké Mart.\n" +
+            "Black, White: talk to the delivery person in any Pokémon Center."),
+        ("What do Legal and Illegal mean?",
+            "Illegal means PKHeX, the tool fans use to check Pokémon, would flag the Pokémon you'd get from it, " +
+            "usually because that event never ran in that game or language. Everything else is Legal."),
+        ("Why did my change disappear?",
+            "Resuming a save state brings back the game as it was before the change, and the next in-game save " +
+            "writes the old data back.\n\nClose the game before using Pokémon Manager, and start it fresh from " +
+            "its save afterwards. Settings > Save State Deletion deletes the state for you."),
+        ("Where are my backups?",
+            "Before every change, the save is copied to PokemonManager/Backups on the SD card, in a folder for each " +
+            "game, trainer and ID. The last 999 are kept.\n\nTo go back, copy a backup over the save in the Saves " +
+            "folder, renamed to the save's own name."),
+        ("How do I update Pokémon Manager?",
+            "Pick Update on the main menu with Wi-Fi on. It downloads the newest release; your saves, backups and " +
+            "settings stay as they are."),
+    ];
 
     private const string HelpText =
         "Pokémon Manager (built on PKHeX)\n" +
