@@ -78,7 +78,6 @@ public sealed class App
             int hidden = _hidden.Count == 0 ? -1 : items.Count;
             if (hidden >= 0)
                 items.Add($"{_hidden.Count} others");
-            int rescan = items.Count; items.Add("Rescan SD card");
             int settings = items.Count; items.Add("Settings");
             int update = items.Count; items.Add("Update");
             int help = items.Count; items.Add("Help");
@@ -94,7 +93,6 @@ public sealed class App
             if (choice < saves.Count && _ui.ActionPressed) { RenameSave(saves[choice.Value]); continue; }
             if (choice < saves.Count && _ui.SecondaryPressed) { MoveSave(saves[choice.Value], toMain: false); continue; }
             if (choice == hidden) { ShowHidden(); continue; }
-            if (choice == rescan) { _saves = null; continue; }
             if (choice == settings) { SettingsMenu(); continue; }
             if (choice == update) { if (UpdateFlow()) return 0; continue; }
             if (choice == help) { HelpMenu(); continue; }
