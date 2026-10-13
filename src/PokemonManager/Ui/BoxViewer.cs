@@ -261,7 +261,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
                 item["options"] = new System.Text.Json.Nodes.JsonArray(options[i].Select(o => (System.Text.Json.Nodes.JsonNode?)o).ToArray());
                 item["selected"] = values[i];
             }
-            items.Add(item);
+            items.Add((System.Text.Json.Nodes.JsonNode)item);
         }
         try
         {
