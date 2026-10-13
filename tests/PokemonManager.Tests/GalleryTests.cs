@@ -50,6 +50,14 @@ public sealed class GalleryTests : IDisposable
         Assert.Equal("WSHMKR Jirachi", GalleryNames.DisplayTitle("WSHMKR Jirachi (Salac Berry)"));
         Assert.Equal("MYSTRY Mew", GalleryNames.DisplayTitle("MYSTRY (118 of 430) Mew (BA7609E8)"));
         Assert.Equal("フシギダネ", GalleryNames.DisplayTitle("フシギダネ - 81EC"));
+        Assert.Equal("Aurora Ticket", GalleryNames.DisplayTitle("Item AuroraTicket 2004 Fall"));
+        Assert.Equal("Mystic Ticket", GalleryNames.DisplayTitle("Item MysticTicket TCGWC 2005"));
+        Assert.Equal("Oak's Letter", GalleryNames.DisplayTitle("Item Oak's Letter"));
+        Assert.Equal("TM02 Dragon Claw", GalleryNames.DisplayTitle("Item TM02 Dragon Claw"));
+        Assert.Equal("Stamp Card 1", GalleryNames.DisplayTitle("Script Stamp Card 1"));
+        Assert.Equal("Shiny Piplup", GalleryNames.DisplayTitle("Debug Slot 2 - Shiny Piplup"));
+        Assert.Equal("Azure Flute", GalleryNames.DisplayTitle("Decchi - Item Azure Flute"));
+        Assert.Equal("10 ANIV Celebi", GalleryNames.DisplayTitle("10 ANIV Celebi"));
     }
 
     private static GalleryEntry Entry(string path, int gen, string[] games, string? lang, GalleryKind kind = GalleryKind.Card, bool released = true)
@@ -119,12 +127,12 @@ public sealed class GalleryTests : IDisposable
         };
         var root = GalleryTree.Open(files, "");
         Assert.Equal(["ENG"], root.Folders);
-        Assert.Equal(["Item Old Sea Map"], root.Items.Select(i => i.Title)); // a folder with one item shows it here
+        Assert.Equal(["Old Sea Map"], root.Items.Select(i => i.Title)); // a folder with one item shows it here
 
         var released = GalleryTree.Open(files.Take(2).ToList(), "");
         Assert.Equal("ENG", released.Path); // the lone language folder is skipped
         Assert.Empty(released.Folders);
-        Assert.Equal(["Aura Mew", "Item AuroraTicket"], released.Items.Select(i => i.Title));
+        Assert.Equal(["Aura Mew", "Aurora Ticket"], released.Items.Select(i => i.Title));
     }
 
     [Fact]

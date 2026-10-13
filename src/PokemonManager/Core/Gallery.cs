@@ -293,7 +293,27 @@ public static partial class GalleryNames
     {
         var shown = Spaces().Replace(Parenthesized().Replace(GroupKey(title), " "), " ").Trim();
         shown = DashedId().Replace(shown, "").Trim();
+        shown = Tidy(shown);
         return shown.Length > 0 ? shown : title;
+    }
+
+    /// <summary>
+    /// The file names' leftovers made readable: debug files' "Tag - " before the name, the "Item " and
+    /// "Script " prefixes, and the tickets by their own names ("Item AuroraTicket Fall" -> "Aurora Ticket"), so
+    /// a ticket's cards from different years are one entry.
+    /// </summary>
+    private static string Tidy(string shown)
+    {
+        int dash = shown.LastIndexOf(" - ", StringComparison.Ordinal);
+        if (dash > 0 && dash + 3 < shown.Length)
+            shown = shown[(dash + 3)..];
+        foreach (var prefix in (string[])["Item ", "Script "])
+            if (shown.StartsWith(prefix, StringComparison.Ordinal) && shown.Length > prefix.Length)
+                shown = shown[prefix.Length..];
+        var letters = Letters(shown);
+        if (Tickets.All.FirstOrDefault(t => letters.StartsWith(t.Key, StringComparison.Ordinal)) is { } ticket)
+            return ticket.Name;
+        return shown;
     }
 
     private static string Letters(string text) => new(text.ToLowerInvariant().Where(char.IsAsciiLetter).ToArray());
