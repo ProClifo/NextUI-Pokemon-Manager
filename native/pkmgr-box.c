@@ -1611,6 +1611,7 @@ static void draw(SDL_Surface *screen, Scene *scene, State *st, const Layout *l, 
 #include "pkmgr-box-clock.c"
 #include "pkmgr-box-card.c"
 #include "pkmgr-box-dialog.c"
+#include "pkmgr-box-options.c"
 
 // --compose out.bmp [--background bg.png] --sprite sheet.png --sprite-rect x,y,w,h: the menu background with the
 // Pokémon's sprite (a whole number of times its size) above the middle, where a message is printed under it, for
@@ -1656,7 +1657,7 @@ int main(int argc, char *argv[])
     const char *screenshot = NULL;
     const char *state_name = "box";
     const char *clock = NULL, *font_path = NULL, *background = NULL, *card = NULL;
-    const char *compose = NULL, *sprite = NULL, *sprite_rect = NULL, *dialog = NULL;
+    const char *compose = NULL, *sprite = NULL, *sprite_rect = NULL, *dialog = NULL, *options = NULL;
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "--clock") == 0 && i + 1 < argc)
@@ -1677,6 +1678,8 @@ int main(int argc, char *argv[])
             state_name = argv[++i];
         else if (strcmp(argv[i], "--dialog") == 0 && i + 1 < argc)
             dialog = argv[++i];
+        else if (strcmp(argv[i], "--options") == 0 && i + 1 < argc)
+            options = argv[++i];
         else if (strcmp(argv[i], "--compose") == 0 && i + 1 < argc)
             compose = argv[++i];
         else if (strcmp(argv[i], "--sprite") == 0 && i + 1 < argc)
@@ -1688,6 +1691,8 @@ int main(int argc, char *argv[])
         return compose_run(compose, background, sprite, sprite_rect);
     if (dialog)
         return dialog_run(dialog, screenshot, state_name);
+    if (options)
+        return options_run(options, write_location, screenshot);
     if (clock)
         return clock_run(clock, font_path, background, write_location, screenshot);
     if (card)

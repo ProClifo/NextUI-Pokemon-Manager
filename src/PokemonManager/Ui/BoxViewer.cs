@@ -242,6 +242,58 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         return null;
     }
 
+    /// <summary>
+    /// A settings list like minarch's in-game options menu (pkmgr-box --options): names and values, the highlighted
+    /// row's description at the bottom; left/right change values, A picks a row without values, B leaves. The
+    /// values and the row picked (-1 for B), or null when the viewer couldn't show it.
+    /// </summary>
+    public (int[] Values, int Selected)? Settings(IReadOnlyList<string> names, IReadOnlyList<string> descriptions,
+        IReadOnlyList<string[]> options, IReadOnlyList<int> values, int selected)
+    {
+        if (FindOnPath(Tool) is null)
+            return null;
+        var items = new System.Text.Json.Nodes.JsonArray();
+        for (int i = 0; i < names.Count; i++)
+        {
+            var item = new System.Text.Json.Nodes.JsonObject { ["name"] = names[i], ["desc"] = descriptions[i] };
+            if (options[i].Length > 0)
+            {
+                item["options"] = new System.Text.Json.Nodes.JsonArray(options[i].Select(o => (System.Text.Json.Nodes.JsonNode?)o).ToArray());
+                item["selected"] = values[i];
+            }
+            items.Add(item);
+        }
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            var input = Path.Combine(tempDir, "options.json");
+            var output = Path.Combine(tempDir, "options-out.json");
+            File.WriteAllText(input, new System.Text.Json.Nodes.JsonObject { ["items"] = items, ["selected"] = selected }.ToJsonString());
+            File.Delete(output);
+            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardError = true };
+            psi.ArgumentList.Add("--options");
+            psi.ArgumentList.Add(input);
+            psi.ArgumentList.Add("--write-location");
+            psi.ArgumentList.Add(output);
+            using var p = Process.Start(psi);
+            if (p is null)
+                return null;
+            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
+            p.BeginErrorReadLine();
+            p.WaitForExit();
+            if (p.ExitCode is not (0 or 2) || !File.Exists(output))
+                return null;
+            using var doc = JsonDocument.Parse(File.ReadAllText(output));
+            var result = doc.RootElement.GetProperty("values").EnumerateArray().Select(v => v.GetInt32()).ToArray();
+            return result.Length == names.Count ? (result, doc.RootElement.GetProperty("selected").GetInt32()) : null;
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception or JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            Console.Error.WriteLine($"pkmgr-box --options failed: {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>Runs pkmgr-box --dialog; its exit code (null when it couldn't run) and what it printed.</summary>
     private int? RunDialog(System.Text.Json.Nodes.JsonObject json, out string output)
     {

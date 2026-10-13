@@ -1616,6 +1616,18 @@ public sealed class App
             "Illegal Transfers", "PC Box View", "Save State Deletion", "Save State Warning",
             "Gallery: All Languages", "Gallery: Unreleased Files", "Show Welcome Screen Again", "Reset to Default",
         };
+        // shown under the list for the highlighted setting, as in NextUI's in-game menu
+        string[] descriptions =
+        [
+            "Move Pokémon between any games PKHeX can convert,\nskipping the games' own trade requirements.\nThey'll usually be flagged as illegal.",
+            "Browse Pokémon on each game's own PC screen.\nOff lists them instead.",
+            "Delete the game's save state after every change,\nso resuming it can't undo the change.",
+            "Ask before a change deletes a save state.",
+            "List Events Gallery files in every language,\nnot just the game's.",
+            "Add debug and test files that were never\ndistributed to the Events Gallery.",
+            "Show the welcome screen next time.",
+            "Put every setting back to how it was\nwhen the pak was installed.",
+        ];
         int welcome = names.Count - 2, reset = names.Count - 1;
         int selected = 0;
         while (true)
@@ -1627,7 +1639,15 @@ public sealed class App
             ];
             var options = names.Select((_, i) => i < current.Length ? onOff : []).ToList();
             var values = names.Select((_, i) => i < current.Length && current[i] ? 1 : 0).ToList();
-            if (_ui.Options("Settings", names, options, values, selected) is not { } result)
+            // the viewer's menu keeps changes on B, like NextUI's; the list version only on A (SAVE)
+            bool leaving = false;
+            var shown = _boxViewer.Settings(names, descriptions, options, values, selected);
+            if (shown is { Selected: < 0 })
+            {
+                leaving = true;
+                shown = (shown.Value.Values, 0);
+            }
+            if ((shown ?? _ui.Options("Settings", names, options, values, selected)) is not { } result)
                 return;
             selected = Math.Max(result.Selected, 0);
             bool On(int i) => result.Values[i] == 1;
@@ -1648,10 +1668,10 @@ public sealed class App
             _settings.SaveStateWarning = On(3);
             _settings.GalleryAllLanguages = On(4);
             _settings.GalleryUnreleased = On(5);
-            if (result.Selected == welcome)
+            if (result.Selected == welcome && !leaving)
                 _settings.SeenWelcome = false;
             _settings.Save(_paths.SettingsFile);
-            if (result.Selected != welcome)
+            if (leaving || (shown is null && result.Selected != welcome && result.Selected != reset))
                 return; // saved
         }
     }
