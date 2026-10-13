@@ -199,7 +199,10 @@ def _finish(target, e_skin, platinum_repo, pc):
             out.save(os.path.join(target, "message_frames", "%d.png" % (n + 1)))
     cursor = os.path.join(platinum_repo, "res", "fonts", "arrow_cursor.png")
     if os.path.exists(cursor):
-        Image.open(cursor).convert("RGBA").save(os.path.join(target, "cursor_menu.png"))
+        # a font glyph: green (the palette's index 0) is transparent, and white is the text's background
+        m = Image.open(cursor).convert("RGBA")
+        m.putdata([(0, 0, 0, 0) if p[:3] in ((0x9C, 0xC5, 0x6A), (0xFF, 0xFF, 0xFF)) else p for p in m.getdata()])
+        m.save(os.path.join(target, "cursor_menu.png"))
 
     layout = {}
     e_layout = os.path.join(e_skin, "layout.json")
