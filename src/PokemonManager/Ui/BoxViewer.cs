@@ -294,6 +294,40 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         }
     }
 
+    /// <summary>
+    /// A page of text wrapped to the screen, scrolled with up/down (pkmgr-box --text). False when the viewer
+    /// couldn't show it.
+    /// </summary>
+    public bool Text(string title, string text)
+        => RunTool("--text", new System.Text.Json.Nodes.JsonObject { ["title"] = title, ["text"] = text }) is 0;
+
+    private int? RunTool(string mode, System.Text.Json.Nodes.JsonObject json)
+    {
+        if (FindOnPath(Tool) is null)
+            return null;
+        try
+        {
+            Directory.CreateDirectory(tempDir);
+            var path = Path.Combine(tempDir, "text.json");
+            File.WriteAllText(path, json.ToJsonString());
+            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardError = true };
+            psi.ArgumentList.Add(mode);
+            psi.ArgumentList.Add(path);
+            using var p = Process.Start(psi);
+            if (p is null)
+                return null;
+            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
+            p.BeginErrorReadLine();
+            p.WaitForExit();
+            return p.ExitCode;
+        }
+        catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
+        {
+            Console.Error.WriteLine($"pkmgr-box {mode} failed: {ex.Message}");
+            return null;
+        }
+    }
+
     /// <summary>Runs pkmgr-box --dialog; its exit code (null when it couldn't run) and what it printed.</summary>
     private int? RunDialog(System.Text.Json.Nodes.JsonObject json, out string output)
     {

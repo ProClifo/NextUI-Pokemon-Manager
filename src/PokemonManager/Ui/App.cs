@@ -63,7 +63,8 @@ public sealed class App
     {
         if (!_settings.SeenWelcome)
         {
-            _ui.Message(HelpText);
+            if (!_boxViewer.Text(Title, HelpText))
+                _ui.Message(HelpText);
             _settings.SeenWelcome = true;
             _settings.Save(_paths.SettingsFile);
         }
@@ -1716,7 +1717,10 @@ public sealed class App
             if (choice is null)
                 return;
             selected = choice.Value;
-            _ui.Message(HelpTopics[choice.Value].Answer);
+            var (question, answer) = HelpTopics[choice.Value];
+            // scrolled in the viewer; the message box can't scroll a long answer
+            if (!_boxViewer.Text(question, answer))
+                _ui.Message(answer);
         }
     }
 
