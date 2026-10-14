@@ -18,6 +18,23 @@ public sealed class Updater(string pakDir, string tempDir)
     public sealed record Release(string Tag, string Name, string? AssetUrl, long AssetSize);
 
     /// <summary>The release this pak came from ("dev" for a local build).</summary>
+    /// <summary>
+    /// False when the device's Wi-Fi is known to be off or not connected (wlan0 down), so the check on startup
+    /// doesn't wait on a network that isn't there; true when connected or when it can't tell.
+    /// </summary>
+    public static bool MaybeOnline()
+    {
+        try
+        {
+            var state = "/sys/class/net/wlan0/operstate";
+            return !File.Exists(state) || File.ReadAllText(state).Trim() is "up" or "unknown";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
     public string InstalledTag
     {
         get
@@ -34,10 +51,13 @@ public sealed class Updater(string pakDir, string tempDir)
         }
     }
 
-    /// <summary>The newest published release with a zip for <paramref name="platform"/>.</summary>
-    public Release Latest(string platform)
+    /// <summary>
+    /// The newest published release with a zip for <paramref name="platform"/>. A <paramref name="timeout"/> bounds
+    /// each attempt to reach GitHub (the check on startup), otherwise they get minutes.
+    /// </summary>
+    public Release Latest(string platform, TimeSpan? timeout = null)
     {
-        var json = DownloadText($"https://api.github.com/repos/{Repository}/releases?per_page=100");
+        var json = DownloadText($"https://api.github.com/repos/{Repository}/releases?per_page=100", timeout);
         using var doc = JsonDocument.Parse(json);
         // GitHub lists releases by tag name as text (alpha.9 before alpha.14): newest published first instead
         var releases = doc.RootElement.EnumerateArray()
@@ -126,11 +146,11 @@ public sealed class Updater(string pakDir, string tempDir)
         }
     }
 
-    private static string DownloadText(string url)
+    private static string DownloadText(string url, TimeSpan? timeout)
     {
         try
         {
-            using var http = Client();
+            using var http = Client(timeout);
             return http.GetStringAsync(url).GetAwaiter().GetResult();
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or PlatformNotSupportedException or TypeInitializationException or DllNotFoundException)
@@ -139,7 +159,7 @@ public sealed class Updater(string pakDir, string tempDir)
             var file = Path.GetTempFileName();
             try
             {
-                RunDownloader(url, file);
+                RunDownloader(url, file, timeout);
                 return File.ReadAllText(file);
             }
             finally
@@ -167,20 +187,21 @@ public sealed class Updater(string pakDir, string tempDir)
         }
     }
 
-    private static HttpClient Client()
+    private static HttpClient Client(TimeSpan? timeout = null)
     {
-        var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        var http = new HttpClient { Timeout = timeout ?? TimeSpan.FromMinutes(10) };
         http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
         return http;
     }
 
     /// <summary>curl, else wget (busybox's included), saving <paramref name="url"/> to <paramref name="path"/>.</summary>
-    private static void RunDownloader(string url, string path)
+    private static void RunDownloader(string url, string path, TimeSpan? timeout = null)
     {
+        string seconds = timeout is { } t ? ((int)Math.Ceiling(t.TotalSeconds)).ToString() : "";
         (string Tool, string[] Args)[] tools =
         [
-            ("curl", ["-fsSL", "-A", UserAgent, "-o", path, url]),
-            ("wget", ["-q", "-U", UserAgent, "-O", path, url]),
+            ("curl", timeout is null ? ["-fsSL", "-A", UserAgent, "-o", path, url] : ["-fsSL", "--max-time", seconds, "-A", UserAgent, "-o", path, url]),
+            ("wget", timeout is null ? ["-q", "-U", UserAgent, "-O", path, url] : ["-q", "-T", seconds, "-U", UserAgent, "-O", path, url]),
         ];
         foreach (var (tool, args) in tools)
         {

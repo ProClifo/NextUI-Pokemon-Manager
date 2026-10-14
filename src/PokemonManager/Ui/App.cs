@@ -68,6 +68,8 @@ public sealed class App
             _settings.SeenWelcome = true;
             _settings.Save(_paths.SettingsFile);
         }
+        else if (StartupUpdate())
+            return 0;
 
         while (true)
         {
@@ -113,8 +115,7 @@ public sealed class App
             _ui.Message("Updates are only available on the device.");
             return false;
         }
-        var pakDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", ".."));
-        var updater = new Updater(pakDir, Path.Combine(_paths.DataDir, "update"));
+        var updater = NewUpdater();
         Updater.Release release;
         try
         {
@@ -141,6 +142,45 @@ public sealed class App
         var size = release.AssetSize > 0 ? $" ({release.AssetSize / (1024 * 1024)} MB)" : "";
         if (!_ui.Confirm($"Update Pokémon Manager?\n\nInstalled: {installed}\nNew: {release.Name}{size}", "UPDATE", "CANCEL"))
             return false;
+        return Install(updater, release, platform);
+    }
+
+    /// <summary>
+    /// On startup (on the device, with Wi-Fi connected): offers a newer release when there is one. Says nothing
+    /// when it's up to date or GitHub can't be reached quickly. Returns true when it updated (the app then closes).
+    /// </summary>
+    private bool StartupUpdate()
+    {
+        var platform = Environment.GetEnvironmentVariable("PLATFORM");
+        if (string.IsNullOrEmpty(platform) || !Updater.MaybeOnline())
+            return false;
+        var updater = NewUpdater();
+        var installed = updater.InstalledTag;
+        if (installed == "dev")
+            return false;
+        Updater.Release release;
+        try
+        {
+            release = updater.Latest(platform, TimeSpan.FromSeconds(4));
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"startup update check: {ex.Message}");
+            return false;
+        }
+        if (release.Tag == installed || release.AssetUrl is null)
+            return false;
+        var size = release.AssetSize > 0 ? $" ({release.AssetSize / (1024 * 1024)} MB)" : "";
+        if (!_ui.Confirm($"An update is available.\n\nInstalled: {installed}\nNew: {release.Name}{size}", "UPDATE", "LATER"))
+            return false;
+        return Install(updater, release, platform);
+    }
+
+    private Updater NewUpdater() =>
+        new(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..")), Path.Combine(_paths.DataDir, "update"));
+
+    private bool Install(Updater updater, Updater.Release release, string platform)
+    {
         try
         {
             _ui.Busy($"Downloading {release.Name}...\nThis can take a few minutes.");
@@ -1769,8 +1809,8 @@ public sealed class App
             "game, trainer and ID. The last 999 are kept.\n\nTo go back, copy a backup over the save in the Saves " +
             "folder, renamed to the save's own name."),
         ("How do I update Pokémon Manager?",
-            "Pick Update on the main menu with Wi-Fi on. It downloads the newest release; your saves, backups and " +
-            "settings stay as they are."),
+            "With Wi-Fi on, the pak checks for a new version when it starts and offers to install it. You can also " +
+            "pick Update on the main menu. Your saves, backups and settings stay as they are."),
     ];
 
     private const string HelpText =
