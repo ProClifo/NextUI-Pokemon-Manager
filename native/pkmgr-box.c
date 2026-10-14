@@ -1093,6 +1093,17 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     if (party_open(st))
     {
         blit_scaled(skin_image(scene, "pc_party.png"), NULL, screen, l, get_int(lo, "pc.party.x", 0), get_int(lo, "pc.party.y", 0));
+        // pc_party.png has every slot filled; as SetPartySlotTilemaps does, empty slots 1-5 get the outline-only
+        // piece (slot_rects lists slots 1-5, or 0-5 in Ruby/Sapphire's layout)
+        JSON_Array *rects = json_object_dotget_array(lo, "pc.party.slot_rects");
+        SDL_Surface *empty = rects ? skin_image(scene, "pc_party_slot_empty.png") : NULL;
+        int first = rects && json_array_get_count(rects) >= 6 ? 0 : 1;
+        for (int i = 1; empty && i < 6; i++)
+        {
+            JSON_Array *r = json_array_get_array(rects, (size_t)(i - first));
+            if (!scene->boxes[0].slots[i].filled && r && json_array_get_count(r) >= 2)
+                blit_scaled(empty, NULL, screen, l, (int)json_array_get_number(r, 0), (int)json_array_get_number(r, 1));
+        }
         for (int i = 0; i < 6; i++)
         {
             int x, y;

@@ -10,7 +10,7 @@ writes layout.json, the same layout in the one form the viewer reads:
   font     {color, shadow, height, cap_top}
   pc       wallpaper, box_name [cx, top], box_name_color/_shadow, arrows, grid, party_button, close_button,
            hand_offset, hand_button_offset, hand_title, hand_cancel, mon_sprite, mon_text (fields),
-           mon_text_bg {rect, color}, party {x, y, slots, cancel}, menu {right, bottom, line_height, text_x,
+           mon_text_bg {rect, color}, party {x, y, slots, slot_rects, cancel}, menu {right, bottom, line_height, text_x,
            text_y, color, shadow}, message, message_text, message_frame
   summary  sprite, info / skills / moves (fields)
 
@@ -196,7 +196,7 @@ def normalize(full):
             "hand_shadow_offset": pc.get("hand_shadow_offset", [8, 28]),
             "mon_sprite": pc["mon_sprite"],
             "mon_text": gender_and_level(pc["mon_text"], mon_color, mon_shadow),
-            "party": {k: pc["party"][k] for k in ("x", "y", "slots", "cancel", "grid") if k in pc["party"]},
+            "party": {k: pc["party"][k] for k in ("x", "y", "slots", "slot_rects", "cancel", "grid") if k in pc["party"]},
             "menu": {
                 "right": menu["right"], "bottom": menu["bottom"], "line_height": menu["line_height"],
                 "text_x": menu["text_x"], "text_y": menu.get("text_y", 1),
