@@ -222,6 +222,8 @@ def normalize(full):
     if "egg" in summary:  # an Egg's one page, with its own background and fields
         out["summary"]["egg"] = summary_fields(summary["egg"], color, shadow)
         out["summary"]["egg_page"] = {"image": "sum_egg.png", "list": "summary.egg"}
+    if "markings" in pc:  # the PKMN DATA panel's markings (top-left of the 32x8 sprite)
+        out["pc"]["markings"] = pc["markings"]
     if "mon_text_rect" in pc:
         out["pc"]["mon_text_bg"] = {"rect": pc["mon_text_rect"], "color": pc.get("mon_text_bg", [148, 148, 172])}
     return out

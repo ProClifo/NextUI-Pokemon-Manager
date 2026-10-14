@@ -1130,6 +1130,11 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         const char *item = json_object_get_string(s, "item");
         if (item && json_object_has_value(s, "item_icon")) // item_icon: it holds one ("NONE" is in the game's language)
             draw_field(screen, l, lo, "pc.mon_text", "item", item);
+        // its markings: row n of markings_pc.png (32x8 each) is the combination with bits n
+        SDL_Rect mk = get_rect(lo, "pc.markings");
+        if (json_object_dothas_value(lo, "pc.markings") && json_object_has_value_of_type(s, "markings", JSONNumber))
+            blit_scaled(skin_image(scene, "markings_pc.png"), &(SDL_Rect){0, ((int)json_object_get_number(s, "markings") & 0xF) * 8, 32, 8},
+                        screen, l, mk.x, mk.y);
     }
 
     SDL_Surface *hand = skin_image(scene, "hand.png");
