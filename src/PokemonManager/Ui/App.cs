@@ -1564,15 +1564,11 @@ public sealed class App
             _ui.Message(result.Message);
             return;
         }
-        if (!result.Legal)
+        // an unreleased file that's illegal is marked so in the menu, and added like any other
+        if (!result.Legal && file.Released)
         {
-            if (file.Released)
-            {
-                _ui.Message($"PKHeX flags {file.Title} as illegal in {Names.Game(entry.Sav)}, so it wasn't added.\n\n{result.Message}");
-                return;
-            }
-            if (!_ui.Confirm($"This unreleased file is flagged as illegal by PKHeX:\n{result.Message}\n\nAdd it anyway?", "ADD", "CANCEL"))
-                return;
+            _ui.Message($"PKHeX flags {file.Title} as illegal in {Names.Game(entry.Sav)}, so it wasn't added.\n\n{result.Message}");
+            return;
         }
         // No trade rules: the real distributions didn't need the National Pokédex (only the Pokédex, checked above).
         PlaceConverted(entry, pk);
@@ -1632,10 +1628,7 @@ public sealed class App
             _ui.Message("The GS Ball event is already enabled.");
             return;
         }
-        var question = sav.Japanese
-            ? $"Enable the GS Ball event in {Names.Game(sav)}?"
-            : $"Enable the GS Ball event in {Names.Game(sav)}?\n\nOutside Japan it only ran in the 3DS Virtual Console release, so PKHeX flags a Celebi from it in a cartridge copy as illegal.";
-        if (!_ui.Confirm(question, "ENABLE", "CANCEL"))
+        if (!_ui.Confirm($"Enable the GS Ball event in {Names.Game(sav)}?", "ENABLE", "CANCEL"))
             return;
         sav.EnableGSBallMobileEvent();
         if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
