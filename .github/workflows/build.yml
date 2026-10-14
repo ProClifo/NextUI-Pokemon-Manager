@@ -21,18 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The Pak Store reads pak.json's version from the repo and downloads that tag's release_filename, so a
-      # release must be tagged exactly as pak.json says
-      - name: Check the release tag matches pak.json
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
-        run: |
-          tag="${{ inputs.release_tag || github.ref_name }}"
-          version="$(python3 -c 'import json; print(json.load(open("pak.json"))["version"])')"
-          if [ "$tag" != "$version" ]; then
-            echo "::error::Release tag $tag doesn't match pak.json version $version: bump pak.json first"
-            exit 1
-          fi
-
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
@@ -68,3 +56,26 @@ jobs:
           generate_release_notes: true
           # v0.1.0-alpha.1 and the like are marked as pre-releases
           prerelease: ${{ contains(inputs.release_tag || github.ref_name, '-') }}
+
+      # The Pak Store reads pak.json's version from this branch every hour and downloads that tag's release_filename:
+      # pak.json moves on to the new tag only now that its release exists, so the store never offers a missing one.
+      - name: Point pak.json at the release
+        if: inputs.release_tag != ''
+        run: |
+          tag="${{ inputs.release_tag }}"
+          python3 - "$tag" <<'PY'
+          import json, sys
+          tag = sys.argv[1]
+          d = json.load(open("pak.json", encoding="utf-8"))
+          d["version"] = tag
+          open("pak.json", "w", encoding="utf-8").write(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+          PY
+          if git diff --quiet pak.json; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "pak.json: $tag [skip ci]" pak.json
+          for i in 1 2 3; do
+            git pull --rebase -q origin "${{ github.ref_name }}" && git push origin "HEAD:${{ github.ref_name }}" && exit 0
+            sleep 5
+          done
+          exit 1

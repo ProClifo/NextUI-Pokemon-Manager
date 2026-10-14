@@ -33,8 +33,12 @@ POKEPLATINUM_COMMIT="${POKEPLATINUM_COMMIT:-c248fb3f8cc9934ded800e489567c5c0eeee
 POKEDIAMOND_COMMIT="${POKEDIAMOND_COMMIT:-b623abef1b4dfe204ca50aab42447ac00c134290}"
 PLATFORMS=(tg5040 tg5050 my355 h700)
 
-# pak.json's version is the release tag ("v0.2.36", as the Pak Store wants); .NET takes the number without the "v"
-VERSION="$(sed -n 's/.*"version": *"v\{0,1\}\([^"]*\)".*/\1/p' "$ROOT/pak.json")"
+# A release builds as its tag (PKMGR_RELEASE, "v0.2.36"); otherwise as pak.json's version. .NET takes the number
+# without the "v".
+case "${PKMGR_RELEASE:-}" in
+    v*) VERSION="${PKMGR_RELEASE#v}" ;;
+    *) VERSION="$(sed -n 's/.*"version": *"v\{0,1\}\([^"]*\)".*/\1/p' "$ROOT/pak.json")" ;;
+esac
 
 rm -rf "$BUILD" "$DIST"
 mkdir -p "$PAK/bin/arm64" "$DIST"
@@ -177,6 +181,17 @@ cp "$ROOT/README.md" "$PAK/README.md"
 # The release this pak is (the in-app Update compares it with GitHub's newest release); "dev" for local builds.
 mkdir -p "$PAK/res"
 echo "${PKMGR_RELEASE:-dev}" > "$PAK/res/release.txt"
+# the pak's own pak.json names the release it is (the repo's is moved on once the release is published)
+case "${PKMGR_RELEASE:-}" in
+    v*) python3 - "$PAK/pak.json" "$PKMGR_RELEASE" <<'PY'
+import json, sys
+path, tag = sys.argv[1:]
+d = json.load(open(path, encoding="utf-8"))
+d["version"] = tag
+open(path, "w", encoding="utf-8").write(json.dumps(d, indent=2, ensure_ascii=False) + "\n")
+PY
+    ;;
+esac
 chmod +x "$PAK/launch.sh"
 
 echo "==> Zipping"
