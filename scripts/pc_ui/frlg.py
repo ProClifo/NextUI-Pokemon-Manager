@@ -630,7 +630,7 @@ def _build_summary(root, out, fonts, layout):
     tiles = load_tiles(_p(s, "bg.png"))  # BG1-3 share charBaseIndex 2, tile offset 0
     normal, small = fonts["normal"], fonts["small"]
     tm = {n: read_tilemap(_p(s, n + ".bin")) for n in
-          ("page_info", "page_skills", "page_moves", "moves_info_page", "moves_page")}
+          ("page_info", "page_skills", "page_moves", "moves_info_page", "moves_page", "page_egg")}
     menu_info = _p(root, "graphics", "interface", "menu_info.png")
 
     # sLevelNickTextColors {bg, fg, shadow}: [0] on palette 6 (right/bottom panes),
@@ -645,7 +645,7 @@ def _build_summary(root, out, fonts, layout):
     # sPrintMoveTextColors on palette 8: [0] normal, [1]..[3] PP getting low
     C_MOVE = [col(8, 7, 8), col(8, 1, 2), col(8, 3, 4), col(8, 5, 6)]
 
-    def compose(page, page_pals):
+    def compose(page, page_pals, egg=False):
         """Layer stack at rest (after the page flips, see PokeSum_InitBgCoordsBeforePageFlips /
         PokeSum_UpdateBgPriorityForPageFlip): BG3 = moves_info_page (normal view, CB2_SetUpPSS
         step 10) + page-progress tiles; then
@@ -654,14 +654,16 @@ def _build_summary(root, out, fonts, layout):
           MOVES:  BG2 page_moves only (BG1 is slid out to HOFS -240)."""
         img = new_img(240, 160, tuple(page_pals[0][0]) + (255,))
         bg3 = list(tm["moves_info_page"])
-        for t0, t1, x in PROGRESS[page]:
+        # PokeSum_DrawPageProgressTiles draws nothing for an Egg
+        for t0, t1, x in [] if egg else PROGRESS[page]:
             bg3[0 * 32 + x] = PAGE_PROGRESS_BASE + t0
             bg3[1 * 32 + x] = PAGE_PROGRESS_BASE + t1
         draw_map(img, bg3, 32, tiles, page_pals, w=30, h=20)
         stack = {"info": ["page_skills", "page_info"], "skills": ["page_info", "page_skills"],
                  "moves": ["page_moves"]}[page]
         for n in stack:
-            draw_map(img, tm[n], 32, tiles, page_pals, w=30, h=20)
+            # an Egg's info page: gSummaryScreen_PageEgg_Tilemap in place of page_info
+            draw_map(img, tm["page_egg" if egg and n == "page_info" else n], 32, tiles, page_pals, w=30, h=20)
         return img
 
     def header(img, title, controls):
@@ -725,6 +727,10 @@ def _build_summary(root, out, fonts, layout):
         img.save(_p(out, "sum_moves%s.png" % suffix))
 
     page_images(pals, "")
+    # An Egg: one page, controls gText_PokeSum_Controls_Cancel
+    img = compose("info", pals, egg=True)
+    header(img, "POKéMON INFO", "{A_BUTTON}CANCEL")
+    img.save(_p(out, "sum_egg.png"))
     shiny = list(pals)
     shiny[0], shiny[1] = bgpals[6], bgpals[5]
     page_images(shiny, "_shiny")
@@ -806,6 +812,14 @@ def _build_summary(root, out, fonts, layout):
         # (.., FONT_NORMAL, 0, 3, letterSpacing 0, lineSpacing 0) -> line height 14
         dict(field="memo", x=8 + 0, y=14 * 8 + 3, width=28 * 8, line_height=14, **c(C_BODY)),
     ]
+    # An Egg (PrintInfoPage, PrintMonLevelNickOnWindow2 printing nothing): its nickname at (47, 19) of the
+    # right pane, the hatch text at (7, 45), PokeSum_PrintTrainerMemo_Egg in the memo window.
+    egg = [
+        dict(field="ball", x=106 - 8, y=88 - 8, w=16, h=16),
+        dict(field="nickname", x=R_INFO[0] + 47, y=R_INFO[1] + 19, **c(C_BODY)),
+        dict(field="state", x=R_INFO[0] + 7, y=R_INFO[1] + 45, width=15 * 8 - 7, line_height=14, **c(C_BODY)),
+        dict(field="memo", x=8 + 0, y=14 * 8 + 3, width=28 * 8, line_height=14, **c(C_BODY)),
+    ]
     R_SK = (20 * 8, 2 * 8)     # sWindowTemplates_Skills[0]: (20,2) 10x14
     # PrintSkillsPage: x = base + (63|27 - strlen*6): right-aligned assuming 6 px per char
     skills = common + [
@@ -851,6 +865,7 @@ def _build_summary(root, out, fonts, layout):
         "info": info,
         "skills": skills,
         "moves": moves,
+        "egg": egg,
         "text_font": "normal",
         "font_line_height": 14,
         "pp_state_note": "PokeSum_PrintMoveName: cur==max -> normal; cur==0 -> empty; "

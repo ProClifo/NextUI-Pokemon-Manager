@@ -219,6 +219,9 @@ def normalize(full):
         out["summary"]["contest"] = summary_fields(summary.get("common", []) + summary["contest"], color, shadow)
         out["summary"]["pages"] = [{"image": f"sum_{name}.png", "list": f"summary.{key}"} for name, key in
                                    (("info", "info"), ("skills", "skills"), ("moves", "moves"), ("contest", "contest"))]
+    if "egg" in summary:  # an Egg's one page, with its own background and fields
+        out["summary"]["egg"] = summary_fields(summary["egg"], color, shadow)
+        out["summary"]["egg_page"] = {"image": "sum_egg.png", "list": "summary.egg"}
     if "mon_text_rect" in pc:
         out["pc"]["mon_text_bg"] = {"rect": pc["mon_text_rect"], "color": pc.get("mon_text_bg", [148, 148, 172])}
     return out

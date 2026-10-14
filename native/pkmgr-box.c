@@ -1368,6 +1368,12 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
     int page = egg ? 0 : st->page % summary_page_count(lo);
     const char *image, *list;
     summary_page(lo, page, &image, &list);
+    // an Egg has its own page where the game gives it one ("summary.egg_page")
+    if (egg && json_object_dotget_string(lo, "summary.egg_page.image") && json_object_dotget_string(lo, "summary.egg_page.list"))
+    {
+        image = json_object_dotget_string(lo, "summary.egg_page.image");
+        list = json_object_dotget_string(lo, "summary.egg_page.list");
+    }
     blit_scaled(skin_image(scene, image), NULL, screen, l, 0, 0);
 
     // The Pokémon's picture, name, species, level, gender and ball (on every page where the layout has them).
@@ -1431,6 +1437,7 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
         draw_type(screen, scene, l, json_array_get_string(types, 1), get_int(t2, "x", 0), get_int(t2, "y", 0));
     draw_lines(screen, l, find_field(lo, list, "ability_desc"), json_object_get_string(s, "ability_desc"));
     draw_lines(screen, l, find_field(lo, list, "memo"), json_object_get_string(s, "memo"));
+    draw_lines(screen, l, find_field(lo, list, "state"), json_object_get_string(s, "state"));
 
     // HP and EXP bars.
     JSON_Object *exp = find_field(lo, list, "exp_bar");

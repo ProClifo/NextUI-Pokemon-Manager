@@ -82,6 +82,17 @@ public static class BoxSummary
             summary["dex_no"] = "???";
         if (pk.Gender is 0 or 1 && !pk.IsEgg)
             summary["gender"] = pk.Gender == 0 ? "male" : "female";
+        if (pk.IsEgg && sav is SAV3 sav3)
+        {
+            // The Gen 3 games' Egg page: no OT or ID ("?????"), the MYSTERY type, how soon it hatches and where it came from
+            summary["ot"] = "?????";
+            summary["ot_female"] = false;
+            summary["id"] = "?????";
+            summary["types"] = new JsonArray((JsonNode)"mystery");
+            summary["state"] = EggState3(pk, sav3);
+            summary["memo"] = EggMemo3(pk, sav3);
+            return summary;
+        }
         if (pk.IsEgg)
         {
             summary["memo"] = UiStrings.EggMemo(UiStrings.Current);
@@ -345,6 +356,68 @@ public static class BoxSummary
             && GameInfo.GetLocationName(false, crystal.MetLocation, 2, 2, GameVersion.C) is { Length: > 0 } name ? Up(name) : null;
         return place is null ? $"Met at Lv{{{crystal.MetLevel}}}." : $"Met at Lv{{{crystal.MetLevel}}},\n{{{place}}}.";
     }
+
+    /// <summary>
+    /// How soon a Gen 3 Egg hatches, from its remaining egg cycles (kept in its friendship): pokeemerald PrintEggState,
+    /// pokeruby SummaryScreen_PrintPokemonInfo, pokefirered PrintInfoPage (FireRed/LeafGreen word it in three lines).
+    /// </summary>
+    private static string EggState3(PKM pk, SAV3 sav)
+    {
+        int cycles = pk.CurrentFriendship;
+        bool frlg = sav is SAV3FRLG;
+        return cycles switch
+        {
+            <= 5 => frlg ? "It's making sounds.\nIt's almost ready\nto hatch!" : "It's making sounds.\nIt's about to hatch!",
+            <= 10 => frlg ? "It occasionally\nmoves. It should\nhatch soon." : "It moves occasionally.\nIt should hatch soon.",
+            <= 40 => frlg ? "What will hatch\nfrom this? It will\ntake some time." : "What will hatch from this?\nIt will take some time.",
+            _ => frlg ? "It looks like this\nEGG will take a\nlong time to hatch." : "It looks like this EGG will\ntake a long time to hatch.",
+        };
+    }
+
+    private const byte MetLocationSpecialEgg = 0xFD, MetLocationFateful = 0xFF; // METLOC_SPECIAL_EGG, METLOC_FATEFUL_ENCOUNTER
+
+    /// <summary>
+    /// Where a Gen 3 Egg came from: pokeemerald PrintEggMemo, pokeruby PokemonSummaryScreen_PrintEggTrainerMemo,
+    /// pokefirered PokeSum_PrintTrainerMemo_Egg.
+    /// </summary>
+    private static string EggMemo3(PKM pk, SAV3 sav)
+    {
+        var met = pk.MetLocation;
+        bool rse = pk.Version is GameVersion.R or GameVersion.S or GameVersion.E;
+        bool frlgMet = pk.Version is GameVersion.FR or GameVersion.LG;
+        // an Egg is stored as Japanese, so its OT name reads full-width ("ＡＳＨ"); compared as the game does, by its characters
+        bool ownOT = HalfWidth(pk.OriginalTrainerName) == HalfWidth(sav.OT) && pk.ID32 == sav.ID32 && pk.OriginalTrainerGender == sav.Gender;
+        if (sav is SAV3FRLG)
+        {
+            const string dayCare = "An odd POKéMON EGG found by the\nDAY-CARE couple.", trade = "A peculiar POKéMON EGG obtained\nin a trade.";
+            if (met == MetLocationFateful || pk.FatefulEncounter)
+                return "A wondrously peculiar POKéMON EGG\nobtained at a nice place.";
+            if (!frlgMet || !ownOT)
+                return trade;
+            return met == MetLocationSpecialEgg ? "An odd POKéMON EGG obtained from\nthe traveling man." : dayCare;
+        }
+        const string trade3 = "A peculiar POKéMON EGG\nobtained in a trade.";
+        if (sav is SAV3E)
+        {
+            if (met == MetLocationFateful)
+                return "A peculiar POKéMON EGG\nobtained at the nice place.";
+            if (!(rse || frlgMet) || !ownOT)
+                return trade3;
+            if (met == MetLocationSpecialEgg)
+                return rse ? "A POKéMON EGG obtained\nat the hot springs." : "An odd POKéMON EGG\nobtained from a traveler.";
+            return "An odd POKéMON EGG found\nby the DAY CARE couple.";
+        }
+        // Ruby/Sapphire
+        if (!rse || (met != MetLocationFateful && !ownOT))
+            return trade3;
+        if (met == MetLocationFateful)
+            return "A peculiar POKéMON EGG\nobtained at the nice place.";
+        return met == MetLocationSpecialEgg ? "A POKéMON EGG obtained\nat the hot springs." : "An odd POKéMON EGG found\nby the DAY CARE couple.";
+    }
+
+    /// <summary>Full-width letters, digits and spaces as their ASCII forms ("ＡＳＨ" → "ASH").</summary>
+    private static string HalfWidth(string s) =>
+        string.Concat(s.Select(c => c is >= '\uFF01' and <= '\uFF5E' ? (char)(c - 0xFEE0) : c == '\u3000' ? ' ' : c));
 
     private static string Name(PKM pk) => pk.IsEgg ? Up(UiStrings.EggName(pk.Format)) : pk.IsNicknamed ? pk.Nickname : Up(Names.Species(pk.Species));
 

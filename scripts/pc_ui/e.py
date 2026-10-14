@@ -455,6 +455,25 @@ def _build_summary(root, out, font, layout):
     text(img, (22, 4), "{ID}{NO}", 56 - idw, 1, 1)      # PrintMonOTID (right-aligned in 56)
     img.save(_p(out, "sum_info.png"))
 
+    # ----- an Egg's page ------------------------------------------------------
+    # LimitEggSummaryPageDisplay scrolls BG3 to its second screen block, page_info_egg.bin (STATE in
+    # place of ABILITY, one page dot); PrintEggInfo clears the dex number and species windows.
+    egg_map = gba.read_tilemap(_p(s, "page_info_egg.bin"))
+    for y in range(18, 20):
+        for x in range(0, 10):
+            egg_map[y * 32 + x] = 1
+    egg_map[0x223] = 0x81A
+    for y in range(4, 12):
+        for x in range(1, 9):
+            egg_map[y * 32 + x] &= 0x0FFF
+    img = Image.new("RGBA", (240, 160), tuple(pals[0][0]) + (255,))
+    gba.draw_tilemap(img, egg_map, 32, tiles, pals, w=30, h=20)
+    title(img, "POKéMON INFO")
+    prompt(img, "CANCEL")
+    text(img, (11, 6), "TYPE/", 0, 1, 0)
+    text(img, (11, 4), "OT/", 0, 1, 1)                  # PrintEggOTName
+    img.save(_p(out, "sum_egg.png"))
+
     # ----- SKILLS page ------------------------------------------------------
     img = base(1)
     title(img, "POKéMON SKILLS")
@@ -565,6 +584,16 @@ def _build_summary(root, out, font, layout):
              highlight={"color": _rgb(pals[6][5]), "shadow": _rgb(pals[6][6])},
              **c(6, 0)),
     ]
+    # PrintEggInfo / PrintEggOTName / PrintEggOTID / PrintEggState / PrintEggMemo
+    egg = [
+        dict(field="ball", x=16 - 8, y=136 - 8, w=16, h=16),
+        dict(field="nickname", x=8, y=12 * 8 + 1, **c(6, 1)),
+        dict(field="ot", x=88 + otw, y=33, **c(6, 1)),
+        dict(field="id", x=176 + 56, y=33, align="right", prefix="{ID}{NO}", **c(6, 1)),
+        dict(field="type1", x=120, y=48, w=32, h=16),     # SetMonTypeIcons: TYPE_MYSTERY
+        dict(field="state", x=88, y=9 * 8 + 1, width=18 * 8, line_height=16, **c(6, 0)),
+        dict(field="memo", x=88, y=14 * 8 + 1, width=18 * 8, line_height=16, **c(6, 0)),
+    ]
     skills = common + [
         dict(field="item", x=80 + 6 + 36, y=33, align="center", **c(6, 0)),      # PrintHeldItemName
         dict(field="ribbon", x=160 + 6 + 35, y=33, align="center", **c(6, 0)),   # PrintRibbonCount
@@ -602,6 +631,7 @@ def _build_summary(root, out, font, layout):
         "skills": skills,
         "moves": moves,
         "contest": contest,
+        "egg": egg,
         "text_font": "normal",
         # GetCurrentPPToMaxPPState (battle_message.c) + 9 = sTextColors id on palette 8
         "pp_text_note": ("PP colour (GetCurrentPPToMaxPPState): pp == max -> high; max <= 2: pp > 1 -> high, "

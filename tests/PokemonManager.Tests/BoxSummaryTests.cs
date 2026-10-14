@@ -71,6 +71,24 @@ public sealed class BoxSummaryTests : IDisposable
     }
 
     [Theory]
+    [InlineData(GameVersion.E, "It will take some time.", "found\nby the DAY CARE couple.")]
+    [InlineData(GameVersion.FR, "take some time.", "found by the\nDAY-CARE couple.")]
+    public void Gen3EggShowsTheGamesEggPage(GameVersion version, string state, string memo)
+    {
+        using var saves = new TestSaves();
+        var sav = saves.Create(version, "Egg.sav").Sav;
+        var pk = TestSaves.Make(sav, Species.Bagon, 5);
+        pk.IsEgg = true;
+        pk.CurrentFriendship = 20; // egg cycles left
+        var s = BoxSummary.For(pk, sav, inParty: false);
+        Assert.Equal("?????", (string?)s["ot"]);
+        Assert.Equal("?????", (string?)s["id"]);
+        Assert.Equal("mystery", (string?)s["types"]![0]);
+        Assert.EndsWith(state, (string?)s["state"]);
+        Assert.EndsWith(memo, (string?)s["memo"]);
+    }
+
+    [Theory]
     [InlineData(GameVersion.RD)]
     [InlineData(GameVersion.C)]
     public void GameBoyTypesAreNamedRight(GameVersion version)

@@ -739,6 +739,21 @@ def build_summary(root, out, font, font4):
     for page, name in ((0, 'sum_info'), (1, 'sum_skills'), (2, 'sum_moves'), (3, 'sum_contest')):
         page_image(page).save(_p(out, name + '.png'))
 
+    # An Egg's only page: BG3 scrolled to its right half (pokemon_info.bin at 0xE800: STATE in place of
+    # ABILITY, a single page dot); sub_809FAC8 erases the "No." tile and the level/species rows.
+    img = Image.new('RGBA', (SCREEN_W, SCREEN_H), backdrop)
+    img.alpha_composite(g.render_bg(0x0000, 0xE000, size=1, hofs=0x100))
+    font.draw(img, 2, 0, titles[0], *WHITE)
+    img.alpha_composite(text_tile(5), (184, 0))
+    img.alpha_composite(text_tile(6), (192, 0))
+    font.draw(img, 200, 0, actions[0], *WHITE)
+    font.draw(img, 88, 48, 'TYPE/', *DEF)
+    img.alpha_composite(text_tile(0), (176, 32))
+    img.alpha_composite(text_tile(2), (184, 32))
+    # SummaryScreen_PrintPokemonInfo (egg): "OT/?????" all in colour 13
+    font.draw(img, 88, 32, 'OT/', *WHITE)
+    img.save(_p(out, 'sum_egg.png'))
+
     # PP label tile (SummaryScreen_PlaceTextTile_White(1, 24, row)), drawn per known move.
     text_tile(1).save(_p(out, 'sum_pp_label.png'))
     # Status panel shown instead of the blank strip when the Pokemon has a status (sub_80A1048
@@ -859,6 +874,17 @@ def build_summary(root, out, font, font4):
             dict(field='moves', row_dy=16, type=[87, 32], type_key='contest_type', name=dict(x=120, y=32, **col(W)),
                  pp_label=[192, 32], pp=dict(x=200, y=32, cur_right=214, slash=True, max_right=232, **col(D)),
                  empty=dict(name='-', name_x=120, pp='--', pp_x=208)),
+        ],
+        # SummaryScreen_PrintPokemonInfo / sub_809FAC8 for an Egg: the nickname at (3, 16) beside the ball,
+        # "?????" for the OT and ID, the MYSTERY type, the hatch state at (11, 9), the Egg's memo at (11, 14).
+        'egg': [
+            dict(field='ball', x=-2, y=128, w=16, h=16),
+            dict(field='nickname', x=24, y=128, **col(W)),
+            dict(field='ot', x=ot_x, y=32, **col(W)),
+            dict(field='id', x=193, y=32, **col(W)),
+            dict(field='type1', x=120, y=48),
+            dict(field='state', x=88, y=72, width=152, line_height=16, **col(D)),
+            dict(field='memo', x=88, y=112, width=152, line_height=16, **col(D)),
         ],
         'page_dots': {'rect': [88, 0, 64, 16], 'note': 'baked per page into sum_*.png (DrawSummaryScreenNavigationDots)'},
     }
