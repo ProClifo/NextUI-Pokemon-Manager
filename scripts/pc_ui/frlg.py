@@ -816,6 +816,7 @@ def _build_summary(root, out, fonts, layout):
     # right pane, the hatch text at (7, 45), PokeSum_PrintTrainerMemo_Egg in the memo window.
     egg = [
         dict(field="ball", x=106 - 8, y=88 - 8, w=16, h=16),
+        dict(field="markings", x=20 - 16, y=91 - 4, w=32, h=8),
         dict(field="nickname", x=R_INFO[0] + 47, y=R_INFO[1] + 19, **c(C_BODY)),
         dict(field="state", x=R_INFO[0] + 7, y=R_INFO[1] + 45, width=15 * 8 - 7, line_height=14, **c(C_BODY)),
         dict(field="memo", x=8 + 0, y=14 * 8 + 3, width=28 * 8, line_height=14, **c(C_BODY)),

@@ -879,6 +879,7 @@ def build_summary(root, out, font, font4):
         # "?????" for the OT and ID, the MYSTERY type, the hatch state at (11, 9), the Egg's memo at (11, 14).
         'egg': [
             dict(field='ball', x=-2, y=128, w=16, h=16),
+            dict(field='markings', x=44, y=22, w=32, h=8),
             dict(field='nickname', x=24, y=128, **col(W)),
             dict(field='ot', x=ot_x, y=32, **col(W)),
             dict(field='id', x=193, y=32, **col(W)),

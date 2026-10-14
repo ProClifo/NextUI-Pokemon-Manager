@@ -587,6 +587,7 @@ def _build_summary(root, out, font, layout):
     # PrintEggInfo / PrintEggOTName / PrintEggOTID / PrintEggState / PrintEggMemo
     egg = [
         dict(field="ball", x=16 - 8, y=136 - 8, w=16, h=16),
+        dict(field="markings", x=60 - 16, y=26 - 4, w=32, h=8),
         dict(field="nickname", x=8, y=12 * 8 + 1, **c(6, 1)),
         dict(field="ot", x=88 + otw, y=33, **c(6, 1)),
         dict(field="id", x=176 + 56, y=33, align="right", prefix="{ID}{NO}", **c(6, 1)),

@@ -1416,6 +1416,13 @@ static void draw_summary(SDL_Surface *screen, Scene *scene, State *st, const Lay
             active_font = previous_font;
         }
     }
+    // The markings: row n of markings_summary.png (32x8 each, 16 rows) is the combination with bits n
+    JSON_Object *marks = find_field(lo, list, "markings");
+    if (marks && json_object_has_value_of_type(s, "markings", JSONNumber))
+    {
+        int n = (int)json_object_get_number(s, "markings") & 0xF;
+        blit_scaled(skin_image(scene, "markings_summary.png"), &(SDL_Rect){0, n * 8, 32, 8}, screen, l, get_int(marks, "x", 0), get_int(marks, "y", 0));
+    }
     JSON_Object *ball = find_field(lo, list, "ball");
     if (ball && json_object_get_string(s, "ball"))
     {

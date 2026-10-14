@@ -76,6 +76,9 @@ public static class BoxSummary
             ["egg"] = pk.IsEgg,
             ["flip"] = !pk.IsEgg && !NotFlipped.Contains(pk.Species),
         };
+        // Gen 3's four markings (circle, square, triangle, heart) as bits 0-3: the row of markings_summary.png
+        if (pk is IAppliedMarkings3 marks)
+            summary["markings"] = marks.MarkingValue & 0xF;
         if (!pk.IsEgg && DexNumber(pk.Species, sav) is { } dex)
             summary["dex_no"] = $"{dex:D3}";
         else if (!pk.IsEgg && sav is SAV3FRLG)

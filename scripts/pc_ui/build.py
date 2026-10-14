@@ -141,11 +141,11 @@ def summary_fields(fields, color, shadow):
             out.append(moves(f, color, shadow))
         elif name in ("exp_bar", "hp_bar"):
             out.append(bar(f))
-        elif name in ("type1", "type2", "ball"):
+        elif name in ("type1", "type2", "ball", "markings"):
             out.append({"field": name, "x": f["x"], "y": f["y"]})
         elif name == "dex_number":
             out.append(field({**f, "field": "dex_no"}, color, shadow))
-        elif name in ("markings", "status", "shiny_star", "pokerus_cured", "move_description"):
+        elif name in ("status", "shiny_star", "pokerus_cured", "move_description"):
             continue  # not shown yet
         else:
             out.append(field(f, color, shadow))
