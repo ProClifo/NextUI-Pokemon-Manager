@@ -1,16 +1,27 @@
 {
   "name": "Pokemon Manager",
+  "version": "v0.2.36",
   "type": "TOOL",
   "description": "PKHeX-powered save manager: move Pokémon between games, perform trade evolutions, and inject Mystery Gifts, Mystery Events and e-Reader cards.",
   "author": "ProClifo",
   "repo_url": "https://github.com/ProClifo/NextUI-Pokemon-Manager",
   "release_filename": "PokemonManager.pak.zip",
+  "changelog": {
+    "v0.2.36": "Pak Store release. Gen 3 Egg summary page, markings, centred HP, update check on start."
+  },
+  "screenshots": [
+    ".github/resources/screenshots/main_menu.jpg",
+    ".github/resources/screenshots/emerald_box.jpg",
+    ".github/resources/screenshots/platinum_box.jpg",
+    ".github/resources/screenshots/firered_box.jpg",
+    ".github/resources/screenshots/heartgold_party.jpg",
+    ".github/resources/screenshots/platinum_summary.jpg"
+  ],
   "platforms": [
     "tg5040",
     "tg5050",
     "my355",
     "h700"
   ],
-  "launch": "launch.sh",
-  "version": "0.1.0"
+  "launch": "launch.sh"
 }

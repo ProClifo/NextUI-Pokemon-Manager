@@ -33,7 +33,8 @@ POKEPLATINUM_COMMIT="${POKEPLATINUM_COMMIT:-c248fb3f8cc9934ded800e489567c5c0eeee
 POKEDIAMOND_COMMIT="${POKEDIAMOND_COMMIT:-b623abef1b4dfe204ca50aab42447ac00c134290}"
 PLATFORMS=(tg5040 tg5050 my355 h700)
 
-VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$ROOT/pak.json")"
+# pak.json's version is the release tag ("v0.2.36", as the Pak Store wants); .NET takes the number without the "v"
+VERSION="$(sed -n 's/.*"version": *"v\{0,1\}\([^"]*\)".*/\1/p' "$ROOT/pak.json")"
 
 rm -rf "$BUILD" "$DIST"
 mkdir -p "$PAK/bin/arm64" "$DIST"
