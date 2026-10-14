@@ -850,7 +850,8 @@ def build_summary(root, out, font, font4):
         'skills': [
             dict(field='item', x=88, y=32, **col(D)),
             dict(field='ribbon', x=168, y=32, **col(D)),
-            dict(field='hp', x=126, y=56, cur_right=150, slash_x=150, max_right=174, **col(D)),
+            dict(field='hp', x=126, y=56, cur_right=150, slash_x=150, max_right=174,
+                 slash_center=150 + font.width('/') // 2, **col(D)),
             dict(field='attack', x=153, y=72, align='center', **col(D)),
             dict(field='defense', x=153, y=88, align='center', **col(D)),
             dict(field='sp_atk', x=225, y=56, align='center', **col(D)),

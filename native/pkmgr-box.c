@@ -678,6 +678,14 @@ static void draw_field(SDL_Surface *dst, const Layout *l, JSON_Object *layout, c
         snprintf(buf, sizeof(buf), "%s%s", prefix ? prefix : "", value);
     if (json_object_has_value(f, "slash_center") && strchr(buf, '/'))
         draw_slashed(dst, l, buf, get_int(f, "slash_center", 0), get_int(f, "y", 0), color, shadow);
+    else if (json_object_has_value(f, "slash_right") && strchr(buf, '/'))
+    {
+        // "cur/max" with max right-aligned at slash_right: the slash is centred just left of max
+        const char *m = strchr(buf, '/') + 1;
+        while (*m == ' ')
+            m++;
+        draw_slashed(dst, l, buf, get_int(f, "slash_right", 0) - text_width(m, l) - text_width("/", l) / 2, get_int(f, "y", 0), color, shadow);
+    }
     else
         draw_text_c(dst, l, buf, get_int(f, "x", 0), get_int(f, "y", 0), field_align(f), color, shadow);
     active_font = previous_font;

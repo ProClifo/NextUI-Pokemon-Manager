@@ -37,7 +37,8 @@ def text(value):
 
 def field(f, color, shadow):
     """A text/position field with its colours filled in and its prefix spelled out."""
-    out = {k: v for k, v in f.items() if k in ("field", "x", "y", "align", "width", "line_height", "w", "h", "font")}
+    out = {k: v for k, v in f.items() if k in ("field", "x", "y", "align", "width", "line_height", "w", "h", "font",
+                                               "slash_center", "slash_right")}
     out["color"] = f.get("color", color)
     out["shadow"] = f.get("shadow", shadow)
     if "prefix" in f:

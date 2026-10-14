@@ -824,8 +824,9 @@ def _build_summary(root, out, fonts, layout):
     R_SK = (20 * 8, 2 * 8)     # sWindowTemplates_Skills[0]: (20,2) 10x14
     # PrintSkillsPage: x = base + (63|27 - strlen*6): right-aligned assuming 6 px per char
     skills = common + [
+        # the maximum keeps the game's right edge; the slash and current HP follow it leftwards
         dict(field="hp", x=R_SK[0] + 14 + 63, y=R_SK[1] + 4, align="right", format="%d/%d",
-             char_width=6, **c(C_BODY)),
+             slash_right=R_SK[0] + 14 + 63, char_width=6, **c(C_BODY)),
         dict(field="attack", x=R_SK[0] + 50 + 27, y=R_SK[1] + 22, align="right", char_width=6, **c(C_BODY)),
         dict(field="defense", x=R_SK[0] + 50 + 27, y=R_SK[1] + 35, align="right", char_width=6, **c(C_BODY)),
         dict(field="sp_atk", x=R_SK[0] + 50 + 27, y=R_SK[1] + 48, align="right", char_width=6, **c(C_BODY)),

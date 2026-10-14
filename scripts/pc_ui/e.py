@@ -598,7 +598,9 @@ def _build_summary(root, out, font, layout):
     skills = common + [
         dict(field="item", x=80 + 6 + 36, y=33, align="center", **c(6, 0)),      # PrintHeldItemName
         dict(field="ribbon", x=160 + 6 + 35, y=33, align="center", **c(6, 0)),   # PrintRibbonCount
-        dict(field="hp", x=hp_right, y=57, align="right", format="%3d/%3d", **c(6, 0)),
+        # NextUI's digits are wider than the game's: centred on the slash, where the game's "%3d/%3d" puts it
+        dict(field="hp", x=hp_right, y=57, align="right", format="%3d/%3d",
+             slash_center=left_x + 3 * digit + slash // 2, **c(6, 0)),
         dict(field="attack", x=left_x + 7 * digit, y=57 + 16, align="right", **c(6, 0)),
         dict(field="defense", x=left_x + 7 * digit, y=57 + 32, align="right", **c(6, 0)),
         dict(field="sp_atk", x=right_x + 3 * digit, y=57, align="right", **c(6, 0)),
