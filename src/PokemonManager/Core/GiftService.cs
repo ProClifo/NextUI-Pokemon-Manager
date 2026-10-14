@@ -242,10 +242,30 @@ public static class GiftService
         foreach (var ev in BuiltInEvents(sav).Where(e => e.Encounter.Species == (ushort)Species.Mew).OrderBy(_ => random.Next()))
         {
             if (EventPokemon.Generate(ev.Encounter, sav) is { } pk && Legality.IsLegal(pk, sav))
+            {
+                // PKHeX always names the first tour's trainer: any of the tours' names is the same event
+                var names = pk.Japanese ? JapanTourOTs : EuropeTourOTs;
+                var first = pk.OriginalTrainerName;
+                pk.OriginalTrainerName = names[random.Next(names.Length)];
+                if (!Legality.IsLegal(pk, sav))
+                    pk.OriginalTrainerName = first;
                 return pk;
+            }
         }
         return null;
     }
+
+    /// <summary>The Game Boy Mew tours' trainer names (PKHeX EncounterGift1 IsTourOT / IsJapanOT).</summary>
+    private static readonly string[] EuropeTourOTs =
+    [
+        "YOSHIRA", "YOSHIRB", "YOSHIBA", "YOSHIBB", "LINKE", "LINKW", "LUIGE", "LUIGW", "LUIGIC", "YOSHIC",
+        "EUROPE", "SWEDEN", "NORWAY", "FINLAND", "DENMARK", "AUSTRIA", "UK", "NAL", "MARIO",
+    ];
+
+    private static readonly string[] JapanTourOTs =
+    [
+        "マクハリ", "フクオカ", "トウキョー", "オーサカ", "サッポロ", "ナゴヤ", "マリオ", "クッパ", "ルイージ", "ピーチ", "ヨッシー", "ドンキー",
+    ];
 
     /// <summary>
     /// A legal event Celebi for a Gen 2 game outside Japan, generated as the distribution did: the Pokémon Center

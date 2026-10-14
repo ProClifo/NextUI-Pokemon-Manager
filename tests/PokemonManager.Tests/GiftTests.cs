@@ -177,13 +177,18 @@ public sealed class GiftTests : IDisposable
     public void Gen1MewIsLegalForTheSavesLanguage(LanguageID language)
     {
         var sav = _saves.Create(GameVersion.RD, $"Red{language}.sav", language: language).Sav;
-        for (int i = 0; i < 5; i++)
+        var trainers = new HashSet<string>();
+        var random = new Random(1);
+        for (int i = 0; i < 20; i++)
         {
-            var mew = GiftService.Mew(sav);
+            var mew = GiftService.Mew(sav, random);
             Assert.NotNull(mew);
             Assert.Equal((ushort)Species.Mew, mew.Species);
             Assert.True(Legality.IsLegal(mew, sav), Legality.FirstProblem(mew));
+            trainers.Add(mew.OriginalTrainerName);
         }
+        // the tours' trainer names, not only the first one's
+        Assert.True(trainers.Count > 1, string.Join(", ", trainers));
     }
 
     [Theory]
