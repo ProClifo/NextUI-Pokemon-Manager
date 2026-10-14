@@ -658,7 +658,8 @@ public static class GalleryLists
     /// gallery keeps every known copy and variant of a distribution; the rest stay in the Gallery.
     /// </summary>
     public static List<GalleryEntry> Distributions(GalleryArchive gallery, GameProfile profile)
-        => Candidates(gallery, profile)
+    {
+        var list = Candidates(gallery, profile)
             .Where(c => !FromEarlierGeneration(profile, c.Entry.Species))
             .GroupBy(c => c.Entry.Species)
             .Select(g => g
@@ -668,13 +669,28 @@ public static class GalleryLists
                 .ThenByDescending(c => c.Copies)
                 .ThenBy(c => c.Entry.Title, StringComparer.OrdinalIgnoreCase)
                 .First().Entry)
-            .OrderBy(e => e.Species)
             .ToList();
+        // Gen 3's Celebi is the Ageto Celebi in every language, though it was only given out in Japan: a Japanese
+        // Pokémon, as if traded over (the one exception to listing the game's own language only)
+        if (profile.Generation == 3 && list.FindIndex(e => e.Species == (ushort)Species.Celebi) is var at and >= 0
+            && AgetoCelebi(gallery) is { } ageto)
+            list[at] = profile.Language == GalleryLanguage.Japanese ? ageto : ageto with { Title = "AGETO Celebi" };
+        return list.OrderBy(e => e.Species).ToList();
+    }
+
+    /// <summary>The gallery's Ageto Celebi, its plain copy rather than the 6IV one.</summary>
+    private static GalleryEntry? AgetoCelebi(GalleryArchive gallery)
+        => gallery.Entries
+            .Where(e => e is { Generation: 3, Species: (ushort)Species.Celebi, Released: true } && e.Title.Contains("アゲト"))
+            .Let(GalleryGroups.Group)
+            .OrderBy(g => g.Title.Contains("6IV", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .Select(g => g.Copies.OrderBy(c => c.Title.Contains("6IV", StringComparison.OrdinalIgnoreCase) ? 1 : 0).First() with { Title = g.Title })
+            .FirstOrDefault();
 
     /// <summary>The distribution picked when a Pokémon has several (otherwise: the game's own language, then the most copies).</summary>
     private static readonly HashSet<string> Preferred = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Aura Mew", "10 ANIV Celebi", "WISHMKR Jirachi", "Manaphy Egg",
+        "Aura Mew", "WISHMKR Jirachi", "Manaphy Egg",
     };
 
     /// <summary>
