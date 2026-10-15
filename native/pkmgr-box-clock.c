@@ -1,7 +1,8 @@
 // The Clock editor (included by pkmgr-box.c): pkmgr-box --clock WEEKDAY,HOUR,MINUTE [--font OG.ttf]
 // [--background art.png] --write-location out.json. WEEKDAY is 0-6 (Sunday first) for Gold/Silver/Crystal or -1
 // for Ruby/Sapphire/Emerald, which have no days of the week. Shows "Sunday 08:41 PM" (or "08:41 PM"):
-// Left/Right pick the weekday, hour, minute or AM/PM, Up/Down change it, A saves, B goes back.
+// Left/Right pick the weekday, hour, minute or AM/PM, Up/Down change it, Y sets the device's own time (localtime, as
+// NextUI's clock shows it), A saves, B goes back.
 // Writes {"weekday": n, "hour": 0-23, "minute": n}; exit codes as the PC's (0 saved, 2 back, 3 MENU).
 
 static const char *CLOCK_DAYS[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
@@ -146,7 +147,21 @@ static void clock_draw(SDL_Surface *screen, TTF_Font *big, TTF_Font *title, SDL_
         }
         x += widths[i] + (i + 1 < n && kinds[i] >= 0 && kinds[i + 1] >= 0 ? gap : 0);
     }
+    GFX_blitButtonGroup((char *[]){"Y", "SYSTEM TIME", NULL}, 0, screen, 0);
     GFX_blitButtonGroup((char *[]){"B", "BACK", "A", "SAVE", NULL}, 1, screen, 1);
+}
+
+// The device's time, as NextUI's clock shows it (the weekday only where the game has one).
+static void clock_set_system(Clock *c)
+{
+    time_t now = time(NULL);
+    struct tm tm;
+    if (localtime_r(&now, &tm) == NULL)
+        return;
+    if (c->weekday >= 0)
+        c->weekday = tm.tm_wday;
+    c->hour = tm.tm_hour;
+    c->minute = tm.tm_min;
 }
 
 static int clock_run(const char *spec, const char *font_path, const char *background_path, const char *write_location, const char *screenshot)
@@ -199,6 +214,8 @@ static int clock_run(const char *spec, const char *font_path, const char *backgr
             clock_change(&c, 1), dirty = 1;
         else if (PAD_justRepeated(BTN_DOWN))
             clock_change(&c, -1), dirty = 1;
+        else if (PAD_justReleased(BTN_Y))
+            clock_set_system(&c), dirty = 1;
         else if (PAD_justReleased(BTN_A))
         {
             exit_code = EXIT_PICKED;

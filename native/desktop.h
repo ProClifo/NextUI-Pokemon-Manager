@@ -18,7 +18,7 @@ static int desktop_scale = 2;
 #define SCALE1(a) ((a) * desktop_scale)
 #define CPU_SPEED_MENU 0
 #define MODE_MAIN 0
-enum { BTN_UP = 1, BTN_DOWN = 2, BTN_LEFT = 4, BTN_RIGHT = 8, BTN_A = 16, BTN_B = 32, BTN_L1 = 64, BTN_R1 = 128, BTN_MENU = 256 };
+enum { BTN_UP = 1, BTN_DOWN = 2, BTN_LEFT = 4, BTN_RIGHT = 8, BTN_A = 16, BTN_B = 32, BTN_L1 = 64, BTN_R1 = 128, BTN_MENU = 256, BTN_X = 512, BTN_Y = 1024 };
 
 typedef struct { TTF_Font *large, *medium, *small, *tiny; } GFX_Fonts;
 static GFX_Fonts font;
