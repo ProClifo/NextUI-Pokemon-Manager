@@ -1731,7 +1731,7 @@ public sealed class App
         // an item still waiting blocks the next gift: no question, just the reason
         if (MysteryGift2.ItemWaiting(sav))
         {
-            _ui.Message("Must receive Mystery Gift at Pokémon Center.");
+            _ui.Message("Must receive Mystery Gift\nat Pokémon Center.");
             return;
         }
         if (!_ui.Confirm("Inject random Mystery Gift?"))
