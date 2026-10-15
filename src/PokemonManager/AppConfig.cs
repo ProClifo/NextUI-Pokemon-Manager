@@ -81,7 +81,10 @@ public sealed class AppSettings
     public bool GalleryAllLanguages { get; set; }
     /// <summary>List the gallery's unreleased files: debug and test cards never distributed (off by default).</summary>
     public bool GalleryUnreleased { get; set; }
-    /// <summary>Puts every setting back to its default ("Reset to Default"); the welcome screen stays seen.</summary>
+    /// <summary>
+    /// Puts every setting back to its default ("Reset to Default"), and shows where save states go again; the
+    /// welcome screen stays seen.
+    /// </summary>
     public void ResetToDefaults()
     {
         var defaults = new AppSettings();
@@ -89,6 +92,7 @@ public sealed class AppSettings
         PcBoxView = defaults.PcBoxView;
         GalleryAllLanguages = defaults.GalleryAllLanguages;
         GalleryUnreleased = defaults.GalleryUnreleased;
+        SeenStateMoved = false; // says where save states go again
     }
 
     public static AppSettings Load(string path)

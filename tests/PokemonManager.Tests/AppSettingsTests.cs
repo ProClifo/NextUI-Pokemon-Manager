@@ -9,7 +9,7 @@ public class AppSettingsTests
     {
         var settings = new AppSettings
         {
-            AllowIllegalTransfers = true, PcBoxView = false, SeenWelcome = true,
+            AllowIllegalTransfers = true, PcBoxView = false, SeenWelcome = true, SeenStateMoved = true,
             GalleryAllLanguages = true, GalleryUnreleased = true,
         };
         settings.ResetToDefaults();
@@ -20,5 +20,6 @@ public class AppSettingsTests
         Assert.Equal(defaults.GalleryAllLanguages, settings.GalleryAllLanguages);
         Assert.Equal(defaults.GalleryUnreleased, settings.GalleryUnreleased);
         Assert.True(settings.SeenWelcome);
+        Assert.False(settings.SeenStateMoved);
     }
 }
