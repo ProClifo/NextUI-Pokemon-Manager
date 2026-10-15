@@ -33,9 +33,7 @@ public static class GameClock
         {
             case SAV2 gs:
             {
-                int o = StartOffset(gs);
-                long elapsed = Math.Max(0, ToUnix(now) - (ReadBaseTime(rtcPath) ?? ToUnix(now)));
-                long seconds = gs.Data[o + 3] + 60L * (gs.Data[o + 2] + 60L * (gs.Data[o + 1] + 24L * gs.Data[o])) + elapsed;
+                long seconds = Seconds(gs, rtcPath, now);
                 long minutes = seconds / 60, hours = minutes / 60, days = hours / 24;
                 return new Time((int)(days % 7), (int)(hours % 24), (int)(minutes % 60));
             }
@@ -92,6 +90,17 @@ public static class GameClock
             default:
                 throw new NotSupportedException($"{Names.Game(sav)} has no clock.");
         }
+    }
+
+    /// <summary>Gen 2's day counter (wCurDay, before it wraps at 140), as day-based events like Mystery Gift count days.</summary>
+    public static int Day(SAV2 sav, string? rtcPath, DateTime now) => (int)(Seconds(sav, rtcPath, now) / 86400);
+
+    /// <summary>Gen 2's time as seconds since day 0: wStart* plus how long the cartridge clock has run.</summary>
+    private static long Seconds(SAV2 sav, string? rtcPath, DateTime now)
+    {
+        int o = StartOffset(sav);
+        long elapsed = Math.Max(0, ToUnix(now) - (ReadBaseTime(rtcPath) ?? ToUnix(now)));
+        return sav.Data[o + 3] + 60L * (sav.Data[o + 2] + 60L * (sav.Data[o + 1] + 24L * sav.Data[o])) + elapsed;
     }
 
     /// <summary>Where wStartDay is: after the player's ID and five names (6 bytes each in Japanese games).</summary>

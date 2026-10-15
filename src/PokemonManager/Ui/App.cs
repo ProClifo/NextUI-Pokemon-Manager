@@ -343,6 +343,9 @@ public sealed class App
                 actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
             else if (tickets.Count > 1)
                 actions.Add(("Mystery Gift", null, () => EventsMenu(entry, tickets)));
+            // Gold/Silver/Crystal's daily Mystery Gift: once unlocked in Goldenrod, and only while today's five are left
+            if (sav is SAV2 gsc && MysteryGift2.Left(gsc, GiftDay(entry)) > 0)
+                actions.Add(("Mystery Gift", null, () => DailyMysteryGift(entry)));
             // Gen 1/2's event-only Pokémon get their own entries (Gen 1/2's other distributions are in the Gallery):
             // Mew in Gen 1 (and Korean Gen 2, which can't link with Gen 1), Celebi in Gen 2 outside Japan, where the
             // GS Ball never ran on cartridges.
@@ -1715,6 +1718,25 @@ public sealed class App
         sav.EnableGSBallMobileEvent();
         if (ConfirmStateLoss(entry) && TryWrite(entry, out _))
             _ui.Message("The GS BALL event has been enabled!");
+    }
+
+    /// <summary>The game day Gen 2's Mystery Gift counts its five a day by (its own clock, not the device's).</summary>
+    private int GiftDay(SaveEntry entry) => GameClock.Day((SAV2)entry.Sav, RtcPath(entry), ClockNow(entry.Sav));
+
+    private void DailyMysteryGift(SaveEntry entry)
+    {
+        if (entry.Sav is not SAV2 sav || !_ui.Confirm("Inject daily Mystery Gifts?"))
+            return;
+        var items = MysteryGift2.Receive(sav, GiftDay(entry), Random.Shared);
+        if (items is null)
+        {
+            _ui.Message("There's no room for the gifts in the bag or the PC.");
+            return;
+        }
+        if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
+            return;
+        var names = GameInfo.GetStrings("en").GetItemStrings(EntityContext.Gen2);
+        _ui.Message("Mystery Gifts received:\n\n" + string.Join("\n", items.Select(i => $"• {names[i]}")));
     }
 
     // ---------------------------------------------------------------- files
