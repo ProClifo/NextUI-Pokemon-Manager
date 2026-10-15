@@ -1915,7 +1915,7 @@ public sealed class App
             "its save afterwards. Settings > Save State Backup moves the state to Backups for you."),
         ("Where are my backups?",
             "Before every change, the save is copied to PokemonManager/Backups on the SD card, in a folder for each " +
-            "game, trainer and ID. The last 999 are kept.\n\nTo go back, copy a backup over the save in the Saves " +
+            "game, trainer and ID, which keeps the last 32 saves and the last 32 save states.\n\nTo go back, copy a backup over the save in the Saves " +
             "folder, renamed to the save's own name."),
         ("How do I update Pokémon Manager?",
             "With Wi-Fi on, the pak checks for a new version when it starts and offers to install it. You can also " +

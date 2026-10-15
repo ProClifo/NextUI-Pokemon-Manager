@@ -16,7 +16,7 @@ A tool pak for NextUI handhelds that lets you manage your Pokémon save files ri
 - **Event Pokémon.** A Distributions menu offers the event-only Pokémon your game can't get any other way, generated fresh for your save. The full Project Pokémon [Events Gallery](https://github.com/projectpokemon/EventsGallery) is built in too.
 - **Your game's own PC.** Browse your boxes on a PC screen drawn like the game's, with its summary pages, sprites and fonts.
 - **Clock and Trainer Card.** Set the in-game clock for Gold/Silver/Crystal and Ruby/Sapphire/Emerald, and view your Trainer Card.
-- **Automatic backups** before every change, in `PokemonManager/Backups`.
+- **Automatic backups** before every change, in `PokemonManager/Backups`: the last 32 saves and 32 save states for each game.
 
 Each event shows whether it's **✅ Legal** or **☠️ Illegal** according to PKHeX's legality check.
 

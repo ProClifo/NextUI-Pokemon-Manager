@@ -99,5 +99,8 @@ public sealed class SaveStatesTests : IDisposable
             SaveStates.MoveSelected(_sd, roms, rom, new SaveStates.Backup(backups, "Pokemon Gold", $"20261015-2115{i:00}"));
         }
         Assert.Equal(SaveStates.BackupsToKeep, Directory.GetFiles(backups, "Pokemon Gold.*.st0").Length);
+        Assert.Equal(32, SaveStates.BackupsToKeep);
+        // their slot files go with them; a save backup beside them is left to the save's own limit
+        Assert.Equal(SaveStates.BackupsToKeep, Directory.GetFiles(backups, "Pokemon Gold.*.txt").Length);
     }
 }

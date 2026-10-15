@@ -10,8 +10,8 @@ public static class SaveStates
 {
     private const int AutoResumeSlot = 9;
 
-    /// <summary>How many backups of each state file are kept: states are bigger than saves (a DS state ~10 MB).</summary>
-    public const int BackupsToKeep = 10;
+    /// <summary>How many save states each backup folder keeps (with their previews and slot files).</summary>
+    public const int BackupsToKeep = 32;
 
     /// <summary>
     /// Where moved-away states go, named like the save's backup made with the same change: "&lt;Name&gt;.&lt;Stamp&gt;" plus
@@ -96,8 +96,7 @@ public static class SaveStates
 
     /// <summary>
     /// Moves a state file into the save's backup folder as "&lt;Name&gt;.&lt;Stamp&gt;&lt;ending&gt;", keeping the newest
-    /// <see cref="BackupsToKeep"/> with that ending. If it can't be moved it's deleted, so the game still can't
-    /// resume it.
+    /// <see cref="BackupsToKeep"/> states there. If it can't be moved it's deleted, so the game still can't resume it.
     /// </summary>
     private static bool Stash(string file, string ending, Backup backup)
     {
@@ -108,7 +107,7 @@ public static class SaveStates
             for (int i = 1; File.Exists(dest); i++)
                 dest = Path.Combine(backup.Dir, $"{backup.Name}.{backup.Stamp}-{i}{ending}");
             File.Move(file, dest);
-            Prune(backup.Dir, backup.Name, ending);
+            Prune(backup.Dir, backup.Name);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -127,18 +126,29 @@ public static class SaveStates
         }
     }
 
-    private static void Prune(string dir, string name, string ext)
+    private static readonly System.Text.RegularExpressions.Regex StateEnding = new(@"^\.(st\d+|state(\..+)?|dss)$");
+    private static readonly System.Text.RegularExpressions.Regex CompanionEnding = new(@"^\.(txt|\d+\.bmp)$");
+
+    /// <summary>
+    /// Keeps the newest <see cref="BackupsToKeep"/> save states in the folder: older ones go with the preview and
+    /// slot file moved with them (same stamp). The save backups beside them are pruned on their own.
+    /// </summary>
+    private static void Prune(string dir, string name)
     {
         var own = new System.Text.RegularExpressions.Regex(
-            $@"^{System.Text.RegularExpressions.Regex.Escape(name)}\.\d{{8}}-\d{{6}}(-\d+)?{System.Text.RegularExpressions.Regex.Escape(ext)}$");
-        var old = Directory.GetFiles(dir, $"{name}.*{ext}")
-            .Where(f => own.IsMatch(Path.GetFileName(f)))
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .ThenByDescending(f => f, StringComparer.Ordinal)
-            .Skip(BackupsToKeep);
-        foreach (var f in old)
+            $@"^{System.Text.RegularExpressions.Regex.Escape(name)}\.(?<stamp>\d{{8}}-\d{{6}}(-\d+)?)(?<end>\..+)$");
+        var files = Directory.GetFiles(dir, $"{name}.*")
+            .Select(f => (Path: f, Match: own.Match(Path.GetFileName(f))))
+            .Where(f => f.Match.Success)
+            .Select(f => (f.Path, Stamp: f.Match.Groups["stamp"].Value, End: f.Match.Groups["end"].Value))
+            .ToList();
+        var old = files.Where(f => StateEnding.IsMatch(f.End)).Select(f => f.Stamp).Distinct()
+            .OrderByDescending(t => t, StringComparer.Ordinal)
+            .Skip(BackupsToKeep)
+            .ToHashSet();
+        foreach (var f in files.Where(f => old.Contains(f.Stamp) && (StateEnding.IsMatch(f.End) || CompanionEnding.IsMatch(f.End))))
         {
-            try { File.Delete(f); }
+            try { File.Delete(f.Path); }
             catch (IOException) { /* best effort */ }
         }
     }

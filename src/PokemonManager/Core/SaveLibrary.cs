@@ -26,7 +26,7 @@ public sealed class SaveEntry(string path, SaveFile sav)
 /// <summary>
 /// Finds, loads and writes save files. Every write is preceded by a timestamped backup.
 /// </summary>
-public sealed class SaveLibrary(string backupDir, int backupsToKeep = 999)
+public sealed class SaveLibrary(string backupDir, int backupsToKeep = 32)
 {
     // Extensions used by the emulators NextUI ships (gpSP/mGBA/Gambatte/DraStic) and common dumps.
     private static readonly HashSet<string> SaveExtensions = new(StringComparer.OrdinalIgnoreCase)
