@@ -1731,7 +1731,7 @@ public sealed class App
         // no question when the game would turn the gift down, just its reason, checked in its order (DoMysteryGift)
         if (MysteryGift2.Left(sav, GiftDay(entry)) == 0)
         {
-            _ui.Message("Sorry--only five\ngifts a day.");
+            _ui.Message("Sorry—only five\ngifts a day.");
             return;
         }
         if (MysteryGift2.ItemWaiting(sav))
