@@ -1736,7 +1736,8 @@ public sealed class App
         if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
             return;
         // a decoration goes to the PC, as the game says: "<decoration> was sent home."
-        _ui.Message("Mystery Gifts received:\n\n" + string.Join("\n", gifts.Select(g => g.Decoration ? $"• {g.Name} (sent home)" : $"• {g.Name}")));
+        // six lines: the message screen's limit on the 640x480 devices (MAIN_ROW_COUNT), so no blank line
+        _ui.Message("Mystery Gifts received:\n" + string.Join("\n", gifts.Select(g => g.Decoration ? $"• {g.Name} (sent home)" : $"• {g.Name}")));
     }
 
     // ---------------------------------------------------------------- files
