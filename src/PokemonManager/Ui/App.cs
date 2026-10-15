@@ -1312,6 +1312,8 @@ public sealed class App
             SAV4DP => "dp",
             SAV4Pt => "pt",
             SAV4HGSS => "hgss",
+            SAV5B2W2 => "b2w2",
+            SAV5 => "bw",
             _ => null,
         };
         if (set is null)

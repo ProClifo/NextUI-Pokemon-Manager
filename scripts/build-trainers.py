@@ -11,7 +11,9 @@ four frames of the same size side by side, which the patched minui-list plays on
 
 Sets: rb, y, gs (Gold/Silver have only a boy), c, rs (Ruby/Sapphire's Brendan and May, which Emerald keeps),
 e, frlg (Red and Leaf), dp (Diamond/Pearl's outfits, which Platinum keeps), pt and hgss (Ethan and Lyra, decoded
-from HeartGold's DS textures). Black/White have no decompilation to take sprites from. Requires Pillow.
+from HeartGold's DS textures), bw (Hilbert and Hilda) and b2w2 (Nate and Rosa), which have no decompilation: they're
+cut from the ripped sheets in assets/gen5/trainers (Black/White by Barubary, Nate by Dazz, Rosa by redblueyellow).
+Requires Pillow.
 """
 import os
 import re
@@ -115,6 +117,21 @@ def nsbtx_frame(path, texture):
     return out
 
 
+def gen5_sheet(path, origin, pitch, backgrounds):
+    """A ripped Gen 5 walking block: 32x32 frames, 3 across (standing, a step, the other step), the second row facing
+    the camera; <backgrounds> are the sheet's background colours, made transparent."""
+    img = Image.open(path).convert("RGBA")
+
+    def frame(col):
+        x, y = origin[0] + col * pitch, origin[1] + pitch
+        part = img.crop((x, y, x + 32, y + 32))
+        part.putdata([(0, 0, 0, 0) if p[:3] in backgrounds else p for p in part.get_flattened_data()])
+        return part
+
+    stand, step, other = frame(0), frame(1), frame(2)
+    return stand, [step, stand, other, stand]
+
+
 def save(out_dir, name, frames):
     """The still and walking sprites, all cropped to the box that holds every frame so they line up."""
     stand, walk = frames
@@ -159,6 +176,13 @@ def main():
     for name, file, texture in (("hgss-m", "mmodel_00000069.NSBTX", "hero"), ("hgss-f", "mmodel_00000070.NSBTX", "heroine")):  # MMODEL_HERO(INE)
         frames = [nsbtx_frame(os.path.join(mmodel, file), f"{texture}.{i}") for i in (6, 5, 8, 7)]
         save(out, name, (frames[1], frames))
+    gen5 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "gen5", "trainers")
+    bw = os.path.join(gen5, "bw.png")
+    save(out, "bw-m", gen5_sheet(bw, (4, 4), 32, {(88, 144, 88)}))
+    save(out, "bw-f", gen5_sheet(bw, (4, 144), 32, {(56, 144, 88)}))
+    for name in ("b2w2-m", "b2w2-f"):
+        # 32x32 cells between 1 px grid lines
+        save(out, name, gen5_sheet(os.path.join(gen5, f"{name}.png"), (1, 1), 33, {(255, 0, 255), (1, 255, 0)}))
     if len(sys.argv) > 3:
         preview = Image.new("RGBA", (len(STORE) * 36, 40), (90, 120, 90, 255))
         for i, img in enumerate(STORE.values()):

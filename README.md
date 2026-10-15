@@ -67,7 +67,7 @@ Saves from ROM hacks, translations and other modified ROMs go in a separate **Ot
 - [NextUI](https://github.com/LoveRetro/NextUI), and [minui-list / minui-presenter](https://github.com/josegonzalez) by Jose Diaz-Gonzalez
 - [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery) for the event files
 - The [pret](https://github.com/pret) decompilations, for the game art, fonts and game data
-- Gen 5 sprites from [The Spriters Resource](https://www.spriters-resource.com/), box icons ripped by Ploaj, Black/White wallpapers ripped by Barubary
+- Gen 5 sprites from [The Spriters Resource](https://www.spriters-resource.com/), box icons ripped by Ploaj, Black/White wallpapers and player sprites ripped by Barubary, Black 2/White 2 player sprites by Dazz and redblueyellow
 - The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event formats
 - ROM checksums from [No-Intro](https://no-intro.org), and ✅/☠️ icons from Google's [Noto Emoji](https://github.com/googlefonts/noto-emoji)
 
