@@ -67,7 +67,17 @@ typedef struct
     bool can_evolve;
     char *transfer_why; // why Transfer/Evolve can't be used, shown when the greyed-out item is picked
     char *evolve_why;
+    bool can_trade;     // trade mode: TRADE is offered (the partner species only)
+    char *trade_why;
 } Slot;
+
+// Trade mode (the scene's "trade"): another game's storage to pick a Karrablast/Shelmet partner from. Its menu is
+// TRADE / CANCEL, and the message box says "<icon> trade for Shelmet" while nothing else is shown there.
+static bool trade_mode = false;
+static char *trade_header = NULL;
+static Slot trade_icon;
+// After that trade, the partner's evolved Pokémon beside ours on the evolution screen (the scene's "evolved_with").
+static Slot evolved_with;
 
 typedef struct
 {
@@ -249,7 +259,25 @@ static bool load_scene(const char *path, Scene *scene)
             slot->can_evolve = json_object_get_boolean(so, "can_evolve") != 0;
             slot->transfer_why = dup_string(so, "transfer_why");
             slot->evolve_why = dup_string(so, "evolve_why");
+            slot->can_trade = json_object_get_boolean(so, "can_trade") == 1;
+            slot->trade_why = dup_string(so, "trade_why");
         }
+    }
+    JSON_Object *trade = json_object_get_object(obj, "trade");
+    if (trade)
+    {
+        trade_mode = true;
+        trade_header = dup_string(trade, "header");
+        trade_icon.icon = dup_string(trade, "icon");
+        trade_icon.icon_rect = get_rect(trade, "icon_rect");
+        trade_icon.filled = trade_icon.icon != NULL;
+    }
+    JSON_Object *with = json_object_get_object(obj, "evolved_with");
+    if (with)
+    {
+        evolved_with.sprite = dup_string(with, "sprite");
+        evolved_with.sprite_rect = get_rect(with, "sprite_rect");
+        evolved_with.filled = evolved_with.sprite != NULL;
     }
     if (scene->box < 0 || scene->box >= scene->box_count)
         scene->box = 1;
@@ -805,6 +833,27 @@ static void draw_message(SDL_Surface *screen, Scene *scene, const Layout *l, con
     active_font = font_before;
 }
 
+static void draw_icon(SDL_Surface *screen, const Layout *l, Slot *slot, int x, int y, bool animate, Uint32 ticks);
+
+// Trade mode's message box: the traded Pokémon's icon, then "trade for Shelmet".
+static void draw_trade_header(SDL_Surface *screen, Scene *scene, const Layout *l)
+{
+    JSON_Object *lo = scene->layout;
+    SDL_Rect m = get_rect(lo, "pc.message"), mt = get_rect(lo, "pc.message_text");
+    SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
+    int font_before = use_font(json_object_dotget_string(lo, "pc.message_font"));
+    draw_window(screen, scene, l, message_frame(scene), m.x, m.y, m.w, m.h);
+    int tx = m.x + mt.x;
+    if (trade_icon.filled)
+    {
+        // the 32x32 icon's Pokémon sits in its lower part: centred on the text line
+        draw_icon(screen, l, &trade_icon, tx - 6, m.y + mt.y + 8 - 22, false, 0);
+        tx += 24;
+    }
+    draw_text_c(screen, l, trade_header, tx, m.y + mt.y, 0, color, shadow);
+    active_font = font_before;
+}
+
 typedef enum
 {
     TARGET_SLOT,
@@ -849,14 +898,31 @@ static const char *ui_string(const char *key, int index, const char *fallback)
 }
 #define MENU_COUNT 4
 
+// The menu's items: TRANSFER / SUMMARY / EVOLVE / CANCEL, or TRADE / CANCEL in trade mode.
+static int menu_count(void)
+{
+    return trade_mode ? 2 : MENU_COUNT;
+}
+
+static const char *menu_label(int item)
+{
+    if (trade_mode)
+        return item == 0 ? ui_string("trade", -1, "TRADE") : ui_string("menu", 3, "CANCEL");
+    return ui_string("menu", item, MENU_ITEMS[item]);
+}
+
 // Transfer and Evolve are greyed out when the Pokémon can't be transferred or evolved; picking them explains why.
 static bool menu_enabled(Slot *slot, int item)
 {
+    if (trade_mode)
+        return item == 0 ? slot->can_trade : true;
     return item == 0 ? slot->can_transfer : item == 2 ? slot->can_evolve : true;
 }
 
 static const char *menu_why(Slot *slot, int item)
 {
+    if (trade_mode)
+        return slot->trade_why ? slot->trade_why : "It can't be traded!";
     if (item == 0)
         return slot->transfer_why ? slot->transfer_why : "It can't be transferred!";
     return slot->evolve_why ? slot->evolve_why : "It can't evolve by trading!";
@@ -1175,22 +1241,22 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
         int menu_font_before = use_font(json_object_dotget_string(lo, "pc.menu.font"));
         SDL_Color color = get_color(lo, "pc.menu.color", text_color), shadow = get_color(lo, "pc.menu.shadow", text_shadow);
         int widest = 0;
-        for (int i = 0; i < MENU_COUNT; i++)
+        for (int i = 0; i < menu_count(); i++)
         {
-            int tw = text_width(ui_string("menu", i, MENU_ITEMS[i]), l);
+            int tw = text_width(menu_label(i), l);
             if (tw > widest)
                 widest = tw;
         }
-        int w = ((widest + 7) / 8 + 2) * 8, h = MENU_COUNT * line;
+        int w = ((widest + 7) / 8 + 2) * 8, h = menu_count() * line;
         int x = get_int(lo, "pc.menu.right", 232) - w, y = get_int(lo, "pc.menu.bottom", 120) - h;
         draw_window(screen, scene, l, NULL, x, y, w, h);
-        for (int i = 0; i < MENU_COUNT; i++)
+        for (int i = 0; i < menu_count(); i++)
         {
             int ty = y + text_y + i * line;
             if (menu_enabled(cur, i))
-                draw_text_c(screen, l, ui_string("menu", i, MENU_ITEMS[i]), x + text_x, ty, 0, color, shadow);
+                draw_text_c(screen, l, menu_label(i), x + text_x, ty, 0, color, shadow);
             else
-                draw_text_c(screen, l, ui_string("menu", i, MENU_ITEMS[i]), x + text_x, ty, 0, (SDL_Color){176, 176, 176, 255}, (SDL_Color){224, 224, 224, 255});
+                draw_text_c(screen, l, menu_label(i), x + text_x, ty, 0, (SDL_Color){176, 176, 176, 255}, (SDL_Color){224, 224, 224, 255});
             if (i != st->menu_item)
                 continue;
             SDL_Surface *arrow = skin_image(scene, "cursor_menu.png");
@@ -1252,6 +1318,8 @@ static void draw_pc(SDL_Surface *screen, Scene *scene, State *st, const Layout *
     }
     else if (st->message)
         draw_message(screen, scene, l, st->message);
+    else if (trade_mode && trade_header && (st->mode == VIEW_BOX || st->mode == VIEW_PARTY))
+        draw_trade_header(screen, scene, l);
 }
 
 // The skin's own screen after an evolution (scripts/pc_ui/evolution.py): its background, the Pokémon where the
@@ -1276,7 +1344,14 @@ static void draw_evolved_screen(SDL_Surface *screen, Scene *scene, State *st, co
     JSON_Array *sp = json_object_get_array(ev, "sprite");
     Slot *cur = hovered(scene, st);
     if (cur && cur->filled && sp)
-        draw_sprite(screen, l, cur, (int)json_array_get_number(sp, 0), (int)json_array_get_number(sp, 1), false, get_int(lo, "sprite_size", 64));
+    {
+        int size = get_int(lo, "sprite_size", 64), cx = (int)json_array_get_number(sp, 0), cy = (int)json_array_get_number(sp, 1);
+        // after a Karrablast/Shelmet trade both evolved Pokémon stand side by side, ours on the left
+        int apart = evolved_with.filled ? size * 3 / 5 : 0;
+        draw_sprite(screen, l, cur, cx - apart, cy, false, size);
+        if (evolved_with.filled)
+            draw_sprite(screen, l, &evolved_with, cx + apart, cy, false, size);
+    }
     char lines[8][160];
     int n = evolved_lines(scene, st, l, lines), per = get_int(ev, "lines", 2), lh = get_int(ev, "line_height", 16);
     JSON_Array *at = json_object_get_array(ev, "text");
@@ -1318,7 +1393,12 @@ static void draw_evolved(SDL_Surface *screen, Scene *scene, State *st, const Lay
     int h = pad + n * 16, y = logical_h - 4 - h;
     Slot *cur = hovered(scene, st);
     if (cur && cur->filled)
-        draw_sprite(screen, l, cur, logical_w / 2, y / 2 + 4, false, get_int(lo, "sprite_size", 64));
+    {
+        int size = get_int(lo, "sprite_size", 64), apart = evolved_with.filled ? size * 3 / 5 : 0;
+        draw_sprite(screen, l, cur, logical_w / 2 - apart, y / 2 + 4, false, size);
+        if (evolved_with.filled)
+            draw_sprite(screen, l, &evolved_with, logical_w / 2 + apart, y / 2 + 4, false, size);
+    }
     draw_window(screen, scene, l, message_frame(scene), 4, y, w, h);
     for (int i = 0; i < n; i++)
         draw_text_c(screen, l, lines[i], 4 + mt.x, y + mt.y + i * 16, 0, color, shadow);
@@ -1942,6 +2022,24 @@ int main(int argc, char *argv[])
                 action = "evolve";
                 exit_code = EXIT_PICKED;
                 quitting = true;
+            }
+            else if (a || b)
+                st.mode = st.menu_from;
+        }
+        else if (st.mode == VIEW_MENU && trade_mode)
+        {
+            if (dy)
+                st.menu_item = 1 - st.menu_item;
+            else if (a && st.menu_item == 0 && menu_enabled(hovered(&scene, &st), 0))
+            {
+                action = "trade";
+                exit_code = EXIT_PICKED;
+                quitting = true;
+            }
+            else if (a && st.menu_item == 0)
+            {
+                st.message = menu_why(hovered(&scene, &st), 0);
+                st.mode = st.menu_from;
             }
             else if (a || b)
                 st.mode = st.menu_from;

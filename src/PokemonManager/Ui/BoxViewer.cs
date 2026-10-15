@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using PKHeX.Core;
 using PokemonManager.Core;
 
@@ -15,12 +16,13 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
 
     /// <summary>What the player chose on the PC screen: Transfer or Evolve on a Pokémon (Summary is shown by
     /// the viewer itself), leaving it, or the viewer couldn't run.</summary>
-    public enum Outcome { Transfer, Evolve, Back, Unavailable }
+    public enum Outcome { Transfer, Evolve, Trade, Back, Unavailable }
 
     public bool IsAvailable => scene.AssetsPresent && FindOnPath(Tool) is not null;
 
     public Outcome Pick(SaveFile sav, string title, ref SlotRef position, UiFont? font = null, UiFont? fallbackFont = null,
-        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null, string? language = null, string? evolved = null)
+        Func<SlotRef, (string? TransferBlocked, string? EvolveBlocked)>? actions = null, string? language = null, string? evolved = null,
+        Action<JsonObject>? decorate = null)
     {
         Directory.CreateDirectory(tempDir);
         var scenePath = Path.Combine(tempDir, "box-scene.json");
@@ -31,6 +33,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             // after an evolution, the viewer shows the evolved Pokémon with this text before the box
             if (evolved is not null)
                 built["evolved"] = evolved;
+            decorate?.Invoke(built);
             File.WriteAllText(scenePath, built.ToJsonString());
             File.Delete(outPath);
         }
@@ -71,8 +74,9 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
                 {
                     using var doc = JsonDocument.Parse(File.ReadAllText(outPath));
                     position = BoxScene.FromViewer(doc.RootElement.GetProperty("box").GetInt32(), doc.RootElement.GetProperty("slot").GetInt32());
-                    return doc.RootElement.TryGetProperty("action", out var action) && action.GetString() == "evolve"
-                        ? Outcome.Evolve : Outcome.Transfer;
+                    return doc.RootElement.TryGetProperty("action", out var action)
+                        ? action.GetString() switch { "evolve" => Outcome.Evolve, "trade" => Outcome.Trade, _ => Outcome.Transfer }
+                        : Outcome.Transfer;
                 }
                 catch (Exception)
                 {
@@ -155,6 +159,18 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
     public BoxScene.ArtImage? Icon(SaveFile sav, PKM pk)
         => scene.Icon(pk, BoxScene.ArtSets(sav), sav is SAV3FRLG { Version: GameVersion.LG }) is { } icon && File.Exists(icon.Sheet)
             ? icon with { H = 32 } : null;
+
+    /// <summary>A Pokémon's box icon for the viewer's scene ({"icon", "icon_rect"}), if the pak has it.</summary>
+    public JsonObject? IconJson(SaveFile sav, PKM pk)
+        => Icon(sav, pk) is { } icon
+            ? new JsonObject { ["icon"] = icon.Sheet, ["icon_rect"] = new JsonArray(icon.X, icon.Y, icon.W, icon.H) }
+            : null;
+
+    /// <summary>A Pokémon's front sprite for the viewer's scene ({"sprite", "sprite_rect"}), if the pak has it.</summary>
+    public JsonObject? SpriteJson(SaveFile sav, PKM pk)
+        => scene.Sprite(pk, BoxScene.ArtSets(sav), sav is SAV3FRLG { Version: GameVersion.LG }) is { } sprite && File.Exists(sprite.Sheet)
+            ? new JsonObject { ["sprite"] = sprite.Sheet, ["sprite_rect"] = new JsonArray(sprite.X, sprite.Y, sprite.W, sprite.H) }
+            : null;
 
     /// <summary>
     /// <paramref name="background"/> (or black) with the Pokémon's front sprite above the middle, for a message

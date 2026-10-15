@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using PKHeX.Core;
 using PokemonManager.Core;
 using PokemonManager.Gen3;
@@ -38,6 +39,8 @@ public sealed class App
     private readonly Dictionary<string, List<TicketChoice>> _tickets = new();
     private readonly GalleryArchive _gallery;
     private readonly UiFont? _nextFont;
+    /// <summary>After a Karrablast/Shelmet trade: the partner's evolved Pokémon, shown beside ours on the evolution screen.</summary>
+    private JsonObject? _evolvedWith;
     private readonly UiFont? _ogFont;
     private readonly int _uiScale;
 
@@ -643,9 +646,12 @@ public sealed class App
             string? evolved = null;
             while (true)
             {
+                var with = _evolvedWith;
                 var outcome = _boxViewer.Pick(entry.Sav, entry.Label, ref position, _ogFont, _nextFont, ActionsFor(entry),
-                    ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, evolved);
+                    ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, evolved,
+                    with is null ? null : scene => scene["evolved_with"] = with.DeepClone());
                 evolved = null;
+                _evolvedWith = null;
                 _boxPositions[entry.Path] = position;
                 if (outcome == BoxViewer.Outcome.Back)
                     return;
@@ -733,7 +739,6 @@ public sealed class App
     {
         var others = GetSaves().Where(s => s.Path != entry.Path).ToList();
         var accepted = new Dictionary<(ushort, byte, bool, bool, int, GameVersion, (ushort, ushort, ushort, ushort)), bool>();
-        var partners = new Dictionary<ushort, bool>(); // Karrablast/Shelmet: is the other one in some save?
         return slot =>
         {
             var pk = slot.Get(entry.Sav);
@@ -746,9 +751,8 @@ public sealed class App
                 ?? (move.Ok ? null : slot.IsParty && entry.Sav.PartyCount <= 1 ? ActionReasons.LastPartyPokemon
                     : move.Message.Contains("last party", StringComparison.Ordinal) ? ActionReasons.LastPartyPokemon : ActionReasons.CantBeMoved)
                 ?? (others.Count == 0 ? ActionReasons.NoOtherGames : anywhere ? null : ActionReasons.NoGamesToSendTo);
-            if (PartnerTrade.Applies(pk) && !partners.ContainsKey(pk.Species))
-                partners[pk.Species] = PartnerTrade.Find(pk, others).Count > 0;
-            string? evolve = ActionReasons.Evolve(pk, partners.GetValueOrDefault(pk.Species))
+            // Karrablast/Shelmet: always offered; the trade partner is picked from the other games after YES
+            string? evolve = ActionReasons.Evolve(pk, partnerAvailable: true)
                 ?? (slot.IsParty ? ActionReasons.PartyTrade(entry.Sav, pk, evolve: true) : null);
             return (transfer, evolve);
         };
@@ -782,8 +786,7 @@ public sealed class App
     private bool CanEvolve(SaveEntry entry, SlotRef slot)
     {
         var pk = slot.Get(entry.Sav);
-        bool partner = PartnerTrade.Applies(pk) && PartnerTrade.Find(pk, GetSaves().Where(s => s.Path != entry.Path)).Count > 0;
-        return ActionReasons.Evolve(pk, partner) is null && !(slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null);
+        return ActionReasons.Evolve(pk, partnerAvailable: true) is null && !(slot.IsParty && TradeLocation.PartyTradeBlocked(entry.Sav, pk) is not null);
     }
 
     /// <summary>A question in lines the highlight skips, then YES / NO with NO highlighted. True for YES.</summary>
@@ -1072,7 +1075,7 @@ public sealed class App
             return false;
         var pk = slot.Get(entry.Sav);
         if (PartnerTrade.Applies(pk))
-            return PartnerTradeFlow(entry, slot, pk);
+            return PartnerTradeFlow(entry, slot, pk, confirmed, out evolvedText);
         // Only evolutions a real trade would trigger: Onix must hold the Metal Coat to become Steelix.
         var options = TradeEvolution.GetOptions(pk).Where(o => o.ConditionsMet).ToList();
         if (options.Count == 0 || TradeEvolution.HoldsEverstone(pk))
@@ -1114,36 +1117,105 @@ public sealed class App
     }
 
     /// <summary>
-    /// Karrablast/Shelmet: pick the other one from another Gen 5 save, then trade them so both evolve.
-    /// Returns true when the slot now holds a different Pokémon.
+    /// Karrablast/Shelmet: pick a game with the other one ("trade for Shelmet"), then the Pokémon in its storage
+    /// (only the partner species can be traded), and both are traded and evolve. Returns true when the slot now holds
+    /// a different Pokémon; <paramref name="evolvedText"/> is "Congratulations! Your Pokémon evolved into ...!" for
+    /// the viewer, which shows both evolved Pokémon (<see cref="_evolvedWith"/>).
     /// </summary>
-    private bool PartnerTradeFlow(SaveEntry entry, SlotRef slot, PKM pk)
+    private bool PartnerTradeFlow(SaveEntry entry, SlotRef slot, PKM pk, bool confirmed, out string? evolvedText)
     {
-        if (TradeEvolution.HoldsEverstone(pk))
+        evolvedText = null;
+        if (ActionReasons.Evolve(pk, partnerAvailable: true) is { } blocked)
+        {
+            _ui.Message(blocked);
             return false;
-        var partners = PartnerTrade.Find(pk, GetSaves().Where(s => s.Path != entry.Path));
+        }
+        if (!confirmed && !_ui.Confirm(UiStrings.EvolveQuestion("en", pk.Nickname), "YES", "NO"))
+            return false;
         var wanted = Names.Species((ushort)PartnerTrade.PartnerSpecies(pk));
+        var partners = PartnerTrade.Find(pk, GetSaves().Where(s => s.Path != entry.Path));
         if (partners.Count == 0)
         {
-            _ui.Message($"{Names.Species(pk)} evolves only when traded for {wanted}, and no other Black/White save has one to trade.");
+            _ui.Message(ActionReasons.Evolve(pk) ?? $"No {wanted} to trade with!");
             return false;
         }
-        var partner = partners[0];
-        if (partners.Count > 1)
+        var games = partners.Select(p => p.Save).DistinctBy(s => s.Path).ToList();
+        var header = $"trade for {wanted}";
+        var icon = _boxViewer.Icon(entry.Sav, pk);
+        var sprites = games.Select(s => TrainerSprite(s.Sav)).ToList();
+        var tags = games.Select((s, i) => (string?)TrainerTag(s.Sav, sprites[i] is not null)).ToList();
+        int selected = 0;
+        while (true)
         {
-            var labels = partners.Select(p => $"{SaveName(p.Save)} {p.Save.Sav.OT}: {Names.Summary(p.Pokemon)} ({p.Slot.Describe(p.Save.Sav)})").ToList();
-            var pick = _ui.Choose($"Trade for which {wanted}?", labels);
-            if (pick is null)
+            var choice = _ui.Choose(icon is null ? header : "\t\t" + header, games.Select(SaveName).ToList(), selected, tags: tags, images: sprites,
+                icons: games.Select(CartridgeIcon).ToList(), titleImage: icon?.Sheet, titleImageRect: icon is null ? null : (icon.X, icon.Y, icon.W, icon.H));
+            if (choice is null)
                 return false;
-            partner = partners[pick.Value];
+            selected = choice.Value;
+            var game = games[selected];
+            var inGame = partners.Where(p => p.Save.Path == game.Path).ToList();
+            var partner = PickPartner(game, inGame, pk, entry, header, icon);
+            if (partner is null)
+                continue;
+            return CompleteTrade(entry, slot, pk, partner, confirmed, out evolvedText);
         }
+    }
 
-        var mineEvolves = Names.Species(TradeEvolution.GetOptions(pk).First(o => o.Method == EvolutionType.TradeShelmetKarrablast).Species);
-        var theirsEvolves = Names.Species(TradeEvolution.GetOptions(partner.Pokemon).First(o => o.Method == EvolutionType.TradeShelmetKarrablast).Species);
-        if (!_ui.Confirm($"Trade {Names.Summary(pk)} for {Names.Summary(partner.Pokemon)} from {SaveName(partner.Save)} ({partner.Save.Sav.OT})?\n\n" +
-                         $"{Names.Species(pk)} will evolve into {mineEvolves}, and {wanted} into {theirsEvolves}.", "TRADE", "CANCEL"))
-            return false;
+    /// <summary>
+    /// The partner in <paramref name="game"/>'s storage: the PC screen with "trade for ..." in its message box and only
+    /// TRADE / CANCEL in its menu (TRADE only on the partner species), or a list of them. Null for back.
+    /// </summary>
+    private PartnerTrade.Partner? PickPartner(SaveEntry game, List<PartnerTrade.Partner> partners, PKM pk, SaveEntry entry, string header,
+        BoxScene.ArtImage? icon)
+    {
+        if (_settings.PcBoxView && _boxViewer.IsAvailable)
+        {
+            var position = partners[0].Slot;
+            var iconJson = _boxViewer.IconJson(entry.Sav, pk);
+            var tradable = partners.Select(p => BoxScene.ToViewer(p.Slot)).ToHashSet();
+            var notThis = $"Only {Names.Species((ushort)PartnerTrade.PartnerSpecies(pk))} can be traded!";
+            var outcome = _boxViewer.Pick(game.Sav, game.Label, ref position, _ogFont, _nextFont, null,
+                ProfileFor(game).ShownLanguage ?? ProfileFor(game).Language, decorate: scene =>
+                {
+                    var trade = new JsonObject { ["header"] = header };
+                    if (iconJson is not null)
+                    {
+                        trade["icon"] = iconJson["icon"]!.DeepClone();
+                        trade["icon_rect"] = iconJson["icon_rect"]!.DeepClone();
+                    }
+                    scene["trade"] = trade;
+                    var boxes = scene["boxes"]!.AsArray();
+                    for (int b = 0; b < boxes.Count; b++)
+                    {
+                        var slots = boxes[b]!["slots"]!.AsArray();
+                        for (int i = 0; i < slots.Count; i++)
+                        {
+                            if (slots[i] is not JsonObject so || !so.ContainsKey("name"))
+                                continue;
+                            bool can = tradable.Contains((b, i));
+                            so["can_trade"] = can;
+                            if (!can)
+                                so["trade_why"] = notThis;
+                        }
+                    }
+                });
+            if (outcome == BoxViewer.Outcome.Trade)
+                return partners.FirstOrDefault(p => p.Slot == position);
+            if (outcome != BoxViewer.Outcome.Unavailable)
+                return null;
+        }
+        if (partners.Count == 1)
+            return partners[0];
+        var labels = partners.Select(p => $"{Names.Summary(p.Pokemon)} ({p.Slot.Describe(p.Save.Sav)})").ToList();
+        var pick = _ui.Choose(icon is null ? header : "\t\t" + header, labels, titleImage: icon?.Sheet,
+            titleImageRect: icon is null ? null : (icon.X, icon.Y, icon.W, icon.H), confirmText: "TRADE");
+        return pick is { } c ? partners[c] : null;
+    }
 
+    /// <summary>Trades and evolves both, writes both saves (undoing the first if the second fails).</summary>
+    private bool CompleteTrade(SaveEntry entry, SlotRef slot, PKM pk, PartnerTrade.Partner partner, bool viewer, out string? evolvedText)
+    {
+        evolvedText = null;
         var result = PartnerTrade.Trade(entry, slot, partner, _settings.AllowIllegalTransfers);
         if (!result.Ok)
         {
@@ -1175,7 +1247,17 @@ public sealed class App
             }
             return false;
         }
-        _ui.Message($"{result.Message}\n\nBackups were saved to PokemonManager/Backups.\n{SaveStateWarning}");
+        Console.Error.WriteLine($"partner trade: {result.Message}");
+        // both evolved Pokémon, named as the game writes them: ours first
+        int gameLanguage = UiStrings.LanguageId(UiStrings.Code(ProfileFor(entry).ShownLanguage ?? ProfileFor(entry).Language, entry.Sav));
+        var mine = slot.Get(entry.Sav);
+        var theirs = partner.Slot.Get(partner.Save.Sav);
+        string Name(PKM p) => SpeciesName.GetSpeciesNameGeneration(p.Species, gameLanguage, entry.Sav.Generation);
+        evolvedText = $"Congratulations! Your Pokémon evolved into {Name(mine)} and {Name(theirs)}!";
+        if (viewer)
+            _evolvedWith = _boxViewer.SpriteJson(partner.Save.Sav, theirs);
+        else
+            _ui.Message(evolvedText);
         return true;
     }
 
