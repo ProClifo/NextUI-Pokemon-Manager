@@ -125,13 +125,13 @@ public sealed class BoxScene(string assetDir)
     public static SlotRef FromViewer(int box, int slot) => box == 0 ? SlotRef.Party(slot) : new SlotRef(box - 1, slot);
 
     /// <summary>
-    /// The box's own wallpaper in Gen 3 and Gen 4 saves (their skins have the game's wallpapers: Diamond/Pearl and
-    /// HeartGold/SoulSilver 24, Platinum 32); Black/White cycle through the first 16.
+    /// The box's own wallpaper (the skins have the game's wallpapers: Diamond/Pearl, HeartGold/SoulSilver and
+    /// Black/White 24, Platinum 32).
     /// </summary>
     private static int WallpaperFor(SaveFile sav, int box)
     {
-        int count = sav switch { SAV4Pt => 32, SAV4DP => 24, SAV4HGSS => 24, _ => WallpaperCount };
-        if (sav is (SAV3 or SAV4) and IBoxDetailWallpaper wallpapers)
+        int count = sav switch { SAV4Pt => 32, SAV4DP => 24, SAV4HGSS => 24, SAV5 => 24, _ => WallpaperCount };
+        if (sav is (SAV3 or SAV4 or SAV5) and IBoxDetailWallpaper wallpapers)
         {
             int id = wallpapers.GetBoxWallpaper(box);
             if (id >= 0 && id < count)
@@ -146,6 +146,10 @@ public sealed class BoxScene(string assetDir)
     /// </summary>
     private string Wallpaper(SaveFile sav, int id)
     {
+        // Black/White's own, in Platinum's frame (scripts/pc_ui/bw_wallpapers.py)
+        var bw = Path.Combine(Skin(sav), "wallpapers-bw", $"{id:00}.png");
+        if (sav is SAV5 && File.Exists(bw))
+            return bw;
         var own = Path.Combine(Skin(sav), "wallpapers", $"{id:00}.png");
         return File.Exists(own) ? own : Path.Combine(AssetDir, "wallpapers", $"{id:00}.png");
     }

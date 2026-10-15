@@ -403,6 +403,10 @@ def main():
     # Diamond/Pearl and Platinum (after Emerald, whose summary screen they borrow)
     from pc_ui import ds
     ds.build(decomp, out)
+    # Black/White's wallpapers in Platinum's frame (after ds, which makes Platinum's)
+    from pc_ui import bw_wallpapers
+    bw_wallpapers.build(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "gen5", "wallpapers.png"),
+                        os.path.join(out, "pt"))
     # The screens after an evolution (after ds, whose skins they add to)
     from pc_ui import evolution
     evolution.build(decomp, out)
