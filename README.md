@@ -1,229 +1,75 @@
 # Pokémon Manager for NextUI
 
-A NextUI tool pak, built on [PKHeX](https://github.com/kwsch/PKHeX), for editing Pokémon save files on your handheld:
+A tool pak for NextUI handhelds that lets you manage your Pokémon save files right on the device. It's built on [PKHeX](https://github.com/kwsch/PKHeX).
 
-- **Transfer Pokémon between games.** Transfer (move) a Pokémon from one save to another. PKHeX converts the data between generations (Gen 1↔2, Gen 1/2→7, 3→4→5→6→7→8...). Trade evolutions are done with *Evolve* in the PC, not on transfer.
-- **Trade evolutions.** Evolve Kadabra, Machoke, Graveler, Haunter, Onix + Metal Coat, Scyther + Metal Coat, Seadra + Dragon Scale, Clamperl, Boldore and the rest without a second console. Pick a Pokémon and choose *Evolve*.
-- **Mystery Gifts, Mystery Events and e-Reader cards**, from the built-in gallery:
-  - Gen 3: Wonder Cards (`.wc3`), Wonder News (`.wn3`), Mystery Events (`.me3`, e.g. the Eon Ticket e-Card), e-Card Trainers (`.ect`) and e-Reader Berries (`.ecb`). These are the formats of the PKHeX *WC3 plugin* and suloku's *Gen III Mystery Gift Tool*, and injection produces the same save data as WC3 plugin 2.6.0 (see below).
-  - Gen 4–7: Wonder Cards are placed in the in-game Mystery Gift album so you pick them up from the delivery person, as if you'd downloaded them (`.pgt .pcd .wc4 .pgf .wc6 .wc7 .wb7`...).
-  - Wonder Card Pokémon only arrive that way, from the delivery person, never straight into the PC.
-  - As in the games, a card that's already there, or that the game has a record of receiving (even if its card was thrown away since), is turned away ("This Wonder Card is already injected."), as is a ticket the game already has, and so is one for a full album ("Your Mystery Gift album is full.": 3 cards and 8 waiting gifts in Diamond/Pearl/Platinum and HeartGold/SoulSilver, 12 cards in Black/White). Throw a card away in-game to make room. FireRed/LeafGreen/Emerald's single Wonder Card slot just takes the new card.
-- **Event gallery built in.** The Gen 1–5 files of Project Pokémon's [EventsGallery](https://github.com/projectpokemon/EventsGallery) ship with the pak, filtered to the game and language of each save:
-  - **Mystery Gift**: every ticket the game has (Aurora Ticket, Mystic Ticket, Eon Ticket, Old Sea Map, Member Card, Oak's Letter, Secret Key, Azure Flute, Enigma Stone, Liberty Pass), marked Legal or Illegal, shown once the game's own Mystery Gift (Mystery Event in Ruby/Sapphire) is unlocked. A game with one event shows it directly: Ruby/Sapphire get *Eon Ticket*, Crystal *GS Ball*.
-  - **Mystery Gift** (Gold/Silver/Crystal): a random Mystery Gift, up to five a day (items wait at the Pokémon Center, decorations go home), drawn with the game's own odds, once the girl on the Goldenrod Dept. Store's 5th floor has unlocked it.
-  - **Distributions**: released distributions of Pokémon that can't be obtained legally any other way in that game's language, e.g. Wishmaker Jirachi, Ageto Celebi and Aura Mew in English Emerald.
-  - **Events Gallery**: every file for the game, in the gallery's own folders. Copies of the same distribution (same trainer, or same name once IDs, berries and the like in parentheses are dropped) are listed once and one is picked at random. A copy that happened to be shiny isn't listed separately, since every Pokémon is regenerated for the save; only distributions that were always shiny say "Shiny"; a folder with a single distribution shows it in the folder above instead.
-  - The highlighted item shows **✅ Legal** or **☠️ Illegal**.
-- **Automatic backups** before every change, in `PokemonManager/Backups`, one folder per save named after the game, trainer and ID (e.g. `Emerald - MAY - 12345`).
+<p>
+  <img src=".github/resources/screenshots/main_menu.jpg" width="32%" alt="Main menu">
+  <img src=".github/resources/screenshots/emerald_box.jpg" width="32%" alt="Emerald PC box">
+  <img src=".github/resources/screenshots/platinum_summary.jpg" width="32%" alt="Platinum summary">
+</p>
 
-> **Status:** public beta. Tested on real hardware on the Anbernic RG35XX SP (640×480), and covered by automated tests on generated saves. Other NextUI devices and screen sizes haven't been tried on hardware yet. Every change is backed up first, but keep your own backup of any save you care about, and please [report problems](https://github.com/ProClifo/NextUI-Pokemon-Manager/issues/new?template=bug_report.yml) with your device, game, language and pak version.
+## What it does
+
+- **Move Pokémon between your games**, from Red/Blue up to Black 2/White 2. By default it follows the same rules as trading in the real games.
+- **Trade evolutions without a second console.** Evolve Kadabra, Haunter, Onix with a Metal Coat and so on. Karrablast and Shelmet can be traded for each other between two of your Gen 5 saves.
+- **Mystery Gifts and events.** Get the event tickets (Eon Ticket, Aurora Ticket, Member Card…) and you collect them in-game, like the real thing. Gold/Silver/Crystal also get their daily Mystery Gift items and decorations.
+- **Event Pokémon.** A Distributions menu offers the event-only Pokémon your game can't get any other way, generated fresh for your save. The full Project Pokémon [Events Gallery](https://github.com/projectpokemon/EventsGallery) is built in too.
+- **Your game's own PC.** Browse your boxes on a PC screen drawn like the game's, with its summary pages, sprites and fonts.
+- **Clock and Trainer Card.** Set the in-game clock for Gold/Silver/Crystal and Ruby/Sapphire/Emerald, and view your Trainer Card.
+- **Automatic backups** before every change, in `PokemonManager/Backups`.
+
+Each event shows whether it's **✅ Legal** or **☠️ Illegal** according to PKHeX's legality check.
 
 ## Installation
 
-### From a release
+1. Download the zip for your device from the [Releases](../../releases) page:
 
-1. Download the SD-card zip for your device from the [Releases](../../releases) page:
-
-   | Device | Zip |
+   | Device | File |
    | --- | --- |
+   | Anbernic H700 devices (RG35XX Plus/H/SP/2024, RG40XX, RG CubeXX, RG34XX…) | `PokemonManager-h700-sdcard.zip` |
    | TrimUI Brick, TrimUI Smart Pro | `PokemonManager-tg5040-sdcard.zip` |
    | TrimUI Smart Pro S | `PokemonManager-tg5050-sdcard.zip` |
    | Miyoo Flip | `PokemonManager-my355-sdcard.zip` |
-   | Anbernic H700 devices (RG35XX Plus/H/SP/2024, RG40XX, RG CubeXX, RG34XX...) | `PokemonManager-h700-sdcard.zip` |
 
-2. Unzip it onto the root of your SD card. You get `Tools/<platform>/Pokemon Manager.pak` and a `PokemonManager` folder.
+2. Unzip it onto the root of your SD card.
+3. Open **Tools → Pokemon Manager**.
 
-`PokemonManager.pak.zip` holds the same pak with its contents at the zip root, for Pak Store–style installers.
-
-### Building it yourself
-
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download), `curl`, `zip`, `git`, Python 3 with Pillow, and Docker, which builds the patched minui-list and the PC box viewer.
-
-```sh
-scripts/build-pak.sh          # -> dist/PokemonManager.pak.zip and dist/PokemonManager-<platform>-sdcard.zip
-dotnet test                   # run the test suite
-scripts/build-native.sh h700  # just minui-list and the PC box viewer for one platform (Docker)
-make -C native desktop        # desktop build of the viewer; --screenshot renders a frame to PNG
-```
+The pak checks for updates when it starts if Wi-Fi is on, and you can check yourself from **Update** on the main menu.
 
 ## Using it
 
-Open **Tools → Pokemon Manager**. The app scans `Saves/` for anything PKHeX recognizes that has its game's ROM on the card (official, see below) and lists the saves most recently played first: in the order of NextUI's Recently Played list, then by when the save was last written. Pick a save, then:
+Your saves are listed with the most recently played first. Pick one to open its menu, where you can browse its Pokémon, collect gifts, or set its clock.
 
-### Official ROMs and Others
+A save only shows up when:
 
-The main list has the saves made with **unmodified, official Pokémon ROMs**. ROM hacks, translations and other modified ROMs go to **Others**: hack saves often look like normal FireRed/Emerald saves to PKHeX, and editing them as if they were can corrupt them, so they're kept apart and aren't offered as games to move Pokémon to.
+- its game's ROM is on the SD card, with the same name as the save, and
+- the game has got as far as receiving the Pokédex.
 
-- A save is matched to its ROM by name, the way NextUI names saves: `Roms/.../Pokemon Emerald.gba` ↔ `Saves/GBA/Pokemon Emerald.gba.sav`, `Pokemon Emerald.sav` or `Pokemon Emerald.srm`. Zipped ROMs work too.
-- The ROM's CRC32 is compared with the 175 retail dumps of the main-series games (Red/Green/Blue/Yellow through Black 2/White 2, all regions and revisions) from the No-Intro database. Zipped ROMs are checked without unzipping, and trimmed DS ROMs are recognised.
-- Each ROM is hashed once and the result is cached in `PokemonManager/rom-check-cache.txt`, so only the first scan is slow.
-- The main menu lists each save by its game's name in the game's own language, e.g. **Emerald** for an English Emerald, **Smaragd** for a German one or **ルビー** for a Japanese Ruby, with the trainer's name, the player's overworld sprite from that game (boy or girl) and the trainer ID on the right. The highlighted save's sprite walks towards you with its game's walking frames (as in the list of games to move a Pokémon to). The sprites come from the pret decompilations at build time (`scripts/build-trainers.py`; HeartGold/SoulSilver's are decoded from the game's DS textures). Black/White have no decompilation, so their saves show just the name and ID.
-- Only saves with their ROM on the card (matched by name, as above) that have received the Pokédex are listed. The Pokédex is read the same way as for distributions (see *Transfers*). Saves without their ROM, or that haven't received the Pokédex yet, aren't shown at all. Saves whose ROM isn't an official release appear under **N others** in the main menu: it lists them like the main menu, and picking one opens it like any other save (they still aren't offered as games to move Pokémon to). On both lists, **Y** renames the highlighted save with NextUI's on-screen keyboard ([minui-keyboard](https://github.com/josegonzalez/minui-keyboard)); the name is kept in `PokemonManager/save-names.txt` and shown wherever the save is listed, and clearing it brings back the game's name. **SELECT** moves the highlighted save between the main list and Others (for a retail ROM the No-Intro list doesn't have, like an old scene dump, or a save you'd rather keep out of the way); this is kept in `PokemonManager/save-lists.txt`.
-- To treat a save from an unofficial ROM like any other, move it to the main list with **SELECT**. A save without its ROM is never listed.
+Saves from ROM hacks, translations and other modified ROMs go in a separate **Others** list. They can be opened, but Pokémon aren't moved to them, because editing a hack as if it were the original game can corrupt it.
 
-To refresh the ROM list from a newer No-Intro database, run `scripts/update-vanilla-roms.py <libretro-database>/metadat/no-intro`.
+## ⚠️ Before you start
 
-### PC box view
+- **Close the game before editing, and start it fresh afterwards, not from a save state or auto-resume.** A save state still has the old save in memory and will write it back over your changes. By default, the pak deletes a game's save state when it changes that game's save, and asks you first.
+- **Keep your own backup** of any save you care about. The pak backs up every save before changing it, but this is still a beta.
 
-**Pokémon (view / transfer / evolve)** opens a full-screen PC drawn like the game's own: Ruby/Sapphire, Emerald and FireRed/LeafGreen saves each get their game's PC and summary screens, with their own box wallpapers. Diamond/Pearl and Platinum get their game's PC screen (the top screen: the panel with the Pokémon under the hand, the box with its wallpaper and banner, the hand, PARTY POKéMON/CLOSE and the party panel with EXIT, in the game's font), with each box's own wallpaper; their summary screen is still Emerald's. HeartGold/SoulSilver get their own PC screen too: the box with its 24 wallpapers, the striped blue column and the party panel, from pokeheartgold's PC archive (`files/a/0/1/9`, placed as the game's PC code loads it; that screen isn't decompiled, so the places come from its assembly). On the DS the highlighted Pokémon and the PARTY/CLOSE buttons are on the touch screen; here they're in the blue column. Black/White, whose PC art no decompilation has, use Platinum's, with their own 24 box wallpapers fitted into Platinum's frame (`scripts/pc_ui/bw_wallpapers.py`, from the sheet in `assets/gen5`, ripped by Barubary). The PC's words are English in every game; only the Pokémon's species names follow the game's language (from the ROM header, or the save; PKHeX's tables: GECKARBOR in a German game, キモリ in a Japanese one, which prints with the game's Japanese font).
+**Status:** public beta. Tested on the Anbernic RG35XX SP and the TrimUI Brick. Other devices should work but haven't been tried. Please [report problems](https://github.com/ProClifo/NextUI-Pokemon-Manager/issues/new?template=bug_report.yml) with your device, game, language and pak version.
 
-Gen 1 and 2 saves get the Game Boy's BILL'S PC instead, on the Game Boy's 160x144 screen with the games' own tiles and layout: Red/Blue/Yellow's list of four Pokémon with their levels over the PC menu and BOX No., Gold/Silver/Crystal's list of five beside the highlighted Pokémon's picture, level, gender and held item. **Up/Down** move through the list, **Left/Right** change the box (the party is left of box 1), **A** opens TRANSFER / STATS / EVOLVE / CANCEL, and STATS shows the games' stats screens (Gen 1's two pages, turned with A, with Up/Down for the next Pokémon; Gen 2's pink, green and blue pages, turned with Left/Right, with Up/Down for the next Pokémon).
+## More details
 
-- Each box shows its own wallpaper from the save (Gen 3 saves). Other games cycle through the 16 Emerald wallpapers.
-- Pokémon appear with the icons and front sprites of the save's own game: Red/Blue, Yellow, Gold, Silver, Crystal, Ruby/Sapphire, Emerald, FireRed/LeafGreen or Platinum (used for every Gen 4 game), Black/White or Black 2/White 2. Game Boy sprites are coloured the way the games colour them (Super Game Boy palettes for Red/Blue/Yellow, Game Boy Color palettes for Gold/Silver/Crystal), and Game Boy party icons keep their 16x16 size. Unown letters, Castform and Gen 4 forms, female differences, shiny palettes and eggs are shown. Gen 3 Deoxys is in the form its game shows (Normal in Ruby/Sapphire, Speed in Emerald, Attack in FireRed, Defense in LeafGreen), with that form's icon; from Gen 4 on, each Deoxys shows its own form. Art a game lacks comes from Emerald or Platinum. Gen 5's 96×96 sprites are bigger than Platinum's 80×80 picture frame, so the large ones spill over its edges, as big Pokémon do in the games.
-- The PKMN DATA panel on the left shows the Pokémon under the white hand: front sprite, name, species, level and gender.
-- **PARTY POKéMON** at the top opens the party, as in the games; **CLOSE BOX** leaves.
-- **A** on a Pokémon opens the white menu with *Transfer*, *Summary*, *Evolve* and *Cancel* ("MEW is selected."). Transfer and Evolve are greyed out when they can't be done; picking one anyway closes the menu and the message box says why in a few words ("No games to send to!", "Must be in a PokéCenter!", "It needs to hold a Metal Coat!"...).
-- *Summary* shows the game's summary pages (**Left/Right** turn them): Pokémon info with the trainer memo in that game's wording, skills (stats, experience, held item, ribbons) and moves with their PP.
-- Text is drawn in each game's own font, glyph for glyph (Red/Blue/Yellow's, Gold/Silver/Crystal's, Ruby/Sapphire's, Emerald's and FireRed/LeafGreen's, from the decompilations), as the games print it. If a skin's font is missing, NextUI's OG font stands in.
-- Only what the games themselves show: no hidden values such as EVs, IVs, PIDs or secret IDs, anywhere in the pak.
-- **D-pad** moves the hand, **L/R** switch boxes, **B** goes back.
-
-The art isn't stored in this repository. It's generated at build time from the pret decompilations: the wallpapers, cursor and background by `scripts/build-box-assets.py` from [pret/pokeemerald](https://github.com/pret/pokeemerald), each game's icons and sprites by `scripts/build-box-art.py` (Black/White and Black 2/White 2, which have no decompilation, from the ripped sheets in `assets/gen5`: front and shiny sprites from [The Spriters Resource](https://www.spriters-resource.com/), box icons ripped by Ploaj; the script reads each cell's dex number from its label), the Gen 3 PC and summary screens (art, window frames, wallpapers, text positions and colours, read from pokeruby, pokeemerald and pokefirered) by `scripts/pc_ui/build.py`, and the Game Boy PC and stats screens' tiles by `scripts/gb_ui/build.py`. Each game's art is packed into two sheets plus an index, so the SD card gets a few dozen files rather than thousands. The screen is drawn by `pkmgr-box`, a small C program in `native/` built against each device's NextUI platform layer, like `minui-list`. If it's missing or fails, that save's Pokémon are shown as lists that time (the reason goes to the log) and the PC is tried again next time; **Settings → PC Box View** switches between the two.
-
-### Game backgrounds
-
-A save's menus show its game's title art (without the logo and text) behind them: the game menu and its sub-menus and messages, but not Pokémon storage. Gold, Silver, Crystal, Ruby, Sapphire, Emerald, FireRed and LeafGreen use title art from `assets/backgrounds`; Red, Blue, Green and Yellow get their Super Game Boy border around the title screen's Pokémon and player, and Diamond, Pearl, Platinum, HeartGold and SoulSilver their cover legendary's DS sprite over the title's colours, drawn at build time from the pret decompilations by `scripts/build-title-backgrounds.py` (Black and White have none yet). Any game can get its own by adding `assets/backgrounds/<game>.png` (red, blue, green, yellow, gold, silver, crystal, diamond, pearl, platinum, heartgold, soulsilver, black, white, black2, white2). The game is read from the ROM's header (the GBA/DS game code, e.g. `BPRE` = FireRed USA, `BPGP` = LeafGreen Europe), so renamed or zipped ROMs still match; if no ROM is found it falls back to what the save says and then to the file name. The art (240×160 for GBA, 256×192 for DS, any size works); `scripts/build-backgrounds.py` pre-scales it with whole-number scaling for every NextUI screen size, so it fills the screen pixel-sharp.
-
-| Menu | What it does |
-| --- | --- |
-| Pokémon | Browse the party and boxes. For each Pokémon: *Transfer* (move it to another game), *Summary*, *Evolve* (trade evolution) or *Cancel*. *Transfer* and *Evolve* are greyed out when they can't be done: Evolve needs a trade evolution whose conditions a real trade would meet (Onix only becomes Steelix holding the Metal Coat; an Everstone stops it). Karrablast and Shelmet evolve only when traded for each other: their Evolve is always offered (unless they hold an Everstone); after YES it lists the other Black/White/Black 2/White 2 games that have the partner ("trade for Shelmet", headed by the Pokémon's icon), then opens the chosen game's storage with the same header, where A gives TRADE / CANCEL and TRADE works only on the partner species (no Everstone, and from the party only where that game lets the party trade). The two swap places and both evolve; the evolution screen shows Escavalier and Accelgor side by side ("Congratulations! Your Pokémon evolved into Accelgor and Escavalier!"). Transfer needs a game that can take the Pokémon. The list of games to move it to (shown like the main menu) only has the games that can take it. |
-| Mystery Gift | Every event ticket the game has, legitimate or not (see below), hidden until the game's own menu that delivered it is unlocked: Mystery Gift (FireRed/LeafGreen/Emerald's Poké Mart questionnaire, Diamond/Pearl/Platinum's Jubilife TV questionnaire, HeartGold/SoulSilver's Pokédex; Black/White from the start), and Mystery Event for Ruby/Sapphire's Eon Ticket (after beating Norman). Emerald outside Japan gets the Eon Ticket by Record Mixing instead, so it has its own *Eon Ticket* entry, shown once Mauville City is visited. Each ticket goes away once it's been received properly, and the Mystery Gift menu with the last one: the save has the item (in the bag, or Gen 3's PC) and what the event's delivery set, which the game checks alongside it. Gen 3: the ferry flag (`FLAG_SYS_HAS_EON_TICKET` in Ruby/Sapphire, `FLAG_ENABLE_SHIP_SOUTHERN_ISLAND`/`BIRTH_ISLAND`/`NAVEL_ROCK`/`FARAWAY_ISLAND` in Emerald and FireRed/LeafGreen). Gen 4: the distribution event var with its magic number (Member Card, Oak's Letter, Azure Flute, Secret Key; HeartGold/SoulSilver's Enigma Stone, which also counts once Steven has taken it at the Pewter Museum). Black/White: the Liberty Pass. Games with a single event show it on the game menu instead: *Eon Ticket* (Ruby/Sapphire), *Enigma Stone* (HeartGold/SoulSilver), *Liberty Pass* (Black/White), *GS Ball* (Crystal). |
-| Mystery Gift (Gold/Silver/Crystal) | One Mystery Gift at a time, as if from a different player each time: "Inject random Mystery Gift?". Each is chosen as the partner's game chose it (pokecrystal `StageDataForMysteryGift`, partly from the partner's trainer ID). Half are decorations, "sent home!" like the game does (the game puts them in the PC's decorations when the save is continued), and they never block another gift: Jigglypuff, Poliwag, Diglett, Staryu, Magikarp, Oddish, Gengar, Shellder, Grimer, Voltorb, Weedle, Geodude, Machop, Bulbasaur, Squirtle and Surf Pikachu Dolls, Big Onix, Big Lapras, Clefairy, Jigglypuff and Pikachu Posters, NES, Super NES, Nintendo 64, Virtual Boy, Magnaplant, Tropicplant, Jumboplant, Pink and Polkadot Beds, and the four Carpets. A decoration already received by Mystery Gift is replaced by an item, as in the game. An item is "sent to Pokémon Center!": collect it from the man on the Pokémon Center's 2nd floor; until then the game, and the pak, take no more gifts ("Must receive Mystery Gift at Pokémon Center."). Items: about 90% Berry, PRZCureBerry, Mint Berry, Ice Berry, Burnt Berry, PSNCureBerry, Guard Spec., X Defend, X Attack, Bitter Berry, Dire Hit, X Special, X Accuracy, Eon Mail, Morph Mail or Music Mail; 8% MiracleBerry, Gold Berry, Revive, Great Ball, Super Repel, Max Repel, Elixer or Ether; 1.6% Water Stone, Fire Stone, Leaf Stone, Thunderstone, Max Ether, Max Elixer, Max Revive or Scope Lens; 0.4% HP Up or PP Up. Five a day, counted with the game's own count and day countdown: after the fifth the entry (and the game's Mystery Gift) is hidden until the next day on the game's clock. Shown once the girl on the Goldenrod Dept. Store's 5th floor has unlocked Mystery Gift and the game was saved. English, French, German, Italian and Spanish games. |
-| Mew / Celebi | Gen 1/2: legal event Pokémon generated for the save like the Game Boy era distributions, from PKHeX's events. *Mew* in Red/Blue/Yellow (the international or Japanese Mew, whichever is legal for the save's language) and in Korean Gold/Silver, which can't link with Gen 1 (an international Mew, as if moved up by Time Capsule and traded over). *Celebi* in Gold/Silver/Crystal outside Japan: the Pokémon Center New York Celebi, since the GS Ball event only ran on Japanese cartridges. |
-| Distributions | Gen 3–5: one distribution of each Pokémon you can't legally get any other way in this game's language and that the previous generation doesn't already provide (Gen 4 gets Mew, Celebi, Jirachi and Deoxys from Gen 3 by Pal Park, except in Korean games, which have no Gen 3; Gen 5 gets everything up to Arceus by Poké Transfer). Where there are several, it's Aura Mew, Wishmaker Jirachi (the WISHMKR distribution) and the Manaphy Egg, else the one in the game's language that most players received (most copies in the gallery). Gen 3's Celebi is always the Ageto Celebi, in every language: it was only given out in Japan, so outside Japanese games it arrives as a Japanese Pokémon, as if traded over (the one exception to the game's-language rule). Once Record Mixing is open (Mauville City visited), Ruby, Sapphire and Emerald also list the Regirock, Regice and Registeel Dolls, decorations no normal play hands out; each goes to the PC's doll inventory, as a Mystery Event's `adddecoration` did, as many times as you like, once the save has visited Mauville City (Record Mixing and the old man who traded them both need it). Every other distribution and copy is in the Events Gallery. Gen 1/2 games have no Distributions menu. |
-
-With Mystery Gift, Distributions, Mew/Celebi and transfers between games, every game in every language can complete its Pokédex. Where a language had no distribution of a Pokémon it needs, Distributions offers one from elsewhere: a distribution that really was given out in that language but isn't in the gallery (Channel Jirachi in French, Italian and German), else the English one, which arrives as an English Pokémon, as if traded from an English game (legal: games of different languages trade). This also covers Pokémon behind tickets that weren't distributed in a language: European Gen 3 games never got the Mystic Ticket, so they get 10th Anniversary Lugia and Ho-Oh.
-| Events Gallery | Every gallery file for this game and language, in the gallery's folders. |
-| Decorations | Ruby, Sapphire and Emerald, shown once Record Mixing is open (Mauville City visited): the PC's decorations by category (Desk, Chair, Plant, Ornament, Mat, Poster, Doll, Cushion). Pick one to send it to another Ruby, Sapphire or Emerald save that has Record Mixing too and room for it; it leaves this game's PC. Decorations placed in your room or Secret Base are greyed out (put them away in-game first). |
-| Info | Headed with the save's file name. **Details**: the save's game, trainer and ID, play time, party and boxes, file; Gen 3 saves also show their Mystery Gift/Event status. **Clock** (Ruby, Sapphire, Emerald, Gold, Silver, Crystal): shows the game's time as "08:41 PM" (Gold/Silver/Crystal: "Sunday 08:41 PM"); Left/Right pick the day, hour, minute or AM/PM and Up/Down change it; Y sets it to the device's own time. Ruby/Sapphire/Emerald get a new clock offset from the device clock (the emulator's cartridge clock), as the game's own clock setting does; Gold/Silver/Crystal get their start time set in the save and the cartridge clock in `Saves/GBC/<rom>.rtc` restarted (NextUI's gambatte core keeps it there). **Trainer Card** (Red/Blue/Yellow, Gold/Silver/Crystal, Ruby/Sapphire, Emerald, FireRed/LeafGreen): the game's own card with its art: name, ID, money, Pokédex, play time and badges; Gold/Silver/Crystal turn to the badges page with Right/A, and the Gen 3 cards show their stars and turn over with A to the back's records (Hall of Fame debut, link battles, trades and so on). |
-
-Every item in these lists is marked **✅ Legal** or **☠️ Illegal**, shown for the highlighted item (the icons are [Noto Emoji](https://github.com/googlefonts/noto-emoji) images, since the menu fonts have no emoji). **Illegal** means PKHeX would flag the Pokémon you get from it; where a file came from (its language, a debug card) doesn't matter on its own:
-
-- **Tickets** are legal when PKHeX accepts the Pokémon they lead to as that game catches them (in the game's own language). The ticket's language doesn't matter, so a French Aurora Ticket in an English Emerald is legal. Illegal are the events that never ran in a game: the Faraway Island Mew outside Japanese Emerald (the Old Sea Map was only given out in Japan), Birth Island Deoxys in Japanese Emerald, Darkrai and Shaymin in Diamond/Pearl (the Member Card and Oak's Letter were Platinum's), Shaymin in Korean Platinum (no Korean Oak's Letter) and the Azure Flute's Arceus anywhere. When there's a choice, Mystery Gift still uses the card that was given out for the game and language.
-- **Emerald's Eon Ticket** has no card of its own: outside Japan, Emerald players got it by Record Mixing with a Ruby/Sapphire that had it. Pokémon Manager does what Emerald's Record Mixing code does (`ReceiveGiftItem` in pokeemerald): it puts the Eon Ticket in Key Items, unless the bag or PC already has one, and enables the Lilycove ferry to Southern Island (`FLAG_ENABLE_SHIP_SOUTHERN_ISLAND`). Like Record Mixing, it needs Mauville City visited (the Cable Club only opens its Record Corner after `FLAG_VISITED_MAUVILLE_CITY`). The ferry runs once you've entered the Hall of Fame.
-- **GS Ball** is legal in Japanese Crystal (Mobile System). Elsewhere it only ran on the 3DS Virtual Console, so it's illegal on a cartridge game. The entry goes away once the event is enabled.
-- **Distributions** are always legal. In the **Events Gallery**, Pokémon files show PKHeX's verdict on the file (released ones PKHeX rejects aren't bundled, and each Pokémon is regenerated and checked again before it's added), Pokémon cards whether PKHeX can make a legal Pokémon from them for this save, and items that give no Pokémon (berries, decorations, Wonder News, e-Card trainers) are legal.
-
-**Which Pokémon count as distributions.** At build time PKHeX checks every mythical, legendary and alternate-form Pokémon in the gallery: is there a legal non-event way to get it in a handheld game of that language? That covers catching, gifts, in-game trades, breeding and transfers from earlier handheld generations; GameCube games don't count. The ones with no other way make up the Distributions list. Language matters: a Faraway Island Mew is only legitimate in Japanese Emerald (the Old Sea Map was only distributed there), so Mew is event-only in every other language, while Deoxys, Lugia and Ho-Oh aren't, because their ticket encounters are legitimate in English Emerald.
-
-Picking a gift: event Pokémon are **generated fresh for your save**, as the real distributions did. PKHeX works out which distribution a gallery file came from and rolls a new PID, nature, IVs and so on with that event's own method, keeping the event's OT and ID. Each Pokémon must pass PKHeX's legality check for your game before it's added; generation is retried until one does. For the few events PKHeX can't recreate (the Berry Glitch Shiny Zigzagoon), you get a random legal copy from the gallery's originals. Pokémon that weren't generated per player (e.g. one specific traded Pokémon) are given as they are. Released files that PKHeX flags as illegal aren't bundled at all, and unreleased ones ask before adding an illegal Pokémon. Gen 1/2 Pokémon are judged as cartridge-era games, so the GB event Mews count as legal. The new Pokémon goes to the first free PC slot, never the party. Gen 4/5 Wonder Cards can go to the in-game Mystery Gift album (pick them up from the delivery person) (Diamond/Pearl/Platinum first need Mystery Gift unlocked in-game: the Jubilife TV questionnaire with "EVERYONE HAPPY" "WI-FI CONNECTION"; HeartGold/SoulSilver unlock it with the Pokédex, Gen 5 has it from the start) or, for Pokémon, straight to your PC. Gen 3 cards are injected as described under *Gen 3 events* below.
-
-### Fonts
-
-The main menu is drawn in NextUI's **Next** font and everything inside a save (its menus and messages) in NextUI's **OG** font; the Pokémon storage screens use the games' own fonts, whatever font NextUI itself is set to. Both are NextUI's own (`.system/res/font1.ttf` and `font2.ttf`). OG has no Japanese and no ♂/♀, so a screen with text it can't show (read from the font's character map) uses Next instead.
-
-### Event gallery
-
-The gallery is [projectpokemon/EventsGallery](https://github.com/projectpokemon/EventsGallery) at a pinned commit, Gen 1–5 only (the generations NextUI emulates). The build bundles the files PKHeX can read into `res/gallery.zip` with an index, so the SD card holds one 3 MB file instead of 7,500 small ones.
-
-- **Game**: from the ROM header, e.g. `BPEE` = Emerald, `CPUE` = Platinum, `IRBO` = Black 2; otherwise from the save. Cards only show for the games named in their file name (a HeartGold/SoulSilver card doesn't show for Platinum). Pokémon files show for every game of their generation, since they can be traded between them.
-- **Language**: from the ROM header's region letter (`E`/`P` English, `D` German, `F` French, `I` Italian, `S` Spanish, `J` Japanese, `K` Korean); otherwise from the save (Gen 4/5) or the player's own Pokémon (Gen 3). Gen 1–2 only distinguish Japanese, Korean and international.
-- **Settings → Gallery: All Languages** (off by default) lists every language in the Events Gallery. Mystery Gift and Distributions always stick to the game's language.
-- **Settings → Gallery: Unreleased Files** (off by default) adds the gallery's *Unreleased* folder: debug and test data that was never distributed.
-
-**Help** (on the main menu) lists common questions (why a save isn't listed, why a Pokémon can't be transferred or evolved, why Mystery Gift isn't showing, how to collect a gift in-game, what Legal and Illegal mean, save states, backups, updating); pick one for its answer.
-
-**Update** (on the main menu) checks this project's GitHub releases over Wi-Fi: when the newest release (alpha releases included) isn't the installed one, it offers to download that release's zip for your device and puts the new pak files in place; then the pak closes, and the new version runs next time you open it. Your saves, backups and settings aren't touched. It uses .NET's own HTTPS, or the device's `curl`/`wget` if that isn't available. The pak also checks when it starts, if Wi-Fi is connected, and offers the update when there is one. That check gives up silently after a few seconds when GitHub can't be reached.
-
-**Settings** look like NextUI's in-game menu: each setting's name on the left and *Enabled*/*Disabled* on the right, changed with left/right, with a description of the highlighted setting at the bottom of the screen; B keeps the changes and leaves. **Reset to Default** (after a confirmation) puts every setting back to how it was when the pak was installed. **Save State Deletion** (enabled by default) deletes the ROM's save state in its selected slot, its preview and NextUI's resume entry whenever Pokémon Manager changes a save, so pressing X can't resume a state from before the change and undo it: the game has to start from its save. NextUI keeps the selected slot in `.userdata/shared/.minui/<EMU>/<rom>.txt` and the states in `.userdata/shared/<EMU>-<core>/`. For DS games it also deletes the DS pak's ([NDS.pak](https://github.com/josegonzalez/minui-nintendo-ds-pak), DraStic) auto save state, which DraStic loads on start: `.userdata/shared/NDS-advanced-drastic/<game>_<slot>.dss`, the slot being `autosavestate_slot` in the pak's `drastic/config/drastic.cfg` (10 by default). **Save State Warning** (enabled by default): with Save State Deletion on, a change that would delete a save state first asks *This will delete your current save state. Continue?* with **Yes, don't warn me again** (which turns this setting off), **Yes** and **No** (the default).
-
-### ⚠️ Save states
-
-Close the game before editing. Afterwards, **start the game fresh from the menu, not from a save state or NextUI's auto-resume**. A save state holds the old save data in memory, and the next in-game save writes it back over your changes.
-
-### SD card folders
-
-```
-SDCARD/
-├── Saves/                     ← NextUI's saves; scanned automatically
-└── PokemonManager/
-    ├── Backups/               ← automatic backups, a folder per game/trainer/ID (last 999 each)
-    └── rom-check-cache.txt    ← cached ROM checks
-```
-
-### Transfers
-
-By default Pokémon only move the way the real games allowed, and only once each game has progressed far enough. As in the games, Ruby/Sapphire get the National Pokédex by trading with a game that has it (pokeruby's trade code checks the partner's flag), so a transfer either way between Ruby/Sapphire and a Gen 3 game with the National Pokédex unlocks it. **Settings → Illegal Transfers** (off by default) turns all of this off: Pokémon can then go between any generations PKHeX can convert (e.g. Gen 4 → Gen 3), but they'll usually be flagged as illegal.
-
-| Route | Allowed | Requirements (from the pret decompilations) |
-| --- | --- | --- |
-| Gen 1 ↔ Gen 1 | Cable Club | Each Gen 1 game has the Pokédex from Oak. |
-| Gen 2 ↔ Gen 2 | Trade Center | Each game has given the Mystery Egg to Elm. |
-| Gen 1 ↔ Gen 2 | Time Capsule | Gen 1: the Pokédex. Gen 2: Bill has switched the Time Capsule on (first visit to the Ecruteak City Pokémon Center). Gen 2-only species and moves can't go to Gen 1. |
-| Gen 3 ↔ Gen 3 | Trade | FireRed/LeafGreen ↔ Ruby/Sapphire/Emerald: the Sapphire has been delivered to Celio, and Emerald is Champion. Emerald and FR/LG without the National Pokédex can't send or receive Eggs or Pokémon outside their Hoenn/Kanto Pokédex (Ruby/Sapphire don't check). Mew and Deoxys need the event flag. |
-| Gen 3 → Gen 4 | Pal Park | The Gen 4 game has the National Pokédex; both games are the same language; no Eggs; no Gen 3 HM moves. |
-| Gen 4 ↔ Gen 4, Gen 5 ↔ Gen 5 | Trade | None. |
-| Gen 4 → Gen 5 | Poké Transfer | The Gen 5 game has the National Pokédex (documented, not decompiled); no Eggs; no Gen 4 HM moves. |
-| Gen 1/2 → Gen 3+, anything backwards | — | Not possible in the games. |
-
-Imported files follow the receiving side of these rules: Game Boy games need their link room open, and Emerald and FireRed/LeafGreen need the National Pokédex for Pokémon outside their regional Pokédex. Distributions (the Distributions and Events Gallery menus, and Mew) don't: the real distributions didn't need the National Pokédex. They only need the Pokédex itself, read from the games' own flags (Gen 1 `EVENT_GOT_POKEDEX`, Gen 2 the event Mr. Pokémon's house sets with `ENGINE_POKEDEX`, Gen 3 `FLAG_SYS_POKEDEX_GET`, Gen 4 the Pokédex block's `pokedexObtained`); Black/White have no decompilation, so there a Pokédex with anything caught counts. Pal Park's once-a-day and six-Pokémon limits aren't applied.
-
-Rules the app always enforces:
-
-- A transferred or imported Pokémon only moves into an empty PC slot (distributions too). Nothing is overwritten.
-- The destination save is written first, then the source save. If the second write fails, the Pokémon ends up in both saves instead of being lost.
-- You can't move your last party Pokémon.
-- A party Pokémon can only be transferred or trade-evolved if its save was made in a Pokémon Center (any floor), as trades happen at the link rooms there. Ruby/Sapphire's Pokémon League center has no link room, so it doesn't count (Emerald's does). In Black/White and Black 2/White 2, party Pokémon trade anywhere once you have the C-Gear (the game's `FE_CGEAR_GET` flag), except ones that know an HM move (Cut, Fly, Surf, Strength, Waterfall, Dive), which still need a Pokémon Center. The map is read from the save, with map numbers from the pret decompilations (Black/White's from the Black 2/White 2 decompilation, whose first 427 zones are Black/White's). Places where the game turns the C-Gear off aren't known, so they aren't checked. Boxed Pokémon aren't limited.
-- Japanese and international Gen 1/2 games can't trade with each other, as on real hardware.
-
-### Gen 3 events: what goes where
-
-| File | Games | Where to collect it |
-| --- | --- | --- |
-| `.wc3` Wonder Card (Aurora Ticket, Mystic Ticket, ...) | FireRed, LeafGreen, Emerald | Delivery man in green, 2nd floor of any Pokémon Center |
-| `.wn3` Wonder News | FireRed, LeafGreen, Emerald | Mystery Gift → Wonder News on the title menu |
-| `.me3` Mystery Event (Eon Ticket e-Card, ...), 1004 or 1012 bytes | Ruby, Sapphire, Emerald | As the original event (Eon Ticket: your dad at the Petalburg Gym). 1012-byte files also set the Record Mixing item. |
-| `.ect` e-Card Trainer | Ruby, Sapphire, Emerald, FireRed, LeafGreen | The game's e-Reader trainer battle |
-| `.ecb` e-Reader Berry: 1328 bytes for R/S, 52 bytes for FR/LG/E | All five | Replaces the Enigma Berry data |
-
-Notes:
-
-- Wonder Cards and Mystery Events share one script slot, so injecting one replaces the other. That's also how the games behave.
-- Japanese and international Wonder Cards/News have different sizes and only work in a save of the matching region.
-- Event files need the game's own menu unlocked first, as on the cartridge (and the Mystery Gift menu's tickets stay hidden until then): Mystery Event in Ruby/Sapphire (after beating Norman, give "MYSTERY EVENT IS EXCITING" as your profile to the man in the Petalburg City Pokémon Center; the game checks `FLAG_BADGE05_GET`, so the app does too), Mystery Gift in FireRed/LeafGreen/Emerald (fill in a Poké Mart questionnaire with "LINK TOGETHER WITH ALL"; Wonder Cards, Wonder News and e-Cards), and Mystery Event in Japanese Emerald for `.me3` files ("MYSTERY EVENT IS EXCITING" in the questionnaire). Pokémon Manager never unlocks these menus itself.
-- **Non-Japanese Emerald** has no Mystery Event menu (and setting its flag corrupts the save), so `.me3` files can't go into it.
-- Like the WC3 plugin, stale checksums in a file (e.g. after hand-editing) are recalculated, and the result message says so. Files for the wrong game or region, and Wonder Cards without an event flag, are refused.
-- Injecting a Mystery Event into Emerald clears any Wonder Card, because the card would point at the replaced script.
-
-**Compared with WC3 plugin 2.6.0:** a test harness runs the plugin's decompiled import code next to Pokémon Manager on the same files. The saves come out byte-identical except for two deliberate differences. Pokémon Manager also unlocks the Mystery Gift/Event menu. For normal Wonder Cards it resets the card's stats block and copies in the icon, as the game's own `SaveWonderCard()` does. It also writes the full 32-bit checksum for Ruby/Sapphire scripts and for berries, where the plugin writes only the low 16 bits.
-
-## Command line
-
-The same binary has scriptable commands, which are handy for testing on a PC (`dotnet run --project src/PokemonManager -- ...`):
-
-```
-pkmgr [--sd <sdcard>] [--data <dir>] <command>
-  ui                                   on-device menus (default)
-  scan                                 list Pokémon saves under <sd>/Saves
-  list <save>                          list Pokémon (slots: p:1 = party 1, 3:12 = box 3 slot 12)
-  show <save> <slot>
-  transfer <src> <slot> <dst> [--copy] [--unofficial]
-  trade-evolve <save> <slot> [option] | trade-evolve <save> --all
-  inject <save> <gift file> [--box]
-  events <save> / redeem-event <save> <index>
-  gen3-status <save>
-```
-
-`PKMGR_UI=console pkmgr ui` runs the full menu tree as a text UI in a terminal.
-
-## How it works
-
-- `src/PokemonManager` is a .NET 10 app using the [PKHeX.Core](https://www.nuget.org/packages/PKHeX.Core) library for save parsing, Pokémon conversion, legality checks, evolution data, Mystery Gift albums and the event database. It's published as one self-contained, partially trimmed, ReadyToRun `linux-arm64` executable (~65 MB). No .NET install is needed on the device, and it works with glibc 2.27 or newer.
-- The UI uses josegonzalez's [`minui-list`](https://github.com/josegonzalez/minui-list) and [`minui-presenter`](https://github.com/josegonzalez/minui-presenter) (NextUI builds, so they follow your theme). They're driven from C#, so the runtime starts once per session. minui-list is built from source with a small patch (`native/minui-list.patch`): the released binaries crash when given a font, which picking NextUI's Next/OG font needs, and the patch adds an option to show the Legal/Illegal tag on the highlighted row only, and plays a row image's walking frames (`<image>.walk.png`) on the highlighted row.
-- Gen 3 event injection isn't part of PKHeX itself. It follows the WC3 plugin's import procedure and goes through PKHeX's Gen 3 block accessors. Game-side details (flag IDs, CRC16, berry checksums, the Wonder Card save routine) were checked against the [pret](https://github.com/pret) decompilations.
+- [Features in detail](docs/features.md): every menu, the PC view, Legal/Illegal, settings
+- [Transfer rules](docs/transfers.md): what each game needs before it can trade
+- [Gen 3 events](docs/gen3-events.md): Wonder Cards, Mystery Events and e-Reader files
+- [Development](docs/development.md): building the pak, command line, how it works
 
 ## Credits
 
-- [PKHeX](https://github.com/kwsch/PKHeX) by Kaphotics and contributors (GPLv3)
-- [minui-list / minui-presenter](https://github.com/josegonzalez) by Jose Diaz-Gonzalez (MIT)
-- The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event file formats and import procedure
-- [NextUI](https://github.com/LoveRetro/NextUI)
-- PC box art from the pret decompilations ([pokered](https://github.com/pret/pokered), [pokeyellow](https://github.com/pret/pokeyellow), [pokegold](https://github.com/pret/pokegold), [pokecrystal](https://github.com/pret/pokecrystal), [pokeruby](https://github.com/pret/pokeruby), [pokeemerald](https://github.com/pret/pokeemerald), [pokefirered](https://github.com/pret/pokefirered), [pokeplatinum](https://github.com/pret/pokeplatinum)), generated at build time
-- ✅ and ☠️ icons from Google's [Noto Emoji](https://github.com/googlefonts/noto-emoji) (Apache License 2.0), fetched at build time
-- ROM checksums from the [No-Intro](https://no-intro.org) DATs, via [libretro-database](https://github.com/libretro/libretro-database)
-- Event files from [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery), bundled at build time
+- [PKHeX](https://github.com/kwsch/PKHeX) by Kaphotics and contributors
+- [NextUI](https://github.com/LoveRetro/NextUI), and [minui-list / minui-presenter](https://github.com/josegonzalez) by Jose Diaz-Gonzalez
+- [Project Pokémon's EventsGallery](https://github.com/projectpokemon/EventsGallery) for the event files
+- The [pret](https://github.com/pret) decompilations, for the game art, fonts and game data
+- Gen 5 sprites from [The Spriters Resource](https://www.spriters-resource.com/), box icons ripped by Ploaj, Black/White wallpapers ripped by Barubary
+- The PKHeX WC3 plugin and suloku's Gen III Mystery Gift Tool, for the Gen 3 event formats
+- ROM checksums from [No-Intro](https://no-intro.org), and ✅/☠️ icons from Google's [Noto Emoji](https://github.com/googlefonts/noto-emoji)
 
 Pokémon is © Nintendo / Creatures Inc. / GAME FREAK inc. This project is not affiliated with or endorsed by them.
 
