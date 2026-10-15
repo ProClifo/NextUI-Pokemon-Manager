@@ -1049,7 +1049,7 @@ public sealed class App
         var now = ClockNow(entry.Sav);
         Console.Error.WriteLine($"clock: set {hour:00}:{minute:00} at device {now:yyyy-MM-dd HH:mm:ss} (.NET local {DateTime.Now:HH:mm:ss}, " +
             $"UTC {DateTime.UtcNow:HH:mm:ss}, TZ={Environment.GetEnvironmentVariable("TZ") ?? "-"})");
-        var rtc = GameClock.Set(entry.Sav, now, weekday, hour, minute);
+        var rtc = GameClock.Set(entry.Sav, now, weekday, hour, minute, rtcPath);
         if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
             return;
         OfferResumeStateDeletion(entry);

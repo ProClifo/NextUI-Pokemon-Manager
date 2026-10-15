@@ -12,7 +12,7 @@ namespace PokemonManager.Core;
 /// <item>Gold/Silver/Crystal show the cartridge clock plus wStartDay/Hour/Minute/Second from the save
 /// (pokecrystal home/time.asm, FixTime); the weekday is wCurDay mod 7. NextUI's Game Boy core (gambatte) keeps
 /// the cartridge clock in Saves/GBC/&lt;rom&gt;.rtc as the Unix time it started counting from (8 bytes, little
-/// endian), so a time is set by restarting that clock at zero and putting the time in wStart*.</item>
+/// endian), so a time is set by restarting that clock and putting the time in wStart*, keeping the game's day count.</item>
 /// </list>
 /// </summary>
 public static class GameClock
@@ -52,23 +52,30 @@ public static class GameClock
 
     /// <summary>
     /// Sets the game's clock to <paramref name="hour"/>:<paramref name="minute"/> (Gen 2: on
-    /// <paramref name="weekday"/>, 0 = Sunday). Gen 2 also needs its .rtc file written; returns its new bytes
-    /// for the caller to write after the save.
+    /// <paramref name="weekday"/>, 0 = Sunday). Gen 2 also needs its .rtc file written (<paramref name="rtcPath"/>
+    /// is the current one); returns its new bytes for the caller to write after the save.
     /// </summary>
-    public static byte[]? Set(SaveFile sav, DateTime now, int weekday, int hour, int minute)
+    public static byte[]? Set(SaveFile sav, DateTime now, int weekday, int hour, int minute, string? rtcPath = null)
     {
         switch (sav)
         {
             case SAV2 gs:
             {
-                // The cartridge clock restarts at 0 days 00:00:00, so the start values are the time itself.
+                // The game's day count (wCurDay = wStartDay + the cartridge clock's days, wrapping at 140) dates its
+                // daily events, which count the days since they last ran. It only goes forward: to the same weekday
+                // it stays, to another it moves on to that day's next one, as if waited for. Going back would read
+                // as most of 140 days passing.
+                int today = Day(gs, rtcPath, now) % DaysWrap;
+                int day = (today + (weekday - today % 7 + 7) % 7) % DaysWrap;
+                // wStartDay stays a weekday as the game sets it; the cartridge clock restarts at the remaining whole
+                // weeks, 00:00:00, so the start values are the time itself.
                 int o = StartOffset(gs);
                 gs.Data[o] = (byte)weekday;
                 gs.Data[o + 1] = (byte)hour;
                 gs.Data[o + 2] = (byte)minute;
                 gs.Data[o + 3] = 0;
                 var rtc = new byte[8];
-                BinaryPrimitives.WriteUInt64LittleEndian(rtc, (ulong)ToUnix(now));
+                BinaryPrimitives.WriteUInt64LittleEndian(rtc, (ulong)(ToUnix(now) - (day - weekday) * 86400L));
                 return rtc;
             }
             case SAV3 s3 when s3.SmallBlock is ISaveBlock3SmallHoenn hoenn:
@@ -104,6 +111,8 @@ public static class GameClock
     }
 
     /// <summary>Where wStartDay is: after the player's ID and five names (6 bytes each in Japanese games).</summary>
+    private const int DaysWrap = 140; // FixDays keeps the cartridge clock's days under 140; 140 days are 20 weeks
+
     private static int StartOffset(SAV2 sav) => sav.Japanese ? 0x202B : 0x2044;
 
     /// <summary>The GBA cartridge clock (the device clock) as pokeemerald counts it: seconds since 2000-01-01.</summary>

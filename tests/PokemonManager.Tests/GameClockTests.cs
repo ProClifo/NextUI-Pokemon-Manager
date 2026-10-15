@@ -56,4 +56,26 @@ public sealed class GameClockTests : IDisposable
         // 20 hours later: Thursday 02:30.
         Assert.Equal(new GameClock.Time(4, 2, 30), GameClock.Read(sav, rtcPath, now.AddHours(20)));
     }
+
+    [Theory]
+    [InlineData(3, 45)] // the same weekday: no day passes, even at an earlier time
+    [InlineData(4, 46)] // Thursday: the next day
+    [InlineData(1, 50)] // Monday: forward to the next Monday, never back
+    public void Gen2ClockKeepsTheGamesDayCount(int weekday, int day)
+    {
+        var sav = (SAV2)_saves.Create(GameVersion.C, "Crystal.sav").Sav;
+        var now = new DateTime(2026, 10, 10, 13, 37, 12);
+        // day 45 (a Wednesday): started on day 3, the cartridge clock 6 weeks in
+        sav.Data[0x2044] = 3;
+        var rtcPath = Path.Combine(_saves.Dir, "game.rtc");
+        var start = new byte[8];
+        BinaryPrimitives.WriteUInt64LittleEndian(start, (ulong)new DateTimeOffset(now.AddDays(-42)).ToUnixTimeSeconds());
+        File.WriteAllBytes(rtcPath, start);
+        Assert.Equal(45, GameClock.Day(sav, rtcPath, now));
+
+        File.WriteAllBytes(rtcPath, GameClock.Set(sav, now, weekday, 6, 30, rtcPath)!);
+        Assert.Equal(day, GameClock.Day(sav, rtcPath, now));
+        Assert.Equal(new GameClock.Time(weekday, 6, 30), GameClock.Read(sav, rtcPath, now));
+        Assert.Equal(weekday, sav.Data[0x2044]); // wStartDay stays a weekday
+    }
 }
