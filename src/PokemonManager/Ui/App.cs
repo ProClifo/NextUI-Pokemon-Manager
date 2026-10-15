@@ -1384,7 +1384,7 @@ public sealed class App
         _ui.Busy("Checking distributions...");
         var list = GalleryLists.Distributions(_gallery, profile)
             .Where(e => EventPokemon.CanGive(_gallery, e, entry.Sav))
-            .Select(e => (e.Title, Tag: (string?)"Legal", Run: (Action)(() => GiveGalleryFile(entry, e)))).ToList();
+            .Select(e => (Title: GalleryLists.MenuName(e), Tag: (string?)"Legal", Run: (Action)(() => GiveGalleryFile(entry, e, GalleryLists.MenuName(e))))).ToList();
         // Ruby/Sapphire/Emerald also get the Regi dolls, which no normal play hands out (decorations can't be illegal),
         // as many as wanted, once Record Mixing is open (Mauville City visited)
         if (entry.Sav is SAV3RS or SAV3E && Decorations.RecordMixingUnlocked((SAV3)entry.Sav))
@@ -1532,7 +1532,7 @@ public sealed class App
             return;
         }
         if (gift.Pokemon is not null)
-            GiveEventPokemon(entry, file);
+            GiveEventPokemon(entry, file, name);
         else if (gift.Card is { } card)
             GiftActions(entry, card, name);
         else if (gift.Gen3 is { } g3)
@@ -1550,14 +1550,14 @@ public sealed class App
     /// Gives a gallery Pokémon the way the distribution did: a new Pokémon (PID, nature, IVs...) generated
     /// for this save, which must pass PKHeX's legality check.
     /// </summary>
-    private void GiveEventPokemon(SaveEntry entry, GalleryEntry file)
+    private void GiveEventPokemon(SaveEntry entry, GalleryEntry file, string name)
     {
         if (TradeRules.CheckDistribution(entry.Sav) is { Ok: false } noDex)
         {
             _ui.Message(noDex.Message);
             return;
         }
-        _ui.Busy($"Generating {file.Title}...");
+        _ui.Busy($"Generating {name}...");
         var result = EventPokemon.FromGallery(_gallery, file, entry.Sav);
         if (result.Pokemon is not { } pk)
         {
@@ -1567,7 +1567,7 @@ public sealed class App
         // an unreleased file that's illegal is marked so in the menu, and added like any other
         if (!result.Legal && file.Released)
         {
-            _ui.Message($"PKHeX flags {file.Title} as illegal in {Names.Game(entry.Sav)}, so it wasn't added.\n\n{result.Message}");
+            _ui.Message($"PKHeX flags {name} as illegal in {Names.Game(entry.Sav)}, so it wasn't added.\n\n{result.Message}");
             return;
         }
         // No trade rules: the real distributions didn't need the National Pokédex (only the Pokédex, checked above).

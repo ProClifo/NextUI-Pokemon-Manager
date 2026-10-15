@@ -687,6 +687,14 @@ public static class GalleryLists
             .Select(g => g.Copies.OrderBy(c => c.Title.Contains("6IV", StringComparison.OrdinalIgnoreCase) ? 1 : 0).First() with { Title = g.Title })
             .FirstOrDefault();
 
+    /// <summary>A distribution's name on the Distributions menu: its gallery title, spelled out where that's shortened.</summary>
+    public static string MenuName(GalleryEntry entry) => MenuNames.GetValueOrDefault(entry.Title, entry.Title);
+
+    private static readonly Dictionary<string, string> MenuNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["WISHMKR Jirachi"] = "Wishmaker Jirachi",
+    };
+
     /// <summary>The distribution picked when a Pokémon has several (otherwise: the game's own language, then the most copies).</summary>
     private static readonly HashSet<string> Preferred = new(StringComparer.OrdinalIgnoreCase)
     {
