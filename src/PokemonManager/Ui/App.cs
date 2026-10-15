@@ -977,10 +977,10 @@ public sealed class App
 
     /// <summary>
     /// Resuming a save state brings back the game's memory as it was, with the old clock in it; the new time
-    /// shows only when the game starts from its save. Offers to delete the state (unless Save State Deletion
-    /// already did on writing).
+    /// shows only when the game starts from its save. Offers to move the state to the save's backups (unless
+    /// Save State Backup already did on writing).
     /// </summary>
-    private void OfferResumeStateDeletion(SaveEntry entry)
+    private void OfferResumeStateDeletion(SaveEntry entry, string saveBackup)
     {
         if (_settings.SaveStateDeletion || _paths.SdRoot is not { } sd)
             return;
@@ -988,12 +988,13 @@ public sealed class App
         if (states.Count == 0 && !draStic)
             return;
         if (_ui.Confirm($"{Names.Game(entry.Sav)} has a save state it would resume from, which keeps the old clock.\n" +
-                "Delete it so the game starts from its save with the new time?", "DELETE", "KEEP"))
+                "Move it to Backups so the game starts from its save with the new time?", "MOVE", "KEEP"))
         {
+            var backups = SaveStates.Backup.Beside(saveBackup);
             foreach (var (rom, root) in states)
-                SaveStates.DeleteSelected(sd, root, rom);
+                SaveStates.MoveSelected(sd, root, rom, backups);
             if (draStic)
-                SaveStates.DeleteDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"));
+                SaveStates.MoveDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"), backups);
         }
     }
 
@@ -1009,8 +1010,8 @@ public sealed class App
     }
 
     /// <summary>
-    /// Before a change is written: with Save State Deletion and Save State Warning on, and a save state that writing
-    /// would delete, asks first (No by default). "Yes, don't warn me again" turns Save State Warning off. On No the
+    /// Before a change is written: with Save State Backup and Save State Warning on, and a save state that writing
+    /// would move away, asks first (No by default). "Yes, don't warn me again" turns Save State Warning off. On No the
     /// saves are put back as they are on disk, and false is returned.
     /// </summary>
     private bool ConfirmStateLoss(params SaveEntry[] entries)
@@ -1026,7 +1027,7 @@ public sealed class App
                         Console.Error.WriteLine($"save state: none for {rom} (emulator {SaveStates.EmuName(root, rom) ?? "?"}, roms {root})");
             return true;
         }
-        const string message = "This will delete your current save state.\nContinue?";
+        const string message = "This will move your current save state\nto Backups. Continue?";
         string[] answers = ["Yes, don't warn me again", "Yes", "No"];
         var title = string.Join(" & ", entries.Select(e => Names.Game(e.Sav)).Distinct());
         int? pick = _boxViewer.Choose(title, message, answers, 2);
@@ -1050,9 +1051,9 @@ public sealed class App
         Console.Error.WriteLine($"clock: set {hour:00}:{minute:00} at device {now:yyyy-MM-dd HH:mm:ss} (.NET local {DateTime.Now:HH:mm:ss}, " +
             $"UTC {DateTime.UtcNow:HH:mm:ss}, TZ={Environment.GetEnvironmentVariable("TZ") ?? "-"})");
         var rtc = GameClock.Set(entry.Sav, now, weekday, hour, minute, rtcPath);
-        if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
+        if (!ConfirmStateLoss(entry) || !TryWrite(entry, out var saveBackup))
             return;
-        OfferResumeStateDeletion(entry);
+        OfferResumeStateDeletion(entry, saveBackup);
         if (rtc is not null && rtcPath is not null)
         {
             try
@@ -1758,7 +1759,7 @@ public sealed class App
         string[] onOff = ["Disabled", "Enabled"];
         var names = new List<string>
         {
-            "Illegal Transfers", "PC Box View", "Save State Deletion", "Save State Warning",
+            "Illegal Transfers", "PC Box View", "Save State Backup", "Save State Warning",
             "Gallery: All Languages", "Gallery: Unreleased Files", "Reset to Default",
         };
         // shown under the list for the highlighted setting, as in NextUI's in-game menu
@@ -1766,8 +1767,8 @@ public sealed class App
         [
             "Move Pokémon between any games PKHeX can convert,\nskipping the games' own trade requirements.\nThey'll usually be flagged as illegal.",
             "Browse Pokémon on each game's own PC screen.\nOff lists them instead.",
-            "Delete the game's save state after every change,\nso resuming it can't undo the change.",
-            "Ask before a change deletes a save state.",
+            "Move the game's save state to Backups after every\nchange, so resuming it can't undo the change.",
+            "Ask before a change moves a save state.",
             "List Events Gallery files in every language,\nnot just the game's.",
             "Add debug and test files that were never\ndistributed to the Events Gallery.",
             "Put every setting back to how it was\nwhen the pak was installed.",
@@ -1836,18 +1837,20 @@ public sealed class App
         {
             try
             {
-                // Resuming the game would load a state from before this change and undo it.
+                // Resuming the game would load a state from before this change and undo it: it goes to the save's
+                // backups, next to the .sav backups.
+                var backups = SaveStates.Backup.Beside(backup);
                 foreach (var rom in RomIndex.FindRoms(entry.Path))
                     foreach (var root in _paths.RomRoots)
-                        SaveStates.DeleteSelected(sd, root, rom);
+                        SaveStates.MoveSelected(sd, root, rom, backups);
                 // the DS pak's DraStic keeps its own auto save state
                 if (entry.Sav.Generation >= 4)
-                    SaveStates.DeleteDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"));
+                    SaveStates.MoveDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"), backups);
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"couldn't delete the save state for {entry.FileName}: {ex}");
-                _ui.Message($"{entry.FileName} was saved, but its save state couldn't be deleted: don't resume it, or the change is undone.");
+                Console.Error.WriteLine($"couldn't move the save state for {entry.FileName}: {ex}");
+                _ui.Message($"{entry.FileName} was saved, but its save state couldn't be moved: don't resume it, or the change is undone.");
             }
         }
         return true;
@@ -1909,7 +1912,7 @@ public sealed class App
         ("Why did my change disappear?",
             "Resuming a save state brings back the game as it was before the change, and the next in-game save " +
             "writes the old data back.\n\nClose the game before using Pokémon Manager, and start it fresh from " +
-            "its save afterwards. Settings > Save State Deletion deletes the state for you."),
+            "its save afterwards. Settings > Save State Backup moves the state to Backups for you."),
         ("Where are my backups?",
             "Before every change, the save is copied to PokemonManager/Backups on the SD card, in a folder for each " +
             "game, trainer and ID. The last 999 are kept.\n\nTo go back, copy a backup over the save in the Saves " +
