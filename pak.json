@@ -1,6 +1,6 @@
 {
   "name": "Pokemon Manager",
-  "version": "v0.2.43",
+  "version": "v0.2.44",
   "type": "TOOL",
   "description": "PKHeX-powered save manager: move Pokémon between games, perform trade evolutions, and inject Mystery Gifts, Mystery Events and e-Reader cards.",
   "author": "ProClifo",
