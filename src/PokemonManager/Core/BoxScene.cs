@@ -92,7 +92,8 @@ public sealed class BoxScene(string assetDir)
     };
 
     /// <summary>The art sets to take a save's icons and sprites from, best first: its own game's, then
-    /// Emerald's and Platinum's for anything that game lacks (Gen 5 saves use Platinum's).</summary>
+    /// Emerald's and Platinum's for anything that game lacks. Black/White's sets carry every Gen 5 icon but only
+    /// Gen 5's sprites (Black 2/White 2 its own sprites); the older Pokémon's icons come from Platinum's.</summary>
     public static string[] ArtSets(SaveFile sav)
     {
         var own = sav switch
@@ -105,12 +106,16 @@ public sealed class BoxScene(string assetDir)
             SAV3E => "e",
             SAV3FRLG => "frlg",
             SAV3 => "rs",
+            SAV5B2W2 => "b2w2",
+            SAV5 => "bw",
             _ => "pt",
         };
         return own switch
         {
             "e" => ["e", "pt"],
             "pt" => ["pt", "e"],
+            "bw" => ["bw", "pt", "e"],
+            "b2w2" => ["b2w2", "bw", "pt", "e"],
             _ => [own, "e", "pt"],
         };
     }

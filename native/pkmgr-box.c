@@ -1032,19 +1032,12 @@ static void draw_sprite(SDL_Surface *screen, const Layout *l, Slot *slot, int cx
     if (sprite == NULL)
         return;
     SDL_Rect src = slot->sprite_rect.w ? slot->sprite_rect : (SDL_Rect){0, 0, sprite->w, sprite->h};
-    if (src.w > size)
-    {
-        src.x += (src.w - size) / 2;
-        src.w = size;
-    }
-    if (src.h > size)
-    {
-        src.y += src.h - size;
-        src.h = size;
-    }
+    // A sprite bigger than the game's frame (Gen 5's 96x96 Pokémon in Platinum's 80x80) overflows it: centred
+    // across, its feet where a frame-sized one's would be.
+    int top = src.h > size ? cy + size / 2 - src.h : cy - src.h / 2;
     if (!flip)
     {
-        blit_scaled(sprite, &src, screen, l, cx - src.w / 2, cy - src.h / 2);
+        blit_scaled(sprite, &src, screen, l, cx - src.w / 2, top);
         return;
     }
     SDL_Surface *part = SDL_CreateRGBSurfaceWithFormat(0, src.w, src.h, 32, SDL_PIXELFORMAT_ARGB8888);
@@ -1062,7 +1055,7 @@ static void draw_sprite(SDL_Surface *screen, const Layout *l, Slot *slot, int cx
                 to[x] = from[src.w - 1 - x];
         }
         SDL_SetSurfaceBlendMode(mirror, SDL_BLENDMODE_BLEND);
-        blit_scaled(mirror, NULL, screen, l, cx - src.w / 2, cy - src.h / 2);
+        blit_scaled(mirror, NULL, screen, l, cx - src.w / 2, top);
     }
     SDL_FreeSurface(part);
     SDL_FreeSurface(mirror);

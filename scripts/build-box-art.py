@@ -20,6 +20,7 @@ palette and their party icons in grey (Gen 1 icons are assembled from overworld 
 like the game's OAM code); Gold/Silver/Crystal sprites in their Game Boy Color palettes and party icons
 in the party menu's palette. Game Boy icons stay 16x16, at the bottom of a Gen 3 sized cell. Requires Pillow.
 """
+import glob
 import json
 import os
 import re
@@ -504,6 +505,129 @@ def gen4(root, out, dex):
 # ------------------------------------------------------------------ main
 
 
+# Gen 5 (Black/White, Black 2/White 2): no decompilation has their art, so it comes from ripped sheets in
+# assets/gen5 (The Spriters Resource): <set>/<first>-<last>[-shiny].png, 96x96 front sprites in rows of eight, each
+# cell on its own background colour with its dex number in a 7-pixel strip below ("003-F", "386-03"), and
+# icons.png, the Gen 5 Pokémon's box icons (ripped by Ploaj), two 32x32 frames each.
+GEN5_CELL, GEN5_PITCH = 96, 103
+# The label font: every glyph the sheets use, as rows of 7.
+GEN5_GLYPHS = {
+    ".../.../.../###/.../.../...": "-",
+    ".###./#...#/#...#/#...#/#...#/#...#/.###.": "0",
+    ".#./##./.#./.#./.#./.#./###": "1",
+    ".###./#...#/....#/...#./..#../.#.../#####": "2",
+    ".###./#...#/....#/..##./....#/#...#/.###.": "3",
+    "...#./..##./.#.#./#..#./#####/...#./...#.": "4",
+    "#####/#..../####./....#/....#/#...#/.###.": "5",
+    "..##./.#.../#..../####./#...#/#...#/.###.": "6",
+    "#####/....#/...#./...#./..#../..#../..#..": "7",
+    ".###./#...#/#...#/.###./#...#/#...#/.###.": "8",
+    ".###./#...#/#...#/.####/....#/...#./.##..": "9",
+    "#####/#..../#..../####./#..../#..../#....": "F",
+    "##...##/##...##/#.#.#.#/#.#.#.#/#..#..#/#..#..#/#.....#": "M",
+}
+
+
+def gen5_label(strip):
+    """The dex label in a cell's 96x7 strip ("003-F"), read glyph by glyph (columns of ink between gaps)."""
+    w, h = strip.size
+    ink = [any(strip.getpixel((x, y))[3] > 0 for y in range(h)) for x in range(w)]
+    text, x = "", 0
+    while x < w:
+        if not ink[x]:
+            x += 1
+            continue
+        start = x
+        while x < w and ink[x]:
+            x += 1
+        bm = "/".join("".join("#" if strip.getpixel((c, y))[3] > 0 else "." for c in range(start, x)) for y in range(h))
+        if bm not in GEN5_GLYPHS:
+            raise ValueError(f"unknown glyph in a Gen 5 sheet label: {bm}")
+        text += GEN5_GLYPHS[bm]
+    return text
+
+
+def gen5_key(label):
+    """"003-F" -> "3-f", "003-M" / "003" -> "3", "386-03" -> "386-3" (the art index's names)."""
+    parts = label.split("-")
+    name = str(int(parts[0]))
+    if len(parts) > 1:
+        name += "-f" if parts[1] == "F" else "" if parts[1] == "M" else f"-{int(parts[1])}"
+    return name
+
+
+def gen5_sprites(sheet_dir, out):
+    count = 0
+    for path in sorted(glob.glob(os.path.join(sheet_dir, "*.png"))):
+        shiny = path.endswith("-shiny.png")
+        sheet = Image.open(path).convert("RGBA")
+        for row in range((sheet.height + GEN5_PITCH - 1) // GEN5_PITCH):
+            y = row * GEN5_PITCH
+            if y + GEN5_PITCH - 1 > sheet.height:
+                break
+            for col in range(sheet.width // GEN5_CELL):
+                x = col * GEN5_CELL
+                label = gen5_label(sheet.crop((x, y + GEN5_CELL, x + GEN5_CELL, y + GEN5_CELL + 7)))
+                if not label:
+                    continue
+                cell = sheet.crop((x, y, x + GEN5_CELL, y + GEN5_CELL))
+                # the cell's own background colour, wherever it is, becomes see-through
+                background = cell.getpixel((0, 0))
+                cell.putdata([(0, 0, 0, 0) if p == background else p for p in cell.getdata()])
+                name = gen5_key(label) + ("-shiny" if shiny else "")
+                save(trimmed(cell), os.path.join(out, "sprites", name + ".png"))
+                count += 1
+    return count
+
+
+# The icon sheet: 14 cells (7 Pokémon) a row from Victini on, with Blue-Striped Basculin after Basculin and
+# Pirouette Meloetta after Meloetta; then an "Other Forms" block from y 768 (only the ones known for sure here).
+GEN5_ICON_FORMS = ["521-f", "592-f", "593-f", "555-1", "647-1"]
+
+
+def gen5_icons(path, out):
+    sheet = Image.open(path).convert("RGB")
+    green = (0, 128, 0)
+
+    def frames(top, rows):
+        cells = []
+        for r in range(rows):
+            for c in range(14):
+                x, y = c * 33 + 1, top + r * 33 + 1
+                cell = sheet.crop((x, y, x + 32, y + 32))
+                if cell.getpixel((0, 0)) != green or len(cell.getcolors(4096) or []) <= 1:
+                    continue
+                rgba = cell.convert("RGBA")
+                rgba.putdata([(0, 0, 0, 0) if p[:3] == green else p for p in rgba.getdata()])
+                cells.append(rgba)
+        return [icon_frames(cells[i], cells[i + 1]) for i in range(0, len(cells) - 1, 2)]
+
+    names = []
+    for species in range(494, 650):
+        names.append(str(species))
+        if species == 550:
+            names.append("550-1")
+        if species == 648:
+            names.append("648-1")
+    main = frames(0, 23)
+    if len(main) != len(names):
+        raise ValueError(f"the Gen 5 icon sheet has {len(main)} icons, expected {len(names)}")
+    for name, icon in zip(names, main):
+        save(icon, os.path.join(out, "icons", name + ".png"))
+    for name, icon in zip(GEN5_ICON_FORMS, frames(768, 3)):
+        save(icon, os.path.join(out, "icons", name + ".png"))
+    return len(main)
+
+
+def gen5(assets, out):
+    """Black/White's sprites with every Gen 5 icon ("bw"), and Black 2/White 2's sprites ("b2w2", whose icons
+    are the same, so it falls back to "bw" for them)."""
+    counts = {"bw": gen5_sprites(os.path.join(assets, "bw"), os.path.join(out, "bw"))}
+    gen5_icons(os.path.join(assets, "icons.png"), os.path.join(out, "bw"))
+    counts["b2w2"] = gen5_sprites(os.path.join(assets, "b2w2"), os.path.join(out, "b2w2"))
+    return counts
+
+
 def preview(path, species=("25", "1", "7", "150", "201-7")):
     """A few species' icons and sprites from every set, for checking."""
     sets = sorted(STORE)
@@ -535,6 +659,7 @@ def main():
         "frlg": gen3(os.path.join(src, "pokefirered"), os.path.join(out, "frlg"), dex, *gen3_icon_palettes(os.path.join(src, "pokefirered"))),
         "pt": gen4(os.path.join(src, "pokeplatinum"), os.path.join(out, "pt"), dex),
     }
+    counts.update(gen5(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "gen5"), out))
     if len(sys.argv) > 3:
         preview(sys.argv[3])
     for set_dir, images in STORE.items():

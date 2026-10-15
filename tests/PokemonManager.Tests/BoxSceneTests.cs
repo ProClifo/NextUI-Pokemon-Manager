@@ -103,6 +103,8 @@ public sealed class BoxSceneTests : IDisposable
         Assert.Equal(["rs", "e", "pt"], BoxScene.ArtSets(_saves.Create(GameVersion.R, "Ruby.sav").Sav));
         Assert.Equal(["frlg", "e", "pt"], BoxScene.ArtSets(_saves.Create(GameVersion.FR, "FireRed.sav").Sav));
         Assert.Equal(["pt", "e"], BoxScene.ArtSets(_saves.Create(GameVersion.HG, "HeartGold.sav").Sav));
+        Assert.Equal(["bw", "pt", "e"], BoxScene.ArtSets(_saves.Create(GameVersion.B, "Black.sav").Sav));
+        Assert.Equal(["b2w2", "bw", "pt", "e"], BoxScene.ArtSets(_saves.Create(GameVersion.B2, "Black2.sav").Sav));
 
         var red = _saves.Create(GameVersion.RD, "Red.sav").Sav;
         var pikachu = TestSaves.Make(red, Species.Pikachu, 5);
