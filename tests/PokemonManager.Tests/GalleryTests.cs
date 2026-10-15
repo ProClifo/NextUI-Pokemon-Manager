@@ -256,6 +256,8 @@ public sealed class GalleryTests : IDisposable
         // Lugia too: there's no German Mystic Ticket, so Navel Rock can't be reached.
         var germanList = GalleryLists.Distributions(gallery, profile with { Language = "GER" });
         Assert.Equal(["10 ANIV Lugia", "WISHMKR Jirachi"], germanList.Select(d => d.Title));
+        // the menu spells the trainer-name titles out
+        Assert.Equal(["10th Anniversary Lugia", "Wishmaker Jirachi"], germanList.Select(GalleryLists.MenuName));
         var german = germanList[1];
         Assert.Equal("ENG", german.Language);
         var germanSave = _saves.Create(GameVersion.E, "German.sav", language: LanguageID.German).Sav;

@@ -688,13 +688,29 @@ public static class GalleryLists
             .FirstOrDefault();
 
     /// <summary>A distribution's name on the Distributions menu: its gallery title, spelled out where that's shortened.</summary>
-    public static string MenuName(GalleryEntry entry) => MenuNames.GetValueOrDefault(entry.Title, entry.Title);
+    public static string MenuName(GalleryEntry entry)
+    {
+        if (MenuNames.TryGetValue(entry.Title, out var name))
+            return name;
+        // the trainer names some distributions are titled by ("10ANNIV Lugia", "CHANNEL Jirachi")
+        foreach (var (from, to) in MenuWords)
+        {
+            if (entry.Title.StartsWith(from + " ", StringComparison.Ordinal))
+                return to + entry.Title[from.Length..];
+        }
+        return entry.Title;
+    }
 
     private static readonly Dictionary<string, string> MenuNames = new(StringComparer.OrdinalIgnoreCase)
     {
         ["WISHMKR Jirachi"] = "Wishmaker Jirachi",
         ["AGETO Celebi"] = "Ageto Celebi",
     };
+
+    private static readonly (string From, string To)[] MenuWords =
+    [
+        ("10ANNIV", "10th Anniversary"), ("10 ANIV", "10th Anniversary"), ("CHANNEL", "Channel"), ("SPACE C", "Space C"),
+    ];
 
     /// <summary>The distribution picked when a Pokémon has several (otherwise: the game's own language, then the most copies).</summary>
     private static readonly HashSet<string> Preferred = new(StringComparer.OrdinalIgnoreCase)
