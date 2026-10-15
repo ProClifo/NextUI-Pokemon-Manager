@@ -1723,21 +1723,21 @@ public sealed class App
     /// <summary>The game day Gen 2's Mystery Gift counts its five a day by (its own clock, not the device's).</summary>
     private int GiftDay(SaveEntry entry) => GameClock.Day((SAV2)entry.Sav, RtcPath(entry), ClockNow(entry.Sav));
 
+    /// <summary>One gift, as the game's Mystery Gift gives them: an item waits at the Pokémon Center, a decoration goes home.</summary>
     private void DailyMysteryGift(SaveEntry entry)
     {
-        if (entry.Sav is not SAV2 sav || !_ui.Confirm("Inject daily Mystery Gifts?"))
+        if (entry.Sav is not SAV2 sav || !_ui.Confirm("Inject random Mystery Gift?"))
             return;
-        var gifts = MysteryGift2.Receive(sav, GiftDay(entry), Random.Shared);
-        if (gifts is null)
+        if (MysteryGift2.ItemWaiting(sav))
         {
-            _ui.Message("There's no room for the gifts in the bag or the PC.");
+            _ui.Message("Must receive Mystery Gift at Pokémon Center.");
             return;
         }
+        if (MysteryGift2.Receive(sav, GiftDay(entry), Random.Shared) is not { } gift)
+            return;
         if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
             return;
-        // a decoration goes to the PC, as the game says: "<decoration> was sent home."
-        // six lines: the message screen's limit on the 640x480 devices (MAIN_ROW_COUNT), so no blank line
-        _ui.Message("Mystery Gifts received:\n" + string.Join("\n", gifts.Select(g => g.Decoration ? $"• {g.Name} (sent home)" : $"• {g.Name}")));
+        _ui.Message(gift.Decoration ? $"{gift.Name} sent home!" : $"{gift.Name} sent to Pokémon Center!");
     }
 
     // ---------------------------------------------------------------- files

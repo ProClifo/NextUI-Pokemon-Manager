@@ -15,6 +15,8 @@ namespace PokemonManager.Core;
 /// partner's trainer ID. A decoration already received by Mystery Gift (sMysteryGiftDecorationsReceived) is
 /// replaced by the item (engine/link/mystery_gift.asm, DoMysteryGift). The game puts received decorations in the
 /// PC's decorations when the save is continued (CopyMysteryGiftReceivedDecorationsToPC).</item>
+/// <item>An item waits in sBackupMysteryGiftItem for the man on the Pokémon Center's 2nd floor (GetMysteryGiftItem);
+/// while one waits, no gift can be received.</item>
 /// </list>
 /// Japanese and Korean games lay SRAM out differently, so they aren't supported.
 /// </summary>
@@ -22,7 +24,9 @@ public static class MysteryGift2
 {
     public const int GiftsPerDay = 5;
 
+    private const int WorkingItem = 0xBE2;  // sMysteryGiftItem: what the Pokémon Center 2F man hands over
     private const int WorkingCount = 0xBE3; // sMysteryGiftUnlocked: copied from the count when the game loads
+    private const int WaitingItem = 0xBE4;  // sBackupMysteryGiftItem: the saved item, copied to sMysteryGiftItem on load
     private const int Count = 0xBE5;        // sNumDailyMysteryGiftPartnerIDs
     private const int PartnerIds = 0xBE6;   // sDailyMysteryGiftPartnerIDs, big endian
     private const int Decorations = 0xBF0;  // sMysteryGiftDecorationsReceived, a flag per DECOFLAG_*
@@ -55,7 +59,7 @@ public static class MysteryGift2
         (3, "Pikachu Bed"), (36, "Unown Doll"), (39, "Tentacool Doll"), // can't be picked
     ];
 
-    /// <summary>A gift: an item, or a decoration sent home to the PC.</summary>
+    /// <summary>A gift: an item waiting at the Pokémon Center, or a decoration sent home.</summary>
     public sealed record Gift(string Name, bool Decoration);
 
     public static bool Supported(SaveFile sav) => sav is SAV2 { Japanese: false, Korean: false };
@@ -77,58 +81,49 @@ public static class MysteryGift2
     }
 
     /// <summary>
-    /// Receives today's remaining gifts (one from each of up to five new partners): items into the bag, or the PC
-    /// when its pocket is full, decorations to the PC. Returns them, or null (and changes nothing) when there's no
-    /// room for an item.
+    /// Whether an item is waiting at the Pokémon Center (sBackupMysteryGiftItem): until the man upstairs hands it
+    /// over, the game takes no more gifts (DoMysteryGift's .GiftWaiting).
     /// </summary>
-    public static List<Gift>? Receive(SAV2 sav, int today, Random rng)
+    public static bool ItemWaiting(SAV2 sav) => sav.Data[WaitingItem] != 0;
+
+    /// <summary>
+    /// Receives one gift from a new partner, as the game's DoMysteryGift does: a decoration is sent home (the game
+    /// puts it in the PC on Continue), an item waits at the Pokémon Center 2F. Null when none can be received now:
+    /// none left today, or an item still waiting.
+    /// </summary>
+    public static Gift? Receive(SAV2 sav, int today, Random rng)
     {
-        int left = Left(sav, today);
-        if (left == 0)
-            return [];
+        if (Left(sav, today) == 0 || ItemWaiting(sav))
+            return null;
         var data = sav.Data;
-        int count = DayPassed(sav, today) ? 0 : data[Count];
-        var bag = sav.Inventory;
-        var gifts = new List<Gift>();
-        var decorations = new List<int>();
-        var itemNames = GameInfo.GetStrings("en").GetItemStrings(EntityContext.Gen2);
-        var partners = new List<ushort>();
-        for (int i = 0; i < left; i++)
+        if (DayPassed(sav, today))
         {
-            // a different trainer for each gift, never yourself (the game turns down the same one twice a day)
-            ushort partner;
-            do partner = (ushort)rng.Next(0x10000);
-            while (partner == sav.TID16 || partners.Contains(partner) || SentToday(sav, count, partner));
-            partners.Add(partner);
-            // the partner's game: SentDeco (Random & 1), WhichItem (ID as is), WhichDeco (its bytes swapped)
-            bool sendDeco = (rng.Next(256) & 1) != 0;
-            ushort item = Items[Sample(rng, partner)];
-            var deco = Decos[Sample(rng, (ushort)(partner << 8 | partner >> 8))];
-            if (sendDeco && !DecorationReceived(sav, deco.Flag) && !decorations.Contains(deco.Flag))
-            {
-                decorations.Add(deco.Flag);
-                gifts.Add(new Gift(deco.Name, true));
-                continue;
-            }
-            if (!Give(bag, item))
-                return null;
-            gifts.Add(new Gift(itemNames[item], false));
-        }
-        bag.CopyTo(sav);
-        foreach (var flag in decorations)
-            data[Decorations + (flag >> 3)] |= (byte)(1 << (flag & 7));
-        if (count == 0)
-        {
+            // DoMysteryGiftIfDayHasPassed: a new day's five, counted from today
+            data[Count] = 0;
             data[Timer] = 1; // InitOneDayCountdown
             data[Timer + 1] = (byte)(today % DaysWrap);
         }
-        for (int i = 0; i < partners.Count; i++)
+        int count = data[Count];
+        // a trainer not met today, never yourself (the game turns down the same one twice a day)
+        ushort partner;
+        do partner = (ushort)rng.Next(0x10000);
+        while (partner == sav.TID16 || SentToday(sav, count, partner));
+        data[PartnerIds + 2 * count] = (byte)(partner >> 8);
+        data[PartnerIds + 2 * count + 1] = (byte)partner;
+        data[Count] = data[WorkingCount] = (byte)(count + 1);
+
+        // the partner's game: SentDeco (Random & 1), WhichItem (ID as is), WhichDeco (its bytes swapped)
+        bool sendDeco = (rng.Next(256) & 1) != 0;
+        ushort item = Items[Sample(rng, partner)];
+        var deco = Decos[Sample(rng, (ushort)(partner << 8 | partner >> 8))];
+        if (sendDeco && !DecorationReceived(sav, deco.Flag))
         {
-            data[PartnerIds + 2 * (count + i)] = (byte)(partners[i] >> 8);
-            data[PartnerIds + 2 * (count + i) + 1] = (byte)partners[i];
+            data[Decorations + (deco.Flag >> 3)] |= (byte)(1 << (deco.Flag & 7));
+            return new Gift(deco.Name, true);
         }
-        data[Count] = data[WorkingCount] = GiftsPerDay;
-        return gifts;
+        // waiting for the Pokémon Center: sBackupMysteryGiftItem, and sMysteryGiftItem the game restores it to
+        data[WaitingItem] = data[WorkingItem] = (byte)item;
+        return new Gift(GameInfo.GetStrings("en").GetItemStrings(EntityContext.Gen2)[item], false);
     }
 
     private static bool DecorationReceived(SAV2 sav, int flag) => (sav.Data[Decorations + (flag >> 3)] >> (flag & 7) & 1) != 0;
@@ -138,17 +133,6 @@ public static class MysteryGift2
         for (int i = 0; i < count; i++)
         {
             if ((sav.Data[PartnerIds + 2 * i] << 8 | sav.Data[PartnerIds + 2 * i + 1]) == partner)
-                return true;
-        }
-        return false;
-    }
-
-    private static bool Give(PlayerBag bag, ushort item)
-    {
-        foreach (var type in new[] { InventoryType.Items, InventoryType.Balls, InventoryType.PCItems })
-        {
-            var pouch = bag.GetPouch(type);
-            if (pouch.CanContain(item) && pouch.GiveItem(bag, item, 1) > 0)
                 return true;
         }
         return false;

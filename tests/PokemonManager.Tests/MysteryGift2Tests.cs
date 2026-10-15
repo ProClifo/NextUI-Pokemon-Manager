@@ -22,23 +22,40 @@ public sealed class MysteryGift2Tests
     }
 
     [Fact]
-    public void FiveGiftsADayGoIntoTheBag()
+    public void AnItemWaitsAtThePokemonCenterUntilCollected()
     {
         var sav = Crystal(unlocked: true);
-        var gifts = MysteryGift2.Receive(sav, 10, new Random(1));
-        Assert.NotNull(gifts);
-        Assert.Equal(5, gifts.Count);
-        var bag = sav.Inventory;
-        var names = GameInfo.GetStrings("en").GetItemStrings(EntityContext.Gen2);
-        foreach (var gift in gifts.Where(g => !g.Decoration))
-            Assert.Contains(bag.Pouches, p => p.Items.Any(i => i.Count > 0 && names[i.Index] == gift.Name));
-        // the game sees today's five, with the countdown started today
-        Assert.Equal(5, sav.Data[0xBE5]);
+        var rng = new Random(1);
+        int received = 0;
+        while (received < 5)
+        {
+            var gift = MysteryGift2.Receive(sav, 10, rng);
+            Assert.NotNull(gift);
+            received++;
+            if (!gift.Decoration)
+            {
+                // the item waits for the man on the Pokémon Center's 2nd floor, blocking the next gift
+                Assert.True(MysteryGift2.ItemWaiting(sav));
+                Assert.NotEqual(0, sav.Data[0xBE4]);
+                Assert.Equal(sav.Data[0xBE4], sav.Data[0xBE2]);
+                Assert.Null(MysteryGift2.Receive(sav, 10, rng));
+                // collected in the game, then saved
+                sav.Data[0xBE2] = sav.Data[0xBE4] = 0;
+            }
+            // the game counts each one
+            Assert.Equal(received, sav.Data[0xBE5]);
+        }
+        // five a day, the countdown started today
         Assert.Equal(new byte[] { 1, 10 }, sav.Data.Slice(0xBFA, 2).ToArray());
         Assert.Equal(0, MysteryGift2.Left(sav, 10));
+        Assert.Null(MysteryGift2.Receive(sav, 10, rng));
         Assert.Equal(5, MysteryGift2.Left(sav, 11));
         // wCurDay wraps at 140
         Assert.Equal(0, MysteryGift2.Left(sav, 150));
+        // the next day starts a new count
+        Assert.NotNull(MysteryGift2.Receive(sav, 11, rng));
+        Assert.Equal(1, sav.Data[0xBE5]);
+        Assert.Equal(11, sav.Data[0xBFB]);
     }
 
     [Fact]
@@ -50,18 +67,20 @@ public sealed class MysteryGift2Tests
         int items = 0;
         for (int day = 0; day < 60; day++)
         {
-            var gifts = MysteryGift2.Receive(sav, day, rng)!;
-            Assert.Equal(5, gifts.Count);
-            decorations.AddRange(gifts.Where(g => g.Decoration).Select(g => g.Name));
-            items += gifts.Count(g => !g.Decoration);
-            // the bag would fill up: empty it each day
-            var bag = sav.Inventory;
-            foreach (var pouch in bag.Pouches)
-                foreach (var i in pouch.Items)
-                    i.Clear();
-            bag.CopyTo(sav);
+            for (int i = 0; i < 5; i++)
+            {
+                var gift = MysteryGift2.Receive(sav, day, rng)!;
+                if (gift.Decoration)
+                {
+                    Assert.False(MysteryGift2.ItemWaiting(sav)); // a decoration doesn't wait anywhere
+                    decorations.Add(gift.Name);
+                }
+                else
+                    items++;
+                sav.Data[0xBE2] = sav.Data[0xBE4] = 0;
+            }
         }
-        // each decoration once (later ones become items); the first day's are about half
+        // each decoration once (later ones become items); about half at first
         Assert.Equal(decorations.Count, decorations.Distinct().Count());
         Assert.InRange(decorations.Count, 10, 34);
         Assert.DoesNotContain("Pikachu Bed", decorations);
