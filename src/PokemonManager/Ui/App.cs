@@ -343,8 +343,8 @@ public sealed class App
                 actions.Add((tickets[0].Ticket.Name, LegalTag(tickets[0].Legal), () => GiveTicket(entry, tickets[0])));
             else if (tickets.Count > 1)
                 actions.Add(("Mystery Gift", null, () => EventsMenu(entry, tickets)));
-            // Gold/Silver/Crystal's daily Mystery Gift: once unlocked in Goldenrod, and only while today's five are left
-            if (sav is SAV2 gsc && MysteryGift2.Left(gsc, GiftDay(entry)) > 0)
+            // Gold/Silver/Crystal's daily Mystery Gift, once unlocked in Goldenrod
+            if (sav is SAV2 gsc && MysteryGift2.Unlocked(gsc))
                 actions.Add(("Mystery Gift", null, () => DailyMysteryGift(entry)));
             // Gen 1/2's event-only Pokémon get their own entries (Gen 1/2's other distributions are in the Gallery):
             // Mew in Gen 1 (and Korean Gen 2, which can't link with Gen 1), Celebi in Gen 2 outside Japan, where the
@@ -1728,7 +1728,12 @@ public sealed class App
     {
         if (entry.Sav is not SAV2 sav)
             return;
-        // an item still waiting blocks the next gift: no question, just the reason
+        // no question when the game would turn the gift down, just its reason, checked in its order (DoMysteryGift)
+        if (MysteryGift2.Left(sav, GiftDay(entry)) == 0)
+        {
+            _ui.Message("Sorry--only five\ngifts a day.");
+            return;
+        }
         if (MysteryGift2.ItemWaiting(sav))
         {
             _ui.Message("Must receive Mystery Gift\nat Pokémon Center.");
