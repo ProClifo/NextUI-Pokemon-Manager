@@ -10,8 +10,11 @@ namespace PokemonManager.Core;
 /// Mystery Gift (UnlockMysteryGift) and the game is saved; then it counts today's gifts, five at most.</item>
 /// <item>sMysteryGiftTimer is a one-day countdown: days left, then the game day it started on (InitOneDayCountdown).
 /// The count goes back to 0 once a day has passed (DoMysteryGiftIfDayHasPassed).</item>
-/// <item>A gift is an item chosen by the partner's game from MysteryGiftItems (engine/link/mystery_gift_2.asm,
-/// StageDataForMysteryGift.RandomSample), partly from the partner's trainer ID.</item>
+/// <item>A gift is chosen by the partner's game (engine/link/mystery_gift_2.asm, StageDataForMysteryGift): half the
+/// time a decoration from MysteryGiftDecos, else an item from MysteryGiftItems, each by RandomSample, partly from the
+/// partner's trainer ID. A decoration already received by Mystery Gift (sMysteryGiftDecorationsReceived) is
+/// replaced by the item (engine/link/mystery_gift.asm, DoMysteryGift). The game puts received decorations in the
+/// PC's decorations when the save is continued (CopyMysteryGiftReceivedDecorationsToPC).</item>
 /// </list>
 /// Japanese and Korean games lay SRAM out differently, so they aren't supported.
 /// </summary>
@@ -22,6 +25,7 @@ public static class MysteryGift2
     private const int WorkingCount = 0xBE3; // sMysteryGiftUnlocked: copied from the count when the game loads
     private const int Count = 0xBE5;        // sNumDailyMysteryGiftPartnerIDs
     private const int PartnerIds = 0xBE6;   // sDailyMysteryGiftPartnerIDs, big endian
+    private const int Decorations = 0xBF0;  // sMysteryGiftDecorationsReceived, a flag per DECOFLAG_*
     private const int Timer = 0xBFA;        // sMysteryGiftTimer
     private const int Locked = 0xFF;
     private const int DaysWrap = 140;       // wCurDay wraps at 140 (FixDays)
@@ -35,6 +39,24 @@ public static class MysteryGift2
         0x18, 0x16, 0x22, 0x17, 0x40, 0x15, 0x28, 0x8C, // Water Stone, Fire Stone, Leaf Stone, Thunderstone, Max Ether, Max Elixer, Max Revive, Scope Lens
         0x1A, 0x3E,                                     // HP Up, PP Up (Rare Candy, Blue Sky Mail and Mirage Mail can't be picked)
     ];
+
+    /// <summary>MysteryGiftDecos, by index: each decoration's DECOFLAG_* and name (DecorationNames).</summary>
+    private static readonly (int Flag, string Name)[] Decos =
+    [
+        (22, "Jigglypuff Doll"), (26, "Poliwag Doll"), (27, "Diglett Doll"), (28, "Staryu Doll"),
+        (29, "Magikarp Doll"), (30, "Oddish Doll"), (31, "Gengar Doll"), (32, "Shellder Doll"),
+        (33, "Grimer Doll"), (34, "Voltorb Doll"), (13, "Clefairy Poster"), (14, "Jigglypuff Poster"),
+        (16, "Super NES"), (35, "Weedle Doll"), (37, "Geodude Doll"), (38, "Machop Doll"),
+        (8, "Magnaplant"), (9, "Tropicplant"), (15, "NES"), (17, "Nintendo 64"),
+        (23, "Bulbasaur Doll"), (25, "Squirtle Doll"), (1, "Pink Bed"), (2, "Polkadot Bed"),
+        (4, "Red Carpet"), (5, "Blue Carpet"), (6, "Yellow Carpet"), (7, "Green Carpet"),
+        (10, "Jumboplant"), (18, "Virtual Boy"), (41, "Big Onix"), (12, "Pikachu Poster"),
+        (42, "Big Lapras"), (20, "Surf Pikachu Doll"),
+        (3, "Pikachu Bed"), (36, "Unown Doll"), (39, "Tentacool Doll"), // can't be picked
+    ];
+
+    /// <summary>A gift: an item, or a decoration sent home to the PC.</summary>
+    public sealed record Gift(string Name, bool Decoration);
 
     public static bool Supported(SaveFile sav) => sav is SAV2 { Japanese: false, Korean: false };
 
@@ -55,10 +77,11 @@ public static class MysteryGift2
     }
 
     /// <summary>
-    /// Receives today's remaining gifts (one from each of up to five new partners) into the bag, or the PC when
-    /// its pocket is full. Returns the items, or null (and changes nothing) when there's no room.
+    /// Receives today's remaining gifts (one from each of up to five new partners): items into the bag, or the PC
+    /// when its pocket is full, decorations to the PC. Returns them, or null (and changes nothing) when there's no
+    /// room for an item.
     /// </summary>
-    public static List<ushort>? Receive(SAV2 sav, int today, Random rng)
+    public static List<Gift>? Receive(SAV2 sav, int today, Random rng)
     {
         int left = Left(sav, today);
         if (left == 0)
@@ -66,7 +89,9 @@ public static class MysteryGift2
         var data = sav.Data;
         int count = DayPassed(sav, today) ? 0 : data[Count];
         var bag = sav.Inventory;
-        var items = new List<ushort>();
+        var gifts = new List<Gift>();
+        var decorations = new List<int>();
+        var itemNames = GameInfo.GetStrings("en").GetItemStrings(EntityContext.Gen2);
         var partners = new List<ushort>();
         for (int i = 0; i < left; i++)
         {
@@ -75,12 +100,23 @@ public static class MysteryGift2
             do partner = (ushort)rng.Next(0x10000);
             while (partner == sav.TID16 || partners.Contains(partner) || SentToday(sav, count, partner));
             partners.Add(partner);
+            // the partner's game: SentDeco (Random & 1), WhichItem (ID as is), WhichDeco (its bytes swapped)
+            bool sendDeco = (rng.Next(256) & 1) != 0;
             ushort item = Items[Sample(rng, partner)];
+            var deco = Decos[Sample(rng, (ushort)(partner << 8 | partner >> 8))];
+            if (sendDeco && !DecorationReceived(sav, deco.Flag) && !decorations.Contains(deco.Flag))
+            {
+                decorations.Add(deco.Flag);
+                gifts.Add(new Gift(deco.Name, true));
+                continue;
+            }
             if (!Give(bag, item))
                 return null;
-            items.Add(item);
+            gifts.Add(new Gift(itemNames[item], false));
         }
         bag.CopyTo(sav);
+        foreach (var flag in decorations)
+            data[Decorations + (flag >> 3)] |= (byte)(1 << (flag & 7));
         if (count == 0)
         {
             data[Timer] = 1; // InitOneDayCountdown
@@ -92,8 +128,10 @@ public static class MysteryGift2
             data[PartnerIds + 2 * (count + i) + 1] = (byte)partners[i];
         }
         data[Count] = data[WorkingCount] = GiftsPerDay;
-        return items;
+        return gifts;
     }
+
+    private static bool DecorationReceived(SAV2 sav, int flag) => (sav.Data[Decorations + (flag >> 3)] >> (flag & 7) & 1) != 0;
 
     private static bool SentToday(SAV2 sav, int count, ushort partner)
     {

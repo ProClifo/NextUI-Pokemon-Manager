@@ -25,12 +25,13 @@ public sealed class MysteryGift2Tests
     public void FiveGiftsADayGoIntoTheBag()
     {
         var sav = Crystal(unlocked: true);
-        var items = MysteryGift2.Receive(sav, 10, new Random(1));
-        Assert.NotNull(items);
-        Assert.Equal(5, items.Count);
+        var gifts = MysteryGift2.Receive(sav, 10, new Random(1));
+        Assert.NotNull(gifts);
+        Assert.Equal(5, gifts.Count);
         var bag = sav.Inventory;
-        foreach (var item in items.Distinct())
-            Assert.Contains(bag.Pouches, p => p.HasItem(item));
+        var names = GameInfo.GetStrings("en").GetItemStrings(EntityContext.Gen2);
+        foreach (var gift in gifts.Where(g => !g.Decoration))
+            Assert.Contains(bag.Pouches, p => p.Items.Any(i => i.Count > 0 && names[i.Index] == gift.Name));
         // the game sees today's five, with the countdown started today
         Assert.Equal(5, sav.Data[0xBE5]);
         Assert.Equal(new byte[] { 1, 10 }, sav.Data.Slice(0xBFA, 2).ToArray());
@@ -38,6 +39,36 @@ public sealed class MysteryGift2Tests
         Assert.Equal(5, MysteryGift2.Left(sav, 11));
         // wCurDay wraps at 140
         Assert.Equal(0, MysteryGift2.Left(sav, 150));
+    }
+
+    [Fact]
+    public void HalfTheGiftsAreDecorationsUntilTheyreAllReceived()
+    {
+        var sav = Crystal(unlocked: true);
+        var rng = new Random(3);
+        var decorations = new List<string>();
+        int items = 0;
+        for (int day = 0; day < 60; day++)
+        {
+            var gifts = MysteryGift2.Receive(sav, day, rng)!;
+            Assert.Equal(5, gifts.Count);
+            decorations.AddRange(gifts.Where(g => g.Decoration).Select(g => g.Name));
+            items += gifts.Count(g => !g.Decoration);
+            // the bag would fill up: empty it each day
+            var bag = sav.Inventory;
+            foreach (var pouch in bag.Pouches)
+                foreach (var i in pouch.Items)
+                    i.Clear();
+            bag.CopyTo(sav);
+        }
+        // each decoration once (later ones become items); the first day's are about half
+        Assert.Equal(decorations.Count, decorations.Distinct().Count());
+        Assert.InRange(decorations.Count, 10, 34);
+        Assert.DoesNotContain("Pikachu Bed", decorations);
+        Assert.Equal(300, decorations.Count + items);
+        // the game's received flags: Jigglypuff Doll is DECOFLAG 22, byte 2 bit 6
+        if (decorations.Contains("Jigglypuff Doll"))
+            Assert.Equal(0x40, sav.Data[0xBF0 + 2] & 0x40);
     }
 
     [Fact]

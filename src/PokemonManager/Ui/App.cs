@@ -1727,16 +1727,16 @@ public sealed class App
     {
         if (entry.Sav is not SAV2 sav || !_ui.Confirm("Inject daily Mystery Gifts?"))
             return;
-        var items = MysteryGift2.Receive(sav, GiftDay(entry), Random.Shared);
-        if (items is null)
+        var gifts = MysteryGift2.Receive(sav, GiftDay(entry), Random.Shared);
+        if (gifts is null)
         {
             _ui.Message("There's no room for the gifts in the bag or the PC.");
             return;
         }
         if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
             return;
-        var names = GameInfo.GetStrings("en").GetItemStrings(EntityContext.Gen2);
-        _ui.Message("Mystery Gifts received:\n\n" + string.Join("\n", items.Select(i => $"• {names[i]}")));
+        // a decoration goes to the PC, as the game says: "<decoration> was sent home."
+        _ui.Message("Mystery Gifts received:\n\n" + string.Join("\n", gifts.Select(g => g.Decoration ? $"• {g.Name} (sent home)" : $"• {g.Name}")));
     }
 
     // ---------------------------------------------------------------- files
