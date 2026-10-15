@@ -49,7 +49,7 @@ Saves from ROM hacks, translations and other modified ROMs go in a separate **Ot
 
 ## ⚠️ Before you start
 
-- **Close the game before editing, and start it fresh afterwards, not from a save state or auto-resume.** A save state still has the old save in memory and will write it back over your changes. By default, when the pak changes a save it moves that game's save state into the save's backup folder, after asking you first.
+- **Close the game before editing, and start it fresh afterwards, not from a save state or auto-resume.** A save state still has the old save in memory and will write it back over your changes. When the pak changes a save, it moves that game's save state into the save's backup folder, so it can't be resumed by mistake.
 - **Keep your own backup** of any save you care about. The pak backs up every save before changing it, but this is still a beta.
 
 **Status:** public beta. Tested on the Anbernic RG35XX SP and the TrimUI Brick. Other devices should work but haven't been tried. Please [report problems](https://github.com/ProClifo/NextUI-Pokemon-Manager/issues/new?template=bug_report.yml) with your device, game, language and pak version.

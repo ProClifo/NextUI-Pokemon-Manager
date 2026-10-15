@@ -3,8 +3,8 @@ namespace PokemonManager.Core;
 /// <summary>
 /// NextUI's save states for a ROM (see minarch's State_getPath and nextui.c's readyResumePath). Resuming a game
 /// loads the state in its last-used slot, which would undo any change made to the save file since, so the
-/// "Save State Backup" setting moves that state, its preview and the slot file that offers to resume into the
-/// save's backup folder, named like the save's backup from the same change, where they can be copied back by hand.
+/// pak moves that state, its preview and the slot file that offers to resume into the save's backup folder whenever it
+/// changes a save, named like the save's backup from the same change, where they can be copied back by hand.
 /// </summary>
 public static class SaveStates
 {
