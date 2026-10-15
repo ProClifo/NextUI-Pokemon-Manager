@@ -4,7 +4,7 @@ A tool pak for NextUI handhelds that lets you manage your Pokémon save files ri
 
 <p>
   <img src=".github/resources/screenshots/main_menu.jpg" width="32%" alt="Main menu">
-  <img src=".github/resources/screenshots/emerald_box.jpg" width="32%" alt="Emerald PC box">
+  <img src=".github/resources/screenshots/emerald_menu.jpg" width="32%" alt="Emerald PC box with the Transfer, Summary, Evolve and Cancel menu">
   <img src=".github/resources/screenshots/platinum_summary.jpg" width="32%" alt="Platinum summary">
 </p>
 
