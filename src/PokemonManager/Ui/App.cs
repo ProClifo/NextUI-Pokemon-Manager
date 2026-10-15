@@ -1726,13 +1726,16 @@ public sealed class App
     /// <summary>One gift, as the game's Mystery Gift gives them: an item waits at the Pokémon Center, a decoration goes home.</summary>
     private void DailyMysteryGift(SaveEntry entry)
     {
-        if (entry.Sav is not SAV2 sav || !_ui.Confirm("Inject random Mystery Gift?"))
+        if (entry.Sav is not SAV2 sav)
             return;
+        // an item still waiting blocks the next gift: no question, just the reason
         if (MysteryGift2.ItemWaiting(sav))
         {
             _ui.Message("Must receive Mystery Gift at Pokémon Center.");
             return;
         }
+        if (!_ui.Confirm("Inject random Mystery Gift?"))
+            return;
         if (MysteryGift2.Receive(sav, GiftDay(entry), Random.Shared) is not { } gift)
             return;
         if (!ConfirmStateLoss(entry) || !TryWrite(entry, out _))
