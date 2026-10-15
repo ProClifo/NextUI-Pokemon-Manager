@@ -693,6 +693,7 @@ public static class GalleryLists
     private static readonly Dictionary<string, string> MenuNames = new(StringComparer.OrdinalIgnoreCase)
     {
         ["WISHMKR Jirachi"] = "Wishmaker Jirachi",
+        ["AGETO Celebi"] = "Ageto Celebi",
     };
 
     /// <summary>The distribution picked when a Pokémon has several (otherwise: the game's own language, then the most copies).</summary>
