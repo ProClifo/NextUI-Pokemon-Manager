@@ -548,11 +548,14 @@ def gen5_label(strip):
 
 
 def gen5_key(label):
-    """"003-F" -> "3-f", "003-M" / "003" -> "3", "386-03" -> "386-3" (the art index's names)."""
+    """"003-F" -> "3-f", "003-M" / "003" -> "3", "386-03" -> "386-3", "648-00" -> "648" (the art index's names: a
+    species' first form is its plain name, as the viewer looks it up)."""
     parts = label.split("-")
     name = str(int(parts[0]))
-    if len(parts) > 1:
-        name += "-f" if parts[1] == "F" else "" if parts[1] == "M" else f"-{int(parts[1])}"
+    if len(parts) > 1 and parts[1] == "F":
+        name += "-f"
+    elif len(parts) > 1 and parts[1] not in ("M", "") and int(parts[1]) > 0:
+        name += f"-{int(parts[1])}"
     return name
 
 
@@ -625,6 +628,13 @@ def gen5(assets, out):
     counts = {"bw": gen5_sprites(os.path.join(assets, "bw"), os.path.join(out, "bw"))}
     gen5_icons(os.path.join(assets, "icons.png"), os.path.join(out, "bw"))
     counts["b2w2"] = gen5_sprites(os.path.join(assets, "b2w2"), os.path.join(out, "b2w2"))
+    # Each sheet misses a form the other has (Black 2/White 2's Chill Drive Genesect, one of Black/White's Arceus
+    # types): taken from the other set rather than Platinum's, whose Arceus forms are numbered differently.
+    bw, b2w2 = STORE[os.path.join(out, "bw")]["sprites"], STORE[os.path.join(out, "b2w2")]["sprites"]
+    for name in set(bw) - set(b2w2):
+        b2w2[name] = bw[name]
+    for name in set(b2w2) - set(bw):
+        bw[name] = b2w2[name]
     return counts
 
 
