@@ -1765,7 +1765,7 @@ public sealed class App
                 // the first time a state goes, say where (once ever)
                 if (moved > 0 && !_settings.SeenStateMoved)
                 {
-                    _ui.Message("Your save state has been moved to:\nsdcard/PokemonManager/Backups/");
+                    _ui.Message("Your save state has been moved to\nsdcard/PokemonManager/Backups/");
                     _settings.SeenStateMoved = true;
                     _settings.Save(_paths.SettingsFile);
                 }
