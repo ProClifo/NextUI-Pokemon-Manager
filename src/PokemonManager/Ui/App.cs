@@ -1755,12 +1755,20 @@ public sealed class App
                 // Resuming the game would load a state from before this change and undo it: it goes to the save's
                 // backups, next to the .sav backups.
                 var backups = SaveStates.Backup.Beside(backup);
+                int moved = 0;
                 foreach (var rom in RomIndex.FindRoms(entry.Path))
                     foreach (var root in _paths.RomRoots)
-                        SaveStates.MoveSelected(sd, root, rom, backups);
+                        moved += SaveStates.MoveSelected(sd, root, rom, backups);
                 // the DS pak's DraStic keeps its own auto save state
                 if (entry.Sav.Generation >= 4)
-                    SaveStates.MoveDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"), backups);
+                    moved += SaveStates.MoveDraSticAuto(sd, entry.Path, Environment.GetEnvironmentVariable("PLATFORM"), backups);
+                // the first time a state goes, say where (once ever)
+                if (moved > 0 && !_settings.SeenStateMoved)
+                {
+                    _ui.Message("Your save state has been moved to:\nsdcard/PokemonManager/Backups/");
+                    _settings.SeenStateMoved = true;
+                    _settings.Save(_paths.SettingsFile);
+                }
             }
             catch (Exception ex)
             {

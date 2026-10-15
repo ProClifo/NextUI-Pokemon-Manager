@@ -75,6 +75,8 @@ public sealed class AppSettings
     /// <summary>Browse Pokémon on a Gen 3 style PC box screen instead of lists (on by default).</summary>
     public bool PcBoxView { get; set; } = true;
     public bool SeenWelcome { get; set; }
+    /// <summary>Whether the pak has said where it moves save states (shown the first time it moves one).</summary>
+    public bool SeenStateMoved { get; set; }
     /// <summary>List gallery files in every language, not just the game's (off by default).</summary>
     public bool GalleryAllLanguages { get; set; }
     /// <summary>List the gallery's unreleased files: debug and test cards never distributed (off by default).</summary>
@@ -104,6 +106,7 @@ public sealed class AppSettings
             {
                 case "allow_illegal_transfers" or "allow_unofficial_transfers": s.AllowIllegalTransfers = on; break;
                 case "seen_welcome": s.SeenWelcome = on; break;
+                case "seen_state_moved": s.SeenStateMoved = on; break;
                 case "pc_box_view": s.PcBoxView = on; break;
                 case "gallery_all_languages": s.GalleryAllLanguages = on; break;
                 case "gallery_unreleased": s.GalleryUnreleased = on; break;
@@ -120,6 +123,7 @@ public sealed class AppSettings
             [
                 $"allow_illegal_transfers={AllowIllegalTransfers.ToString().ToLowerInvariant()}",
                 $"seen_welcome={SeenWelcome.ToString().ToLowerInvariant()}",
+                $"seen_state_moved={SeenStateMoved.ToString().ToLowerInvariant()}",
                 $"pc_box_view={PcBoxView.ToString().ToLowerInvariant()}",
                 $"gallery_all_languages={GalleryAllLanguages.ToString().ToLowerInvariant()}",
                 $"gallery_unreleased={GalleryUnreleased.ToString().ToLowerInvariant()}",
