@@ -41,11 +41,14 @@ public static class RomHeader
         return null;
     }
 
-    /// <summary>Language of a region letter: J Japan, E USA, P Europe (English), D/F/I/S, K Korea.</summary>
+    /// <summary>
+    /// Language of a region letter: J Japan, E USA, P Europe (English), O the English ROM Black/White and Black 2/
+    /// White 2 sold in both (IRAO = White), D/F/I/S, K Korea.
+    /// </summary>
     public static string? Language(char region) => char.ToUpperInvariant(region) switch
     {
         'J' => GalleryLanguage.Japanese,
-        'E' or 'P' => GalleryLanguage.English,
+        'E' or 'P' or 'O' => GalleryLanguage.English,
         'D' => GalleryLanguage.German,
         'F' => GalleryLanguage.French,
         'I' => GalleryLanguage.Italian,

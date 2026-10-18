@@ -80,6 +80,22 @@ public sealed class GalleryTests : IDisposable
     }
 
     [Fact]
+    public void TheEnglishBlackAndWhiteRomIsEnglishWhateverTheSaveSays()
+    {
+        // a save edited from a Japanese one keeps the save's Japanese language byte; the ROM decides
+        var sav = _saves.Create(GameVersion.W, "Pokemon White.sav", language: LanguageID.Japanese).Sav;
+        var rom = Path.Combine(_saves.Dir, "Pokemon White.nds");
+        var data = new byte[0x200];
+        "IRAO"u8.CopyTo(data.AsSpan(0x0C)); // White, USA/Europe
+        File.WriteAllBytes(rom, data);
+
+        var profile = GameProfile.For(sav, [rom]);
+        Assert.Equal(["W"], profile.Games);
+        Assert.Equal("ENG", profile.ShownLanguage);
+        Assert.Equal("JPN", GameProfile.For(sav, []).ShownLanguage);
+    }
+
+    [Fact]
     public void LanguageAndGameComeFromTheRomHeader()
     {
         var sav = _saves.Create(GameVersion.FR, "Pokemon.sav").Sav;

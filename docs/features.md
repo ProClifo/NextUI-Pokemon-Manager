@@ -87,8 +87,8 @@ The main menu is drawn in NextUI's **Next** font and everything inside a save (i
 
 The gallery is [projectpokemon/EventsGallery](https://github.com/projectpokemon/EventsGallery) at a pinned commit, Gen 1–5 only (the generations NextUI emulates). The build bundles the files PKHeX can read into `res/gallery.zip` with an index, so the SD card holds one 3 MB file instead of 7,500 small ones.
 
-- **Game**: from the ROM header, e.g. `BPEE` = Emerald, `CPUE` = Platinum, `IRBO` = Black 2; otherwise from the save. Cards only show for the games named in their file name (a HeartGold/SoulSilver card doesn't show for Platinum). Pokémon files show for every game of their generation, since they can be traded between them.
-- **Language**: from the ROM header's region letter (`E`/`P` English, `D` German, `F` French, `I` Italian, `S` Spanish, `J` Japanese, `K` Korean); otherwise from the save (Gen 4/5) or the player's own Pokémon (Gen 3). Gen 1–2 only distinguish Japanese, Korean and international.
+- **Game**: from the ROM header, e.g. `BPEE` = Emerald, `CPUE` = Platinum, `IREO` = Black 2; otherwise from the save. Cards only show for the games named in their file name (a HeartGold/SoulSilver card doesn't show for Platinum). Pokémon files show for every game of their generation, since they can be traded between them.
+- **Language**: from the ROM header's region letter (`E`/`P`/`O` English, `D` German, `F` French, `I` Italian, `S` Spanish, `J` Japanese, `K` Korean); otherwise from the save (Gen 4/5) or the player's own Pokémon (Gen 3). Gen 1–2 only distinguish Japanese, Korean and international.
 - **Settings → Gallery: All Languages** (off by default) lists every language in the Events Gallery. Mystery Gift and Distributions always stick to the game's language.
 - **Settings → Gallery: Unreleased Files** (off by default) adds the gallery's *Unreleased* folder: debug and test data that was never distributed.
 
