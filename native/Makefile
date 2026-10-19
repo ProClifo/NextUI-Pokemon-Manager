@@ -8,17 +8,14 @@
 # NextUI release each device runs.
 
 PLATFORM ?= desktop
-NEXTUI_VERSION ?= v6.14.0
-H700_VERSION ?= h700-rc11
+NEXTUI_VERSION ?= v6.15.0
 MY355_NEXTUI_VERSION ?= my355-latest
 PARSON_VERSION ?= ec53fb6528b45811df9db0db22cab96a94a96a11
 MINUI_LIST_VERSION ?= 0.15.4
 
 WORKSPACE = $(patsubst %-nextui,%,$(PLATFORM))
-ifeq ($(PLATFORM),h700-nextui)
-  UPSTREAM_REPO = https://github.com/pvaibhav/NextUI
-  UPSTREAM_VERSION = $(H700_VERSION)
-else ifeq ($(PLATFORM),my355-nextui)
+# The Anbernic H700 devices are in NextUI itself from v6.15.0; the Miyoo Flip still has its own tag.
+ifeq ($(PLATFORM),my355-nextui)
   UPSTREAM_REPO = https://github.com/LoveRetro/NextUI
   UPSTREAM_VERSION = $(MY355_NEXTUI_VERSION)
 else
