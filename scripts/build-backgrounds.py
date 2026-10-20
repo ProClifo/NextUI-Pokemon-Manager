@@ -16,7 +16,7 @@ from collections import Counter
 
 from PIL import Image
 
-SCREENS = [(640, 480), (720, 480), (720, 720), (1024, 768), (1280, 720)]
+SCREENS = [(320, 240), (640, 480), (720, 480), (720, 720), (1024, 768), (1280, 720)]
 MAX_CROP = 0.15
 
 

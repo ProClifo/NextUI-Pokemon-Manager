@@ -90,6 +90,7 @@ public sealed class GameBackgroundTests : IDisposable
     [InlineData("h700", "rgsp", 720, 480)]
     [InlineData("h700", "rg34xxsp", 720, 480)]
     [InlineData("h700", "rgcubexx", 720, 720)]
+    [InlineData("trimuismart", null, 320, 240)]
     [InlineData("h700", "rg35xxplus", 640, 480)]
     [InlineData("tg5040", "brick", 1024, 768)]
     [InlineData("tg5040", "smartpro", 1280, 720)]

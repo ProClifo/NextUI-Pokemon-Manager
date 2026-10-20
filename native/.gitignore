@@ -5,3 +5,4 @@ pkmgr-box-*
 minui-list-src/
 minui-list-*-nextui
 !pkmgr-box-*.c
+minui-list-trimuismart

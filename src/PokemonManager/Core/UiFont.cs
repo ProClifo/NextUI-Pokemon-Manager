@@ -24,8 +24,13 @@ public sealed class UiFont(string path)
         return File.Exists(path) ? new UiFont(path) : null;
     }
 
-    /// <summary>The device's UI scale: 3 on the TrimUI Brick, 2 everywhere else NextUI runs.</summary>
-    public static int Scale(string? platform, string? device) => platform == "tg5040" && device is "brick" or "brickpro" ? 3 : 2;
+    /// <summary>The device's UI scale: 3 on the TrimUI Brick, 1 on MinUI's TrimUI Smart (320x240), 2 everywhere else.</summary>
+    public static int Scale(string? platform, string? device) => platform switch
+    {
+        "tg5040" when device is "brick" or "brickpro" => 3,
+        "trimuismart" => 1,
+        _ => 2,
+    };
 
     /// <summary>Whether the font has every (non-control) character of the texts.</summary>
     public bool Covers(IEnumerable<string?> texts)

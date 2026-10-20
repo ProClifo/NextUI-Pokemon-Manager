@@ -85,6 +85,6 @@ minui-list: $(NEXTUI_DIR) minui-list-src include/parson $(CURDIR)/platform/$(PLA
 		-L$(LIB_DIR) -L/opt/nextui/lib $(LDFLAGS) -lmsettings $(NEXTUI_GL_LIBS)
 
 clean:
-	rm -rf pkmgr-box-* minui-list-*-nextui minui-list-src platform nextui-*
+	rm -rf pkmgr-box-* minui-list-*-nextui minui-list-trimuismart minui-list-src platform nextui-*
 
 .PHONY: all desktop device nextui clean minui-list

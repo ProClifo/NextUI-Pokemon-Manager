@@ -1,6 +1,6 @@
 #!/bin/sh
-# Pokémon Manager for NextUI - launcher.
-# NextUI provides PLATFORM, SDCARD_PATH, USERDATA_PATH and LOGS_PATH.
+# Pokémon Manager for NextUI (and MinUI on the TrimUI Smart) - launcher.
+# NextUI/MinUI provide PLATFORM, SDCARD_PATH, USERDATA_PATH and LOGS_PATH.
 PAK_DIR="$(cd "$(dirname "$0")" && pwd)"
 PAK_NAME="$(basename "$PAK_DIR")"
 PAK_NAME="${PAK_NAME%.*}"
@@ -27,12 +27,24 @@ export DOTNET_BUNDLE_EXTRACT_BASE_DIR="$USERDATA_PATH/$PAK_NAME/dotnet"
 export DOTNET_gcServer=0
 export TMPDIR="${TMPDIR:-/tmp}"
 
+PKMGR="$PAK_DIR/bin/arm64/pkmgr"
+if [ "$PLATFORM" = trimuismart ]; then
+    # MinUI's TrimUI Smart is 32-bit with glibc 2.23, older than .NET needs: pkmgr brings its own (lib/arm32). Its
+    # interpreter is /tmp/pkmgr-ld-linux-armhf.so.3, linked here to the pak's loader wherever the pak is, and it finds
+    # the pak's libraries by its RUNPATH, so the device's own tools (minui-list...) keep the device's glibc.
+    PKMGR="$PAK_DIR/bin/arm32/pkmgr"
+    chmod +x "$PKMGR" "$PAK_DIR/lib/arm32/ld-linux-armhf.so.3" 2>/dev/null
+    ln -sf "$PAK_DIR/lib/arm32/ld-linux-armhf.so.3" /tmp/pkmgr-ld-linux-armhf.so.3
+    # 120 MB of RAM: keep the managed heap well inside it
+    export DOTNET_GCHeapHardLimit=0x5000000
+fi
+
 # Zip extraction on some PCs drops the executable bit.
-chmod +x "$PAK_DIR/bin/arm64/pkmgr" "$PAK_DIR/bin/$PLATFORM/"* 2>/dev/null
+chmod +x "$PKMGR" "$PAK_DIR/bin/$PLATFORM/"* 2>/dev/null
 
 minui-presenter --message "Loading Pokémon Manager..." --timeout -1 &
 
-"$PAK_DIR/bin/arm64/pkmgr" --sd "$SDCARD_PATH" ui
+"$PKMGR" --sd "$SDCARD_PATH" ui
 status=$?
 
 killall minui-presenter >/dev/null 2>&1 || true

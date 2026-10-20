@@ -4,6 +4,8 @@
 #   scripts/build-pak.sh            -> dist/PokemonManager.pak.zip                (pak contents at the zip root, for the Pak Store)
 #                                      dist/PokemonManager-<platform>-sdcard.zip (Tools/<platform>/Pokemon Manager.pak/..., unzip onto the SD card)
 #                                      for platform in tg5040, tg5050, my355, h700
+#                                   dist/PokemonManager-trimuismart-sdcard.zip   (MinUI on the TrimUI Smart: 32-bit, with its
+#                                                                                own glibc; not in the Pak Store zip)
 #
 # Needs the .NET 10 SDK, curl, zip, git and Python 3 with Pillow (box art, sprites, icons).
 # The event gallery is bundled from projectpokemon/EventsGallery at a pinned commit.
@@ -203,5 +205,44 @@ for platform in "${PLATFORMS[@]}"; do
     cp -a "$PAK" "$sdcard/Tools/$platform/"
     (cd "$sdcard" && zip -qr9 "$DIST/PokemonManager-$platform-sdcard.zip" .)
 done
+
+echo "==> TrimUI Smart (MinUI): 32-bit pkmgr with its own glibc"
+# The TrimUI Smart is 32-bit ARM with glibc 2.23, and .NET needs 2.34: the pak brings Debian's (bookworm, armhf). pkmgr's
+# interpreter is /tmp/pkmgr-ld-linux-armhf.so.3, which launch.sh links to the pak's loader, and its RUNPATH finds the
+# pak's libraries, so the device's own tools never load them. No PC box viewer yet: Pokémon are shown as lists.
+PAK32="$BUILD/trimuismart/Pokemon Manager.pak"
+mkdir -p "$(dirname "$PAK32")"
+cp -a "$PAK" "$PAK32"
+rm -rf "${PAK32:?}/bin"
+mkdir -p "$PAK32/bin/arm32" "$PAK32/bin/trimuismart" "$PAK32/lib/arm32"
+dotnet publish "$ROOT/src/PokemonManager/PokemonManager.csproj" \
+    -c Release -r linux-arm --self-contained \
+    -p:Version="$VERSION" \
+    -p:PublishReadyToRun=true \
+    -p:PublishTrimmed=true -p:TrimMode=partial \
+    -p:DebugType=none \
+    -o "$BUILD/publish-arm32"
+cp -a "$BUILD/publish-arm32/." "$PAK32/bin/arm32/"
+command -v patchelf >/dev/null 2>&1 || python3 -m pip install -q patchelf
+glibc=$(docker create --platform linux/arm/v7 debian:bookworm-slim)
+for lib in ld-linux-armhf.so.3 libc.so.6 libm.so.6 libdl.so.2 libpthread.so.0 librt.so.1 libgcc_s.so.1 libstdc++.so.6; do
+    docker cp -L "$glibc:/usr/lib/arm-linux-gnueabihf/$lib" "$PAK32/lib/arm32/$lib"
+done
+docker rm "$glibc" >/dev/null
+patchelf --set-interpreter /tmp/pkmgr-ld-linux-armhf.so.3 '--set-rpath' '$ORIGIN:$ORIGIN/../../lib/arm32' "$PAK32/bin/arm32/pkmgr"
+for lib in "$PAK32"/bin/arm32/*.so; do
+    patchelf '--set-rpath' '$ORIGIN:$ORIGIN/../../lib/arm32' "$lib"
+done
+fetch "https://github.com/josegonzalez/minui-presenter/releases/download/$MINUI_PRESENTER_VERSION/minui-presenter-trimuismart" "$PAK32/bin/trimuismart/minui-presenter"
+fetch "https://github.com/josegonzalez/minui-keyboard/releases/download/$MINUI_KEYBOARD_VERSION/minui-keyboard-trimuismart" "$PAK32/bin/trimuismart/minui-keyboard"
+list32="$ROOT/native/minui-list-trimuismart"
+if [ ! -x "$list32" ] || [ "$ROOT/native/minui-list.patch" -nt "$list32" ]; then
+    "$ROOT/scripts/build-native.sh" trimuismart
+fi
+cp "$list32" "$PAK32/bin/trimuismart/minui-list"
+sdcard="$BUILD/sdcard-trimuismart"
+mkdir -p "$sdcard/Tools/trimuismart" "$sdcard/PokemonManager/Gifts" "$sdcard/PokemonManager/Import"
+cp -a "$PAK32" "$sdcard/Tools/trimuismart/"
+(cd "$sdcard" && zip -qr9 -y "$DIST/PokemonManager-trimuismart-sdcard.zip" .)
 
 ls -la "$DIST"

@@ -68,6 +68,7 @@ public sealed class UiFontTests : IDisposable
     [InlineData("tg5040", "brick", 3)]
     [InlineData("tg5040", "smartpro", 2)]
     [InlineData("h700", "rgsp", 2)]
+    [InlineData("trimuismart", null, 1)] // MinUI's TrimUI Smart
     [InlineData(null, null, 2)]
     public void UiScaleMatchesNextUi(string? platform, string? device, int scale)
         => Assert.Equal(scale, UiFont.Scale(platform, device));

@@ -1,5 +1,5 @@
 diff --git a/minui-list.c b/minui-list.c
-index 4639bb1..ed8e0b3 100644
+index 4639bb1..2dc4db2 100644
 --- a/minui-list.c
 +++ b/minui-list.c
 @@ -1,4 +1,5 @@
@@ -220,7 +220,7 @@ index 4639bb1..ed8e0b3 100644
          {
              if (!state->list_state->items[state->list_state->visible[state->list_state->selected]].features.disabled)
              {
-@@ -2471,6 +2534,80 @@ void ensure_item_image(struct ListItem *item, const char *effective, int max_w,
+@@ -2471,6 +2534,87 @@ void ensure_item_image(struct ListItem *item, const char *effective, int max_w,
      item->image_surface = scaled;
  }
  
@@ -266,6 +266,12 @@ index 4639bb1..ed8e0b3 100644
 +static int walk_strip_frames = 0;
 +static SDL_Surface *walk_strip_for(const char *image_path, SDL_Surface *still)
 +{
++#ifndef USE_SDL2
++    // the walk needs SDL2's scaled blits (MinUI's TrimUI Smart is SDL 1.2): just the still image there
++    (void)image_path;
++    (void)still;
++    return NULL;
++#else
 +    char path[1024];
 +    size_t len = strlen(image_path);
 +    if (len < 4 || len + 6 >= sizeof(path) || strcmp(image_path + len - 4, ".png") != 0)
@@ -296,12 +302,13 @@ index 4639bb1..ed8e0b3 100644
 +    }
 +    SDL_FreeSurface(loaded);
 +    return walk_strip;
++#endif
 +}
 +
  // draw_background draws the background of the list
  bool draw_background(SDL_Surface *screen, struct AppState *state)
  {
-@@ -2755,6 +2892,109 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2755,6 +2899,111 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          char truncated_title_text[256];
          int title_width = GFX_truncateText(state->fonts.medium, state->title, truncated_title_text, title_available_width, SCALE1(BUTTON_PADDING * 2));
  
@@ -310,6 +317,7 @@ index 4639bb1..ed8e0b3 100644
 +        bool title_composed = false;
 +        if (state->title_image[0] != '\0' && strchr(state->title, '\t') != NULL)
 +        {
++#ifdef USE_SDL2 // cropping and scaling the title image needs SDL2: no image beside the title on SDL 1.2
 +            if (state->title_image_surface == NULL)
 +            {
 +                SDL_Surface *loaded = IMG_Load(state->title_image);
@@ -383,6 +391,7 @@ index 4639bb1..ed8e0b3 100644
 +                }
 +                state->title_image_surface = loaded;
 +            }
++#endif
 +            char parts_text[1024];
 +            strncpy(parts_text, state->title, sizeof(parts_text) - 1);
 +            parts_text[sizeof(parts_text) - 1] = '\0';
@@ -411,7 +420,7 @@ index 4639bb1..ed8e0b3 100644
          // compute the x position of the title based on the alignment
          int title_x_pos;
          const char *title_alignment = state->title_alignment[0] != '\0' ? state->title_alignment : "left";
-@@ -2801,15 +3041,42 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2801,15 +3050,42 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          }
  
          // draw the title
@@ -463,7 +472,7 @@ index 4639bb1..ed8e0b3 100644
      }
  
      // the rest of the function is just for drawing your app to the screen
-@@ -2888,6 +3155,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2888,6 +3164,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          // resolve the row text color from its state (selected/disabled/muted).
          // ListTheme_RowTextRole captures the precedence; theme_row_text_color maps
          // the role to the greyscale palette or, on -nextui builds, the theme colors.
@@ -475,7 +484,7 @@ index 4639bb1..ed8e0b3 100644
          SDL_Color text_color = theme_row_text_color(ListTheme_RowTextRole(
              j == selected_row,
              state->list_state->items[i].features.disabled,
-@@ -2911,13 +3183,27 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2911,13 +3192,27 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              char image_effective[1024];
              image_effective_path(image_item, state->fallback_image, image_effective, sizeof(image_effective));
              ensure_item_image(image_item, image_effective, screen->w / IMAGE_MAX_WIDTH_DIVISOR, SCALE1(PILL_SIZE - 4));
@@ -504,7 +513,7 @@ index 4639bb1..ed8e0b3 100644
          char truncated_display_text[256];
          int text_width = GFX_truncateText(state->fonts.large, display_text, truncated_display_text, available_width, SCALE1(BUTTON_PADDING * 2));
  
-@@ -2942,7 +3228,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2942,7 +3237,7 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
                  int value_width = 0;
                  TTF_SizeUTF8(state->fonts.large, display_selected_text, &value_width, NULL);
                  int value_left = screen->w - value_width - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
@@ -513,7 +522,7 @@ index 4639bb1..ed8e0b3 100644
                  if (value_viewport < scroll_viewport)
                  {
                      scroll_viewport = value_viewport;
-@@ -2965,11 +3251,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -2965,11 +3260,11 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              }
          }
  
@@ -527,7 +536,7 @@ index 4639bb1..ed8e0b3 100644
          }
  
          if (j == selected_row)
-@@ -3086,6 +3372,19 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3086,6 +3381,19 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
              text_x_pos = SCALE1(PADDING + BUTTON_PADDING);
          }
  
@@ -547,7 +556,7 @@ index 4639bb1..ed8e0b3 100644
          int text_y_pos = SCALE1(PADDING + (j * PILL_SIZE) + initial_list_y_padding + 4);
          SDL_Rect pos = {
              text_x_pos,
-@@ -3146,6 +3445,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3146,6 +3454,8 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          int initial_cube_x_pos = text_x_pos + text_surface_width;
  
          // draw the selected option text
@@ -556,7 +565,7 @@ index 4639bb1..ed8e0b3 100644
          if (strcmp(display_selected_text, "") != 0)
          {
              initial_cube_x_pos = screen->w - SCALE1(PADDING + BUTTON_PADDING) - color_box_space - image_col_space;
-@@ -3155,11 +3456,57 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3155,11 +3465,57 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
                      (state->list_state->items[i].features.disabled || state->list_state->items[i].features.unselectable)
                          ? LIST_TEXT_MUTED
                          : LIST_TEXT_NORMAL);
@@ -619,7 +628,7 @@ index 4639bb1..ed8e0b3 100644
              }
          }
  
-@@ -3188,10 +3535,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3188,10 +3544,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
  
          // draw the per-item right-hand image, vertically centered in the row and
          // anchored to the right edge (left of the hardware group on the top row)
@@ -633,7 +642,7 @@ index 4639bb1..ed8e0b3 100644
              if (in_top_row_no_title)
              {
                  image_right_edge -= (ow + SCALE1(PADDING));
-@@ -3262,7 +3611,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
+@@ -3262,7 +3620,12 @@ void draw_screen(SDL_Surface *screen, struct AppState *state, int ow, bool shoul
          }
          else if (strcmp(state->action_button, "") != 0 && !state->list_state->items[state->list_state->visible[state->list_state->selected]].features.hide_action)
          {
@@ -647,7 +656,7 @@ index 4639bb1..ed8e0b3 100644
          }
      }
  
-@@ -3485,6 +3839,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3485,6 +3848,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
      {
          OPT_SCREEN_RESOLUTION = 1000,
          OPT_FALLBACK_IMAGE,
@@ -660,7 +669,7 @@ index 4639bb1..ed8e0b3 100644
          OPT_ALLOW_FILTER,
          OPT_FILTER_BUTTON,
          OPT_DISPLAY_FILTER_KEYBOARD,
-@@ -3519,6 +3879,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3519,6 +3888,12 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          {"alphabetic-scroll", no_argument, 0, 'S'},
          {"screen-resolution", required_argument, 0, OPT_SCREEN_RESOLUTION},
          {"fallback-image", required_argument, 0, OPT_FALLBACK_IMAGE},
@@ -673,7 +682,7 @@ index 4639bb1..ed8e0b3 100644
          {"allow-filter", required_argument, 0, OPT_ALLOW_FILTER},
          {"filter-button", required_argument, 0, OPT_FILTER_BUTTON},
          {"display-filter-keyboard", required_argument, 0, OPT_DISPLAY_FILTER_KEYBOARD},
-@@ -3571,13 +3937,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3571,13 +3946,13 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
              state->show_hardware_group = 0;
              break;
          case 'l':
@@ -690,7 +699,7 @@ index 4639bb1..ed8e0b3 100644
              break;
          case 'K':
              strncpy(state->item_key, optarg, sizeof(state->item_key) - 1);
-@@ -3615,6 +3981,26 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
+@@ -3615,6 +3990,26 @@ bool parse_arguments(struct AppState *state, int argc, char *argv[])
          case OPT_FALLBACK_IMAGE:
              strncpy(state->fallback_image, optarg, sizeof(state->fallback_image) - 1);
              break;
@@ -717,7 +726,7 @@ index 4639bb1..ed8e0b3 100644
          case OPT_ALLOW_FILTER:
              if (strcmp(optarg, "true") == 0)
              {
-@@ -3832,7 +4218,7 @@ int write_output(struct AppState *state)
+@@ -3832,7 +4227,7 @@ int write_output(struct AppState *state)
  {
      if (strcmp(state->write_value, "selected") == 0)
      {
@@ -726,7 +735,7 @@ index 4639bb1..ed8e0b3 100644
          {
              return state->exit_code;
          }
-@@ -4061,6 +4447,52 @@ int write_output(struct AppState *state)
+@@ -4061,6 +4456,52 @@ int write_output(struct AppState *state)
  }
  
  // main is the entry point for the app
@@ -779,7 +788,7 @@ index 4639bb1..ed8e0b3 100644
  int main(int argc, char *argv[])
  {
      // Initialize app state
-@@ -4090,6 +4522,7 @@ int main(int argc, char *argv[])
+@@ -4090,6 +4531,7 @@ int main(int argc, char *argv[])
          .show_brightness_setting = 0,
          .always_show_confirm = false,
          .disable_auto_sleep = false,
@@ -787,7 +796,7 @@ index 4639bb1..ed8e0b3 100644
          .initial_selected = -1,
          .scroll_anim_selected = -1,
          .scroll_anim_option = -1,
-@@ -4312,7 +4745,8 @@ int main(int argc, char *argv[])
+@@ -4312,7 +4754,8 @@ int main(int argc, char *argv[])
                  GFX_blitHardwareHints(screen, state.show_brightness_setting);
                  break;
              case BOTTOM_LEFT_SLEEP:

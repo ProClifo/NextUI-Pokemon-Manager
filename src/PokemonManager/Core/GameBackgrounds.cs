@@ -100,12 +100,13 @@ public sealed class GameBackgrounds(string assetDir)
         return Games.FirstOrDefault(name.Contains);
     }
 
-    /// <summary>Screen resolution of the NextUI device, from the PLATFORM and DEVICE variables launch.sh sees.</summary>
+    /// <summary>Screen resolution of the NextUI (or MinUI) device, from the PLATFORM and DEVICE variables launch.sh sees.</summary>
     public static (int Width, int Height)? ScreenSize(string? platform, string? device) => platform switch
     {
         "tg5040" => device is "brick" or "brickpro" ? (1024, 768) : (1280, 720),
         "tg5050" => (1280, 720),
         "my355" => (640, 480),
+        "trimuismart" => (320, 240), // MinUI's TrimUI Smart
         "h700" => device switch
         {
             "rg34xx" or "rg34xxsp" or "rgsp" => (720, 480),
