@@ -1,6 +1,7 @@
 # pkmgr-box: Gen 3 style PC box viewer.
 #
 #   make desktop                        build a desktop binary (needs SDL2, SDL2_image, SDL2_ttf dev packages)
+#   make desktop-sdl12                  the same on SDL 1.2 (sdl12-compat.h, as on MinUI's TrimUI Smart)
 #   make PLATFORM=h700-nextui           build for a device, inside its NextUI toolchain container
 #                                       (see .github/workflows/build.yml and scripts/build-native.sh)
 #
@@ -38,6 +39,10 @@ desktop: include/parson
 	$(CC) -O2 -std=gnu99 -DDESKTOP -I. -Iinclude pkmgr-box.c include/parson/parson.c -o pkmgr-box-desktop \
 		$(shell pkg-config --cflags --libs sdl2 SDL2_image SDL2_ttf) -lm
 
+desktop-sdl12: include/parson
+	$(CC) -O2 -std=gnu99 -DDESKTOP -DUSE_SDL12 -I. -Iinclude pkmgr-box.c include/parson/parson.c -o pkmgr-box-desktop-sdl12 \
+		$(shell pkg-config --cflags --libs sdl SDL_image SDL_ttf) -lm
+
 NEXTUI_DIR = nextui-$(WORKSPACE)
 
 $(NEXTUI_DIR):
@@ -69,6 +74,23 @@ device: $(NEXTUI_DIR) include/parson $(CURDIR)/platform/$(PLATFORM)/include/mset
 		-DPLATFORM=\"$(WORKSPACE)\" -DPLATFORM_NEXTUI -O2 -std=gnu99 \
 		-L$(LIB_DIR) -L/opt/nextui/lib $(LDFLAGS) -lmsettings $(NEXTUI_GL_LIBS)
 
+# MinUI's TrimUI Smart (make PLATFORM=trimuismart minui-device, in MinUI's toolchain): SDL 1.2, through sdl12-compat.h.
+# Built against the MinUI that minui-list-src builds with (its `setup` clones it and builds libmsettings), as minui-list is.
+MINUI_DIR = minui-list-src/minui
+MINUI_PREFIX = minui-list-src/platform/$(PLATFORM)
+ifeq ($(PLATFORM),trimuismart)
+  -include $(MINUI_DIR)/workspace/$(PLATFORM)/platform/makefile.env
+endif
+
+minui-device: include/parson
+	$(CROSS_COMPILE)gcc pkmgr-box.c include/parson/parson.c \
+		$(MINUI_DIR)/workspace/all/common/scaler.c $(MINUI_DIR)/workspace/all/common/utils.c $(MINUI_DIR)/workspace/all/common/api.c \
+		$(MINUI_DIR)/workspace/$(PLATFORM)/platform/platform.c \
+		-o pkmgr-box-$(PLATFORM) \
+		$(ARCH) -fomit-frame-pointer -I. -Iinclude -I$(MINUI_PREFIX)/include -I$(MINUI_DIR)/workspace/all/common \
+		-I$(MINUI_DIR)/workspace/$(PLATFORM)/platform -DPLATFORM=\"$(PLATFORM)\" -DPLATFORM_MINUI -DUSE_SDL -O2 -std=gnu99 \
+		-L$(MINUI_PREFIX)/lib -ldl -lmsettings $(LIBS) -lSDL -lSDL_image -lSDL_ttf -lpthread -lm -lz
+
 # minui-list, patched (minui-list.patch): its --font-large/--font-medium/--font-default options strncpy into
 # NULL pointers and crash (still so upstream), which the per-game menu fonts need; and --options-selected-only
 # shows a row's option value and image on the highlighted row only, with the image left of the value.
@@ -87,4 +109,4 @@ minui-list: $(NEXTUI_DIR) minui-list-src include/parson $(CURDIR)/platform/$(PLA
 clean:
 	rm -rf pkmgr-box-* minui-list-*-nextui minui-list-trimuismart minui-list-src platform nextui-*
 
-.PHONY: all desktop device nextui clean minui-list
+.PHONY: all desktop desktop-sdl12 device minui-device nextui clean minui-list

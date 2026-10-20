@@ -13,8 +13,9 @@
 // Transfer and Evolve are written to --write-location as {"box": n, "slot": n, "action": "transfer"|"evolve"}.
 // Exit codes: 0 picked, 2 back (B / CLOSE BOX), 3 back (MENU), 1 error.
 //
-// Built for NextUI with the device toolchains (make PLATFORM=...), or for a desktop with `make desktop`,
-// which adds --screenshot out.png [--state box|party|menu|party_button|summary0|summary1|summary2].
+// Built for NextUI with the device toolchains (make PLATFORM=...), for MinUI's TrimUI Smart (SDL 1.2, through
+// sdl12-compat.h), or for a desktop with `make desktop`, which adds --screenshot out.png
+// [--state box|party|menu|party_button|summary0|summary1|summary2].
 
 #include <math.h>
 #include <stdbool.h>
@@ -27,6 +28,12 @@
 
 #ifdef DESKTOP
 #include "desktop.h"
+#elif defined(PLATFORM_MINUI)
+#include <msettings.h>
+#include "defines.h"
+#include "api.h"
+#include "utils.h"
+#include "sdl12-compat.h"
 #else
 #include <msettings.h>
 #include <SDL2/SDL_image.h>
@@ -34,6 +41,9 @@
 #include "defines.h"
 #include "api.h"
 #include "utils.h"
+#endif
+#ifndef COLOR_ALPHA
+#define COLOR_ALPHA(c) ((c).a)
 #endif
 
 enum
@@ -126,7 +136,8 @@ static SDL_Surface *load_image(const char *path)
     SDL_Surface *converted = NULL;
     if (loaded != NULL)
     {
-        converted = SDL_ConvertSurfaceFormat(loaded, SDL_PIXELFORMAT_RGBA8888, 0);
+        // RGBA32: the layout SDL_image loads RGBA PNGs in, so SDL 1.2 (sdl12-compat.h) needn't copy them
+        converted = SDL_ConvertSurfaceFormat(loaded, SDL_PIXELFORMAT_RGBA32, 0);
         SDL_FreeSurface(loaded);
     }
     if (cache_count == cache_capacity)
@@ -341,6 +352,9 @@ static void open_text_font(Scene *scene, const Layout *l)
 #ifdef DESKTOP
     if (path == NULL)
         path = getenv("PKMGR_FONT");
+#elif defined(PLATFORM_MINUI)
+    if (path == NULL)
+        path = FONT_PATH; // MinUI has none of NextUI's fonts: its own
 #endif
     font_height = get_int(scene->layout, "font.height", 10);
     cap_top = get_int(scene->layout, "font.cap_top", 2);
@@ -555,7 +569,7 @@ static int draw_game_text(SDL_Surface *dst, const Layout *l, const char *text, i
                     continue;
                 if (r > 128)
                     out[pen + xx] = fg;
-                else if (gg > 128 && shadow.a)
+                else if (gg > 128 && COLOR_ALPHA(shadow))
                     out[pen + xx] = sh;
             }
         }
@@ -622,7 +636,7 @@ static int draw_text_c(SDL_Surface *dst, const Layout *l, const char *text, int 
     else if (align == 2)
         x -= w;
     int px = l->origin_x + x * l->scale, py = l->origin_y + (y + cap_top) * l->scale - text_cap_offset;
-    SDL_Surface *s = shadow.a ? TTF_RenderUTF8_Blended(text_font, text, shadow) : NULL;
+    SDL_Surface *s = COLOR_ALPHA(shadow) ? TTF_RenderUTF8_Blended(text_font, text, shadow) : NULL;
     SDL_Surface *t = TTF_RenderUTF8_Blended(text_font, text, color);
     if (s)
     {
@@ -1744,9 +1758,10 @@ static int compose_run(const char *out, const char *background, const char *spri
         SDL_FreeSurface(bg);
     }
     SDL_Surface *sheet = sprite_path ? IMG_Load(sprite_path) : NULL;
-    SDL_Rect r = {0, 0, 0, 0};
-    if (sheet && rect_text && sscanf(rect_text, "%d,%d,%d,%d", &r.x, &r.y, &r.w, &r.h) == 4 && r.w > 0 && r.h > 0)
+    int rx, ry, rw, rh;
+    if (sheet && rect_text && sscanf(rect_text, "%d,%d,%d,%d", &rx, &ry, &rw, &rh) == 4 && rw > 0 && rh > 0)
     {
+        SDL_Rect r = {rx, ry, rw, rh};
         int k = h / 3 / r.h;
         if (k < 1)
             k = 1;

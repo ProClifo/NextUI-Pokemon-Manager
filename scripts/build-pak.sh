@@ -209,7 +209,7 @@ done
 echo "==> TrimUI Smart (MinUI): 32-bit pkmgr with its own glibc"
 # The TrimUI Smart is 32-bit ARM with glibc 2.23, and .NET needs 2.34: the pak brings Debian's (bookworm, armhf). pkmgr's
 # interpreter is /tmp/pkmgr-ld-linux-armhf.so.3, which launch.sh links to the pak's loader, and its RUNPATH finds the
-# pak's libraries, so the device's own tools never load them. No PC box viewer yet: Pokémon are shown as lists.
+# pak's libraries, so the device's own tools never load them. The PC box viewer is built against MinUI (SDL 1.2).
 PAK32="$BUILD/trimuismart/Pokemon Manager.pak"
 mkdir -p "$(dirname "$PAK32")"
 cp -a "$PAK" "$PAK32"
@@ -235,11 +235,17 @@ for lib in "$PAK32"/bin/arm32/*.so; do
 done
 fetch "https://github.com/josegonzalez/minui-presenter/releases/download/$MINUI_PRESENTER_VERSION/minui-presenter-trimuismart" "$PAK32/bin/trimuismart/minui-presenter"
 fetch "https://github.com/josegonzalez/minui-keyboard/releases/download/$MINUI_KEYBOARD_VERSION/minui-keyboard-trimuismart" "$PAK32/bin/trimuismart/minui-keyboard"
-list32="$ROOT/native/minui-list-trimuismart"
-if [ ! -x "$list32" ] || [ "$ROOT/native/minui-list.patch" -nt "$list32" ]; then
+list32="$ROOT/native/minui-list-trimuismart" box32="$ROOT/native/pkmgr-box-trimuismart"
+stale=
+for src in "$ROOT"/native/pkmgr-box*.c "$ROOT/native/sdl12-compat.h" "$ROOT/native/Makefile"; do
+    [ "$src" -nt "$box32" ] && stale=1
+done
+[ "$ROOT/native/minui-list.patch" -nt "$list32" ] && stale=1
+if [ ! -x "$list32" ] || [ ! -x "$box32" ] || [ -n "$stale" ]; then
     "$ROOT/scripts/build-native.sh" trimuismart
 fi
 cp "$list32" "$PAK32/bin/trimuismart/minui-list"
+cp "$box32" "$PAK32/bin/trimuismart/pkmgr-box"
 sdcard="$BUILD/sdcard-trimuismart"
 mkdir -p "$sdcard/Tools/trimuismart" "$sdcard/PokemonManager/Gifts" "$sdcard/PokemonManager/Import"
 cp -a "$PAK32" "$sdcard/Tools/trimuismart/"

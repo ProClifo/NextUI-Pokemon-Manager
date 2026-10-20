@@ -1,10 +1,21 @@
 // Minimal stand-in for the NextUI API so pkmgr-box can be built and screenshotted on a desktop.
 // Screen size and UI scale come from PKMGR_WIDTH / PKMGR_HEIGHT / PKMGR_SCALE, the font from PKMGR_FONT.
+// With USE_SDL12 (make desktop-sdl12) it's built on SDL 1.2 through sdl12-compat.h, with an RGB565 screen, as on
+// MinUI's TrimUI Smart, and screenshots are BMPs whatever their name.
 #pragma once
+#include <stdbool.h>
+#include <stdlib.h>
+#ifdef USE_SDL12
+#include <SDL/SDL.h>
+#include <SDL/SDL_image.h>
+#include <SDL/SDL_ttf.h>
+#include "sdl12-compat.h"
+#define IMG_SavePNG(surface, path) SDL_SaveBMP(surface, path)
+#else
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
-#include <stdlib.h>
+#endif
 
 #define FONT_LARGE 16
 #define FONT_MEDIUM 14
@@ -44,7 +55,11 @@ static SDL_Surface *GFX_init(int mode)
         font.small = TTF_OpenFont(path, SCALE1(FONT_SMALL));
         font.tiny = TTF_OpenFont(path, SCALE1(FONT_TINY));
     }
+#ifdef USE_SDL12
+    return SDL_CreateRGBSurface(SDL_SWSURFACE, env_int("PKMGR_WIDTH", 640), env_int("PKMGR_HEIGHT", 480), 16, 0xF800, 0x07E0, 0x001F, 0);
+#else
     return SDL_CreateRGBSurfaceWithFormat(0, env_int("PKMGR_WIDTH", 640), env_int("PKMGR_HEIGHT", 480), 32, SDL_PIXELFORMAT_RGBA8888);
+#endif
 }
 
 static void GFX_clear(SDL_Surface *s) { SDL_FillRect(s, NULL, 0); }

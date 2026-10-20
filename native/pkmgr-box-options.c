@@ -32,6 +32,12 @@ static void options_row_pill(SDL_Surface *dst, SDL_Rect r) { options_pill(dst, r
 static void options_name_pill(SDL_Surface *dst, SDL_Rect r) { options_pill(dst, r, (SDL_Color){255, 255, 255, 255}); }
 static SDL_Color options_selected_text(void) { return (SDL_Color){0, 0, 0, 255}; }
 static Uint32 options_backdrop(SDL_Surface *dst) { return SDL_MapRGB(dst->format, 0, 0, 0); }
+#elif defined(PLATFORM_MINUI)
+// minarch's own: a grey row with its name in white
+static void options_row_pill(SDL_Surface *dst, SDL_Rect r) { GFX_blitPill(ASSET_OPTION, dst, &r); }
+static void options_name_pill(SDL_Surface *dst, SDL_Rect r) { GFX_blitPill(ASSET_BUTTON, dst, &r); }
+static SDL_Color options_selected_text(void) { return COLOR_BLACK; }
+static Uint32 options_backdrop(SDL_Surface *dst) { return SDL_MapRGB(dst->format, 0, 0, 0); }
 #else
 static void options_row_pill(SDL_Surface *dst, SDL_Rect r) { GFX_blitPillLight(ASSET_BUTTON, dst, &r); }
 static void options_name_pill(SDL_Surface *dst, SDL_Rect r) { GFX_blitPillDark(ASSET_BUTTON, dst, &r); }

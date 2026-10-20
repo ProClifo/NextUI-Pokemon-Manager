@@ -4,8 +4,8 @@
 #
 #   scripts/build-native.sh [platform...]     default: tg5040 tg5050 my355 h700 trimuismart
 #
-# Output: native/pkmgr-box-<platform>-nextui and native/minui-list-<platform>-nextui (native/minui-list-trimuismart for
-# MinUI's TrimUI Smart). Needs Docker; on x86 hosts the arm64 toolchain
+# Output: native/pkmgr-box-<platform>-nextui and native/minui-list-<platform>-nextui (native/pkmgr-box-trimuismart and
+# native/minui-list-trimuismart for MinUI's TrimUI Smart). Needs Docker; on x86 hosts the arm64 toolchain
 # images run through QEMU (binfmt). Sources are cloned on the host, so the containers need no network.
 set -euo pipefail
 
@@ -17,14 +17,14 @@ PLATFORMS=("$@")
 status=0
 for platform in "${PLATFORMS[@]}"; do
     if [ "$platform" = trimuismart ]; then
-        # MinUI's TrimUI Smart: just minui-list (patched), built by its own Makefile against MinUI in MinUI's
-        # toolchain (savant/minui-toolchain, as upstream's releases are). No PC box viewer yet.
-        echo "==> minui-list for $platform (MinUI)"
-        make -s -C "$NATIVE" minui-list-src
+        # MinUI's TrimUI Smart: minui-list (patched), built by its own Makefile against MinUI in MinUI's toolchain
+        # (savant/minui-toolchain, as upstream's releases are), then pkmgr-box against the same MinUI (SDL 1.2).
+        echo "==> pkmgr-box and minui-list for $platform (MinUI)"
+        make -s -C "$NATIVE" minui-list-src include/parson
         # cloned on the host (the toolchain container needs no network); CROSS_COMPILE only satisfies its guard here
         make -s -C "$NATIVE/minui-list-src" PLATFORM="$platform" CROSS_COMPILE=host- minui include/parson
         if docker run --rm --platform linux/arm64 -v "$NATIVE":/root/workspace/repo "savant/minui-toolchain:$platform" \
-            bash -c "source /root/.bashrc && make -C /root/workspace/repo/minui-list-src PLATFORM=$platform setup && make -C /root/workspace/repo/minui-list-src PLATFORM=$platform"; then
+            bash -c "source /root/.bashrc && make -C /root/workspace/repo/minui-list-src PLATFORM=$platform setup && make -C /root/workspace/repo/minui-list-src PLATFORM=$platform && make -C /root/workspace/repo PLATFORM=$platform minui-device"; then
             cp "$NATIVE/minui-list-src/minui-list-$platform" "$NATIVE/minui-list-$platform"
         else
             echo "!! build failed for $platform" >&2

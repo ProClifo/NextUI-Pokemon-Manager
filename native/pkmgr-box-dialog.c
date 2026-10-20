@@ -6,7 +6,8 @@
 // the one highlighted first; A prints "answer=<index>" (on a line of its own: NextUI's libraries print to stdout
 // too) and exits 0, B exits 2.
 
-// The selection pill and the text colours: NextUI's theme on the device, white and black on a desktop.
+// The selection pill and the text colours: NextUI's theme on the device, MinUI's white pill and black text (its menus
+// have no theme), white and black on a desktop.
 #ifdef DESKTOP
 static void dialog_pill(SDL_Surface *dst, SDL_Rect r, bool selected)
 {
@@ -25,6 +26,14 @@ static void dialog_pill(SDL_Surface *dst, SDL_Rect r, bool selected)
     }
 }
 static SDL_Color dialog_text(bool selected) { return selected ? (SDL_Color){0, 0, 0, 255} : (SDL_Color){255, 255, 255, 255}; }
+static Uint32 dialog_backdrop(SDL_Surface *dst) { return SDL_MapRGB(dst->format, 0, 0, 0); }
+#elif defined(PLATFORM_MINUI)
+static void dialog_pill(SDL_Surface *dst, SDL_Rect r, bool selected)
+{
+    if (selected)
+        GFX_blitPill(ASSET_WHITE_PILL, dst, &r);
+}
+static SDL_Color dialog_text(bool selected) { return selected ? COLOR_BLACK : COLOR_WHITE; }
 static Uint32 dialog_backdrop(SDL_Surface *dst) { return SDL_MapRGB(dst->format, 0, 0, 0); }
 #else
 static void dialog_pill(SDL_Surface *dst, SDL_Rect r, bool selected)
