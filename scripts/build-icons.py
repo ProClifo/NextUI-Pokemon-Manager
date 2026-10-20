@@ -24,7 +24,7 @@ def main():
     os.makedirs(out, exist_ok=True)
     for name, file in ICONS.items():
         image = Image.open(os.path.join(src, "2D", "png", "128", file)).convert("RGBA")
-        for scale in (2, 3):
+        for scale in (1, 2, 3):  # 1: MinUI's TrimUI Smart
             size = TEXT_PX * scale
             icon = image.resize((size, size), Image.LANCZOS)
             icon.save(os.path.join(out, f"{name}-{scale}x.png"))

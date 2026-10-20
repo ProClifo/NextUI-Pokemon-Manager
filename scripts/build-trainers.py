@@ -141,7 +141,7 @@ def save(out_dir, name, frames):
         box = (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
     stand, walk = stand.crop(box), [f.crop(box) for f in walk]
     STORE[name] = stand
-    for scale in (2, 3):
+    for scale in (1, 2, 3):  # 1: MinUI's TrimUI Smart
         factor = max(1, -(-TEXT_PX * scale // stand.height))  # rounded up: at least the text's height
         size = (stand.width * factor, stand.height * factor)
         stand.resize(size, Image.NEAREST).save(os.path.join(out_dir, f"{name}-{scale}x.png"))

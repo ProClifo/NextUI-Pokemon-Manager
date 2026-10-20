@@ -1,4 +1,6 @@
-// The part of SDL2's surface API pkmgr-box uses, on SDL 1.2 (MinUI's TrimUI Smart; `make desktop-sdl12` on a PC).
+// The part of SDL2's surface API pkmgr-box uses, on SDL 1.2 (MinUI's TrimUI Smart; `make desktop-sdl12` on a PC), and
+// minui-list's patch for its row and title images (with SDL12_COMPAT_KEEP_BLITS: SDL_BlitSurface and SDL_FillRect
+// stay SDL 1.2's, which the rest of minui-list is written for).
 //
 // Blits follow SDL2's rules rather than SDL 1.2's: a surface's blend mode (SDL_SetSurfaceBlendMode, kept in its
 // SDL_SRCALPHA flag) decides between copying a pixel and blending it, blending also blends the alpha channel (SDL 1.2
@@ -6,6 +8,7 @@
 // between any formats, so they can draw straight onto MinUI's RGB565 screen. SDL_Rect's w and h are 16-bit unsigned
 // in SDL 1.2: a negative width wraps round, so anything over 32767 is taken as nothing.
 #pragma once
+#include <stdbool.h>
 #include <string.h>
 
 typedef enum
@@ -274,7 +277,9 @@ static SDL_Surface *SDL_ConvertSurfaceFormat(SDL_Surface *src, Uint32 format, Ui
     return out;
 }
 
+#define SDL_BlitScaled compat_blit_scaled
+#ifndef SDL12_COMPAT_KEEP_BLITS
 #undef SDL_BlitSurface
 #define SDL_BlitSurface compat_blit
-#define SDL_BlitScaled compat_blit_scaled
 #define SDL_FillRect compat_fill
+#endif

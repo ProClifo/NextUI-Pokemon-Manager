@@ -240,7 +240,10 @@ stale=
 for src in "$ROOT"/native/pkmgr-box*.c "$ROOT/native/sdl12-compat.h" "$ROOT/native/Makefile"; do
     [ "$src" -nt "$box32" ] && stale=1
 done
-[ "$ROOT/native/minui-list.patch" -nt "$list32" ] && stale=1
+# its patch includes sdl12-compat.h on SDL 1.2
+for src in "$ROOT/native/minui-list.patch" "$ROOT/native/sdl12-compat.h"; do
+    [ "$src" -nt "$list32" ] && stale=1
+done
 if [ ! -x "$list32" ] || [ ! -x "$box32" ] || [ -n "$stale" ]; then
     "$ROOT/scripts/build-native.sh" trimuismart
 fi
