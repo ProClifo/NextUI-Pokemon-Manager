@@ -6,3 +6,5 @@ minui-list-src/
 minui-list-*-nextui
 !pkmgr-box-*.c
 minui-list-trimuismart
+minui-presenter-src/
+minui-presenter-*-nextui

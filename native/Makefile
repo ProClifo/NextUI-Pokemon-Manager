@@ -12,6 +12,7 @@ NEXTUI_VERSION ?= v6.15.0
 MY355_NEXTUI_VERSION ?= my355-latest
 PARSON_VERSION ?= ec53fb6528b45811df9db0db22cab96a94a96a11
 MINUI_LIST_VERSION ?= 0.15.4
+MINUI_PRESENTER_VERSION ?= 0.13.4
 
 WORKSPACE = $(patsubst %-nextui,%,$(PLATFORM))
 # The Anbernic H700 devices are in NextUI itself from v6.15.0; the Miyoo Flip still has its own tag.
@@ -84,7 +85,20 @@ minui-list: $(NEXTUI_DIR) minui-list-src include/parson $(CURDIR)/platform/$(PLA
 		-DPLATFORM=\"$(WORKSPACE)\" -DPLATFORM_NEXTUI -O2 -std=gnu99 \
 		-L$(LIB_DIR) -L/opt/nextui/lib $(LDFLAGS) -lmsettings $(NEXTUI_GL_LIBS)
 
-clean:
-	rm -rf pkmgr-box-* minui-list-*-nextui minui-list-trimuismart minui-list-src platform nextui-*
+# minui-presenter, unchanged, but built here against the same patched NextUI (scripts/patch-nextui-keep-frame.py) so
+# its message screens don't flash black either.
+minui-presenter-src:
+	git clone -q --branch $(MINUI_PRESENTER_VERSION) https://github.com/josegonzalez/minui-presenter.git minui-presenter-src
 
-.PHONY: all desktop device nextui clean minui-list
+minui-presenter: $(NEXTUI_DIR) minui-presenter-src include/parson $(CURDIR)/platform/$(PLATFORM)/include/msettings.h
+	$(CROSS_COMPILE)gcc minui-presenter-src/minui-presenter.c minui-presenter-src/presenter_theme.c include/parson/parson.c \
+		$(COMMON)/scaler.c $(COMMON)/utils.c $(COMMON)/api.c $(COMMON)/config.c $(PLAT)/platform.c \
+		-o minui-presenter-$(PLATFORM) \
+		$(CFLAGS) -Iminui-presenter-src -Iinclude -Iplatform/$(PLATFORM)/include -I$(COMMON) -I$(PLAT) -I/opt/nextui/include \
+		-DPLATFORM=\"$(WORKSPACE)\" -DPLATFORM_NEXTUI -O2 -std=gnu99 \
+		-L$(LIB_DIR) -L/opt/nextui/lib $(LDFLAGS) -lmsettings $(NEXTUI_GL_LIBS)
+
+clean:
+	rm -rf pkmgr-box-* minui-list-*-nextui minui-list-trimuismart minui-list-src minui-presenter-*-nextui minui-presenter-src platform nextui-*
+
+.PHONY: all desktop device nextui clean minui-list minui-presenter

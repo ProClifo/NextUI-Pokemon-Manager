@@ -63,31 +63,31 @@ fetch() {
     chmod +x "$dest"
 }
 
-echo "==> Fetching minui-presenter $MINUI_PRESENTER_VERSION"
-for platform in "${PLATFORMS[@]}"; do
-    mkdir -p "$PAK/bin/$platform"
-    fetch "https://github.com/josegonzalez/minui-presenter/releases/download/$MINUI_PRESENTER_VERSION/minui-presenter-$platform-nextui" "$PAK/bin/$platform/minui-presenter"
-done
-
 echo "==> Fetching minui-keyboard $MINUI_KEYBOARD_VERSION"
 for platform in "${PLATFORMS[@]}"; do
+    mkdir -p "$PAK/bin/$platform"
     fetch "https://github.com/josegonzalez/minui-keyboard/releases/download/$MINUI_KEYBOARD_VERSION/minui-keyboard-$platform-nextui" "$PAK/bin/$platform/minui-keyboard"
 done
 
-# Built from source: the PC box viewer, and minui-list $MINUI_LIST_VERSION patched (native/minui-list.patch) so its
+# Built from source: the PC box viewer, minui-presenter $MINUI_PRESENTER_VERSION (as released, but against NextUI patched
+# by scripts/patch-nextui-keep-frame.py, so moving between the pak's screens doesn't flash black), and minui-list
+# $MINUI_LIST_VERSION patched (native/minui-list.patch) so its
 # font options don't crash (the release binaries segfault on --font-large, which picking NextUI's Next/OG font uses) and
 # so it can show the Legal/Illegal tag on the highlighted row only.
-echo "==> PC box viewer and minui-list"
+echo "==> PC box viewer, minui-list and minui-presenter"
 missing=()
 for platform in "${PLATFORMS[@]}"; do
-    box="$ROOT/native/pkmgr-box-$platform-nextui" list="$ROOT/native/minui-list-$platform-nextui"
+    box="$ROOT/native/pkmgr-box-$platform-nextui" list="$ROOT/native/minui-list-$platform-nextui" presenter="$ROOT/native/minui-presenter-$platform-nextui"
     stale=
     # rebuilt when a source is newer than the binary, so a pak never ships an old viewer
-    for src in "$ROOT"/native/pkmgr-box*.c "$ROOT/native/desktop.h" "$ROOT/native/Makefile"; do
+    for src in "$ROOT"/native/pkmgr-box*.c "$ROOT/native/desktop.h" "$ROOT/native/Makefile" "$ROOT/scripts/patch-nextui-keep-frame.py"; do
         [ "$src" -nt "$box" ] && stale=1
     done
-    [ "$ROOT/native/minui-list.patch" -nt "$list" ] && stale=1
-    { [ -x "$box" ] && [ -x "$list" ] && [ -z "$stale" ]; } || missing+=("$platform")
+    for src in "$ROOT/native/minui-list.patch" "$ROOT/scripts/patch-nextui-keep-frame.py"; do
+        [ "$src" -nt "$list" ] && stale=1
+    done
+    [ "$ROOT/scripts/patch-nextui-keep-frame.py" -nt "$presenter" ] && stale=1
+    { [ -x "$box" ] && [ -x "$list" ] && [ -x "$presenter" ] && [ -z "$stale" ]; } || missing+=("$platform")
 done
 if [ ${#missing[@]} -ne 0 ]; then
     command -v docker >/dev/null 2>&1 || { echo "docker is required to build minui-list and the PC box viewer for ${missing[*]}" >&2; exit 1; }
@@ -96,6 +96,7 @@ fi
 for platform in "${PLATFORMS[@]}"; do
     cp "$ROOT/native/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
     cp "$ROOT/native/pkmgr-box-$platform-nextui" "$PAK/bin/$platform/pkmgr-box"
+    cp "$ROOT/native/minui-presenter-$platform-nextui" "$PAK/bin/$platform/minui-presenter"
 done
 
 echo "==> Event gallery (projectpokemon/EventsGallery ${EVENTSGALLERY_COMMIT:0:7}, Gen 1-5)"

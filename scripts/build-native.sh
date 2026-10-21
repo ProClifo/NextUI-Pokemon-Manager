@@ -4,8 +4,8 @@
 #
 #   scripts/build-native.sh [platform...]     default: tg5040 tg5050 my355 h700 trimuismart
 #
-# Output: native/pkmgr-box-<platform>-nextui and native/minui-list-<platform>-nextui (native/minui-list-trimuismart for
-# MinUI's TrimUI Smart). Needs Docker; on x86 hosts the arm64 toolchain
+# Output: native/pkmgr-box-, minui-list- and minui-presenter-<platform>-nextui (native/minui-list-trimuismart for MinUI's
+# TrimUI Smart). Needs Docker; on x86 hosts the arm64 toolchain
 # images run through QEMU (binfmt). Sources are cloned on the host, so the containers need no network.
 set -euo pipefail
 
@@ -34,9 +34,11 @@ for platform in "${PLATFORMS[@]}"; do
     fi
     target="$platform-nextui"
     echo "==> pkmgr-box and minui-list for $platform"
-    make -s -C "$NATIVE" PLATFORM="$target" nextui include/parson minui-list-src
+    make -s -C "$NATIVE" PLATFORM="$target" nextui include/parson minui-list-src minui-presenter-src
+    # PKMGR_KEEP_FRAME: no black frames between the pak's screens (scripts/patch-nextui-keep-frame.py)
+    python3 "$ROOT/scripts/patch-nextui-keep-frame.py" "$NATIVE/nextui-$platform"
     if ! docker run --rm --platform linux/arm64 -v "$NATIVE":/root/workspace/repo "savant/minui-toolchain:$target" \
-        bash -c "source /root/.bashrc && make -C /root/workspace/repo PLATFORM=$target device minui-list"; then
+        bash -c "source /root/.bashrc && make -C /root/workspace/repo PLATFORM=$target device minui-list minui-presenter"; then
         echo "!! build failed for $platform" >&2
         status=1
     fi
