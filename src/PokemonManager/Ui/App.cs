@@ -123,7 +123,7 @@ public sealed class App
         try
         {
             _ui.Busy("Checking for updates...");
-            release = updater.Latest(platform);
+            release = updater.Latest(platform, _settings.BetaUpdates);
         }
         catch (Exception ex)
         {
@@ -132,7 +132,7 @@ public sealed class App
             return false;
         }
         var installed = updater.InstalledTag;
-        if (release.Tag == installed)
+        if (!Updater.IsNewer(release.Tag, installed))
         {
             _ui.Message($"Pokémon Manager is up to date ({installed}).");
             return false;
@@ -164,14 +164,14 @@ public sealed class App
         Updater.Release release;
         try
         {
-            release = updater.Latest(platform, TimeSpan.FromSeconds(4));
+            release = updater.Latest(platform, _settings.BetaUpdates, TimeSpan.FromSeconds(4));
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"startup update check: {ex.Message}");
             return false;
         }
-        if (release.Tag == installed || release.AssetUrl is null)
+        if (!Updater.IsNewer(release.Tag, installed) || release.AssetUrl is null)
             return false;
         var size = release.AssetSize > 0 ? $" ({release.AssetSize / (1024 * 1024)} MB)" : "";
         if (!_ui.Confirm($"An update is available.\n\nInstalled: {installed}\nNew: {release.Name}{size}", "UPDATE", "LATER"))

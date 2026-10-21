@@ -52,12 +52,16 @@ public sealed class Updater(string pakDir, string tempDir)
     }
 
     /// <summary>
-    /// The newest published release with a zip for <paramref name="platform"/>. A <paramref name="timeout"/> bounds
-    /// each attempt to reach GitHub (the check on startup), otherwise they get minutes.
+    /// The newest published release with a zip for <paramref name="platform"/>: a stable one, or with
+    /// <paramref name="beta"/> (settings.txt's hidden beta_updates) a pre-release ("v0.2.53-beta.1") too. A
+    /// <paramref name="timeout"/> bounds each attempt to reach GitHub (the check on startup), otherwise they get minutes.
     /// </summary>
-    public Release Latest(string platform, TimeSpan? timeout = null)
+    public Release Latest(string platform, bool beta = false, TimeSpan? timeout = null)
+        => Pick(DownloadText($"https://api.github.com/repos/{Repository}/releases?per_page=100", timeout), platform, beta);
+
+    /// <summary>The newest release in GitHub's release list (JSON) that <see cref="Latest"/> would offer.</summary>
+    public static Release Pick(string json, string platform, bool beta)
     {
-        var json = DownloadText($"https://api.github.com/repos/{Repository}/releases?per_page=100", timeout);
         using var doc = JsonDocument.Parse(json);
         // GitHub lists releases by tag name as text (alpha.9 before alpha.14): newest published first instead
         var releases = doc.RootElement.EnumerateArray()
@@ -65,6 +69,8 @@ public sealed class Updater(string pakDir, string tempDir)
         foreach (var r in releases)
         {
             if (r.TryGetProperty("draft", out var draft) && draft.GetBoolean())
+                continue;
+            if (!beta && r.TryGetProperty("prerelease", out var pre) && pre.GetBoolean())
                 continue;
             string tag = r.GetProperty("tag_name").GetString() ?? "";
             string name = r.TryGetProperty("name", out var n) && n.GetString() is { Length: > 0 } s ? s : tag;
@@ -83,6 +89,51 @@ public sealed class Updater(string pakDir, string tempDir)
                 return new Release(tag, name, url, size);
         }
         throw new InvalidDataException($"There are no releases for this device ({platform}) yet.");
+    }
+
+    /// <summary>
+    /// Whether <paramref name="tag"/> is a newer version than <paramref name="installed"/>, by semantic version
+    /// ("v0.2.53-beta.1" is newer than v0.2.52 and older than v0.2.53), so turning betas off never offers an older
+    /// stable release. A tag that isn't a version ("dev") counts as older than any release.
+    /// </summary>
+    public static bool IsNewer(string tag, string installed)
+    {
+        if (Parse(tag) is not { } a)
+            return false;
+        if (Parse(installed) is not { } b)
+            return true;
+        for (int i = 0; i < 3; i++)
+        {
+            if (a.Numbers[i] != b.Numbers[i])
+                return a.Numbers[i] > b.Numbers[i];
+        }
+        // same version: a release is newer than its pre-releases, pre-releases compare part by part
+        if (a.Pre.Length == 0 || b.Pre.Length == 0)
+            return a.Pre.Length == 0 && b.Pre.Length != 0;
+        for (int i = 0; i < Math.Min(a.Pre.Length, b.Pre.Length); i++)
+        {
+            bool an = int.TryParse(a.Pre[i], out var x), bn = int.TryParse(b.Pre[i], out var y);
+            int c = an && bn ? x.CompareTo(y) : an ? -1 : bn ? 1 : string.CompareOrdinal(a.Pre[i], b.Pre[i]);
+            if (c != 0)
+                return c > 0;
+        }
+        return a.Pre.Length > b.Pre.Length;
+
+        static (int[] Numbers, string[] Pre)? Parse(string version)
+        {
+            var v = version.Trim().TrimStart('v', 'V');
+            int dash = v.IndexOf('-');
+            var core = (dash < 0 ? v : v[..dash]).Split('.');
+            var numbers = new int[3];
+            if (core.Length is < 1 or > 3)
+                return null;
+            for (int i = 0; i < core.Length; i++)
+            {
+                if (!int.TryParse(core[i], out numbers[i]))
+                    return null;
+            }
+            return (numbers, dash < 0 ? [] : v[(dash + 1)..].Split('.'));
+        }
     }
 
     /// <summary>

@@ -77,6 +77,11 @@ public sealed class AppSettings
     public bool SeenWelcome { get; set; }
     /// <summary>Whether the pak has said where it moves save states (shown the first time it moves one).</summary>
     public bool SeenStateMoved { get; set; }
+    /// <summary>
+    /// Offer beta releases (GitHub pre-releases) in Update too. Not in the Settings menu: testers turn it on with
+    /// "beta_updates=true" in settings.txt. Reset to Default leaves it as it is.
+    /// </summary>
+    public bool BetaUpdates { get; set; }
     /// <summary>List gallery files in every language, not just the game's (off by default).</summary>
     public bool GalleryAllLanguages { get; set; }
     /// <summary>List the gallery's unreleased files: debug and test cards never distributed (off by default).</summary>
@@ -111,6 +116,7 @@ public sealed class AppSettings
                 case "allow_illegal_transfers" or "allow_unofficial_transfers": s.AllowIllegalTransfers = on; break;
                 case "seen_welcome": s.SeenWelcome = on; break;
                 case "seen_state_moved": s.SeenStateMoved = on; break;
+                case "beta_updates": s.BetaUpdates = on; break;
                 case "pc_box_view": s.PcBoxView = on; break;
                 case "gallery_all_languages": s.GalleryAllLanguages = on; break;
                 case "gallery_unreleased": s.GalleryUnreleased = on; break;
@@ -128,6 +134,7 @@ public sealed class AppSettings
                 $"allow_illegal_transfers={AllowIllegalTransfers.ToString().ToLowerInvariant()}",
                 $"seen_welcome={SeenWelcome.ToString().ToLowerInvariant()}",
                 $"seen_state_moved={SeenStateMoved.ToString().ToLowerInvariant()}",
+                $"beta_updates={BetaUpdates.ToString().ToLowerInvariant()}",
                 $"pc_box_view={PcBoxView.ToString().ToLowerInvariant()}",
                 $"gallery_all_languages={GalleryAllLanguages.ToString().ToLowerInvariant()}",
                 $"gallery_unreleased={GalleryUnreleased.ToString().ToLowerInvariant()}",

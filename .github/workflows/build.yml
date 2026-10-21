@@ -59,8 +59,9 @@ jobs:
 
       # The Pak Store reads pak.json's version from this branch every hour and downloads that tag's release_filename:
       # pak.json moves on to the new tag only now that its release exists, so the store never offers a missing one.
+      # A beta (a tag with '-') leaves it alone: only testers with beta_updates=true in settings.txt get those.
       - name: Point pak.json at the release
-        if: inputs.release_tag != ''
+        if: inputs.release_tag != '' && !contains(inputs.release_tag, '-')
         run: |
           tag="${{ inputs.release_tag }}"
           python3 - "$tag" <<'PY'
