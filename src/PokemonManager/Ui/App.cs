@@ -37,6 +37,8 @@ public sealed class App
     private readonly Dictionary<string, string?> _backgroundCache = new();
     private readonly Dictionary<string, GameProfile> _profiles = new();
     private readonly Dictionary<string, List<TicketChoice>> _tickets = new();
+    // The highlighted save's first legality check and ticket list, done while the saves list is up (StartWarmup)
+    private Task? _warmup;
     private readonly GalleryArchive _gallery;
     private readonly UiFont? _nextFont;
     /// <summary>After a Karrablast/Shelmet trade: the partner's evolved Pokémon, shown beside ours on the evolution screen.</summary>
@@ -91,6 +93,7 @@ public sealed class App
             int help = items.Count; items.Add("Help");
 
             var icons = saves.Select(CartridgeIcon).ToList();
+            StartWarmup(saves);
             // Y renames the highlighted save, SELECT moves it to Others (not on the menu's own rows)
             var noActions = items.Select((_, i) => i >= saves.Count).ToList();
             var choice = _ui.Choose(saves.Count == 0 ? $"{Title} - no saves found" : $"{Title} - choose a save", items, _mainSelected, tags: tags, images: sprites, icons: icons,
@@ -206,6 +209,7 @@ public sealed class App
     {
         if (_saves is not null)
             return _saves;
+        AwaitWarmup();
         _ui.Busy("Looking for Pokémon saves...");
         var all = SaveLibrary.Scan(_paths.SaveRoots);
         _hidden = [];
@@ -293,8 +297,37 @@ public sealed class App
 
     // ---------------------------------------------------------------- save menu
 
+    /// <summary>
+    /// Once a session, while the saves list waits for the player: PKHeX's first legality check and the highlighted
+    /// save's event tickets (about a second on an RG35XX SP the first time, then cached), so opening it doesn't wait
+    /// for them. Whatever runs PKHeX next waits for it first (<see cref="AwaitWarmup"/>): its settings are global.
+    /// </summary>
+    private void StartWarmup(List<SaveEntry> saves)
+    {
+        if (_warmup is not null || saves.Count == 0)
+            return;
+        var entry = saves[Math.Clamp(_mainSelected, 0, saves.Count - 1)];
+        _warmup = Task.Run(() =>
+        {
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
+            try
+            {
+                Legality.For(entry.Sav);
+                TicketsFor(entry);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"warm-up failed: {ex}");
+            }
+            Console.Error.WriteLine($"[timing] warm-up for {Path.GetFileName(entry.Path)}: {System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds:0} ms");
+        });
+    }
+
+    private void AwaitWarmup() => _warmup?.Wait();
+
     private void SaveMenu(SaveEntry entry)
     {
+        AwaitWarmup();
         // A save's menus are drawn in NextUI's OG font.
         var previousFont = _ui.Font;
         _ui.Font = _ogFont;
@@ -318,6 +351,7 @@ public sealed class App
     private void SaveMenuLoop(SaveEntry entry)
     {
         int selected = 0;
+        long opened = System.Diagnostics.Stopwatch.GetTimestamp();
         while (true)
         {
             var sav = entry.Sav;
@@ -363,6 +397,11 @@ public sealed class App
                 actions.Add(("Decorations", null, () => DecorationsMenu(entry)));
             actions.Add(("Info", null, () => InfoMenu(entry)));
 
+            if (opened != 0)
+            {
+                Console.Error.WriteLine($"[timing] {Path.GetFileName(entry.Path)}'s menu: {System.Diagnostics.Stopwatch.GetElapsedTime(opened).TotalMilliseconds:0} ms");
+                opened = 0;
+            }
             // Headed like the save on the main menu: "[ENG] Emerald   NAME <player sprite> ID".
             var choice = _ui.Choose($"{SaveName(entry)}\t{sav.OT}\t{sav.DisplayTID:D5}", actions.Select(a => a.Label).ToList(), selected,
                 BackgroundFor(entry), actions.Select(a => a.Tag).ToList(), titleImage: TrainerSprite(sav));
