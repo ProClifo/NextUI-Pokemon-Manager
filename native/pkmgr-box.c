@@ -140,6 +140,24 @@ static SDL_Surface *load_image(const char *path)
     return converted;
 }
 
+// Run by pkmgr-host when it unloads this screen (and at a program's exit): the image cache and the text font go, or
+// the host would keep every box's art from every visit.
+static TTF_Font *text_font;
+__attribute__((destructor)) static void release_images(void)
+{
+    for (int i = 0; i < cache_count; i++)
+    {
+        SDL_FreeSurface(cache[i].surface);
+        free(cache[i].path);
+    }
+    free(cache);
+    cache = NULL;
+    cache_count = cache_capacity = 0;
+    if (text_font && TTF_WasInit())
+        TTF_CloseFont(text_font);
+    text_font = NULL;
+}
+
 // An image from the skin folder.
 static SDL_Surface *skin_image(Scene *scene, const char *name)
 {
@@ -328,7 +346,6 @@ static void fill_logical(SDL_Surface *dst, const Layout *l, int x, int y, int w,
 
 // The game's text, in NextUI's font sized so a capital letter is as tall as the game's. Layout positions are
 // the top of the game's 16-pixel glyph cell; capitals start font.cap_top pixels below it.
-static TTF_Font *text_font = NULL;
 static int text_cap_offset = 0; // screen pixels from the TTF line's top to the top of a capital letter
 static int font_height = 10;    // GBA pixels of a capital letter
 static int cap_top = 2;         // GBA pixels from the glyph cell's top to a capital's top

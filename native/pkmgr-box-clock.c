@@ -241,6 +241,10 @@ static int clock_run(const char *spec, const char *font_path, const char *backgr
             fclose(f);
         }
     }
+    if (big != font.large)
+        TTF_CloseFont(big);
+    if (title != font.large)
+        TTF_CloseFont(title);
     QuitSettings();
     PWR_quit();
     PAD_quit();
