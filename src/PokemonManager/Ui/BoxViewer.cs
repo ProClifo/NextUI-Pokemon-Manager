@@ -51,7 +51,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             psi.ArgumentList.Add(scenePath);
             psi.ArgumentList.Add("--write-location");
             psi.ArgumentList.Add(outPath);
-            using var p = Process.Start(psi);
+            using var p = ScreenTiming.Start(psi);
             if (p is null)
                 return Outcome.Unavailable;
             p.OutputDataReceived += static (_, _) => { };
@@ -124,7 +124,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
                 psi.ArgumentList.Add("--background");
                 psi.ArgumentList.Add(background);
             }
-            using var p = Process.Start(psi);
+            using var p = ScreenTiming.Start(psi);
             if (p is null)
             {
                 unavailable = true;
@@ -194,7 +194,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
                 psi.ArgumentList.Add("--background");
                 psi.ArgumentList.Add(background);
             }
-            using var p = Process.Start(psi);
+            using var p = ScreenTiming.Start(psi);
             if (p is null)
                 return null;
             p.StandardOutput.ReadToEnd();
@@ -291,7 +291,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             psi.ArgumentList.Add(input);
             psi.ArgumentList.Add("--write-location");
             psi.ArgumentList.Add(output);
-            using var p = Process.Start(psi);
+            using var p = ScreenTiming.Start(psi);
             if (p is null)
                 return null;
             p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
@@ -329,7 +329,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardError = true };
             psi.ArgumentList.Add(mode);
             psi.ArgumentList.Add(path);
-            using var p = Process.Start(psi);
+            using var p = ScreenTiming.Start(psi);
             if (p is null)
                 return null;
             p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
@@ -358,7 +358,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             psi.ArgumentList.Add("--dialog");
             psi.ArgumentList.Add(path);
-            using var p = Process.Start(psi);
+            using var p = ScreenTiming.Start(psi);
             if (p is null)
                 return null;
             var stdout = new System.Text.StringBuilder();
@@ -397,7 +397,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             psi.ArgumentList.Add("--card");
             psi.ArgumentList.Add(cardPath);
-            using var p = Process.Start(psi);
+            using var p = ScreenTiming.Start(psi);
             if (p is null)
                 return false;
             p.OutputDataReceived += static (_, _) => { };

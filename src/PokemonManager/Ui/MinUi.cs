@@ -327,7 +327,7 @@ public sealed class MinUi : IUi
         var psi = Start("minui-presenter", ["--message", Escape(text), "--timeout", "-1", .. MessageFont(text), .. MessageBackground()]);
         try
         {
-            _busy = Process.Start(psi);
+            _busy = ScreenTiming.Start(psi);
         }
         catch (Exception)
         {
@@ -373,7 +373,7 @@ public sealed class MinUi : IUi
 
     private static int Run(string tool, params string[] args)
     {
-        using var p = Process.Start(Start(tool, args));
+        using var p = ScreenTiming.Start(Start(tool, args));
         if (p is null)
             return -1;
         // Drain output so the tool never blocks on a full pipe; contents are informational only.
