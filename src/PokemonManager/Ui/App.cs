@@ -64,6 +64,8 @@ public sealed class App
 
     public int Run()
     {
+        if (_settings.Incomplete)
+            _settings.Save(_paths.SettingsFile);
         if (!_settings.SeenWelcome)
         {
             if (!_boxViewer.Text(Title, HelpText))

@@ -100,16 +100,24 @@ public sealed class AppSettings
         SeenStateMoved = false; // says where save states go again
     }
 
+    /// <summary>
+    /// Whether settings.txt is missing a setting (or the whole file), say beta_updates in one from before it existed:
+    /// the pak saves it on startup then, so every setting is there to edit, at its default.
+    /// </summary>
+    public bool Incomplete { get; private set; }
+
     public static AppSettings Load(string path)
     {
-        var s = new AppSettings();
+        var s = new AppSettings { Incomplete = true };
         if (!File.Exists(path))
             return s;
+        var keys = new HashSet<string>();
         foreach (var line in File.ReadAllLines(path))
         {
             var parts = line.Split('=', 2, StringSplitOptions.TrimEntries);
             if (parts.Length != 2)
                 continue;
+            keys.Add(parts[0]);
             bool on = parts[1].Equals("true", StringComparison.OrdinalIgnoreCase);
             switch (parts[0])
             {
@@ -122,8 +130,15 @@ public sealed class AppSettings
                 case "gallery_unreleased": s.GalleryUnreleased = on; break;
             }
         }
+        s.Incomplete = !Keys.All(keys.Contains);
         return s;
     }
+
+    private static readonly string[] Keys =
+    [
+        "allow_illegal_transfers", "seen_welcome", "seen_state_moved", "beta_updates", "pc_box_view",
+        "gallery_all_languages", "gallery_unreleased",
+    ];
 
     public void Save(string path)
     {

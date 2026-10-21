@@ -43,4 +43,27 @@ public class AppSettingsTests
             File.Delete(path);
         }
     }
+
+    [Fact]
+    public void ASettingsFileWithoutBetaUpdatesIsIncompleteUntilSaved()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pkmgr-settings-{Guid.NewGuid():N}.txt");
+        try
+        {
+            Assert.True(AppSettings.Load(path).Incomplete);
+            File.WriteAllText(path, "seen_welcome=true\npc_box_view=false\n");
+            var settings = AppSettings.Load(path);
+            Assert.True(settings.Incomplete);
+            settings.Save(path);
+            Assert.Contains("beta_updates=false", File.ReadAllLines(path));
+            var saved = AppSettings.Load(path);
+            Assert.False(saved.Incomplete);
+            Assert.True(saved.SeenWelcome);
+            Assert.False(saved.PcBoxView);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }
