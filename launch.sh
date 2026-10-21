@@ -27,8 +27,8 @@ export DOTNET_BUNDLE_EXTRACT_BASE_DIR="$USERDATA_PATH/$PAK_NAME/dotnet"
 export DOTNET_gcServer=0
 export TMPDIR="${TMPDIR:-/tmp}"
 # The pak's screens are separate programs: keep each one's last frame up until the next draws, instead of blanking
-# between them (scripts/patch-nextui-keep-frame.py).
-export PKMGR_KEEP_FRAME=1
+# between them (scripts/patch-nextui-keep-frame.py). Off until it's been tested in a beta.
+# export PKMGR_KEEP_FRAME=1
 
 PKMGR="$PAK_DIR/bin/arm64/pkmgr"
 if [ "$PLATFORM" = trimuismart ]; then
