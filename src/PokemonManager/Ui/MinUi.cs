@@ -36,6 +36,8 @@ public sealed class MinUi : IUi
             try { p.Kill(); }
             catch (Exception) { /* already gone */ }
         }
+        // the screen host opens the display while the pak finds the saves
+        ScreenHost.Start();
     }
 
     /// <summary>The icon for a Legal/Illegal tag at this UI scale, if the pak has it.</summary>
@@ -220,6 +222,8 @@ public sealed class MinUi : IUi
         StopBusy();
         var output = Path.Combine(_tmp, "keyboard-out.txt");
         File.Delete(output);
+        // the keyboard is a program of its own, and the screen host has the display
+        ScreenHost.Stop();
         int code = Run("minui-keyboard", "--title", title, "--initial-value", initial, "--write-location", output);
         if (code != ExitSelected || !File.Exists(output))
             return null;
@@ -324,7 +328,11 @@ public sealed class MinUi : IUi
     public void Busy(string text)
     {
         StopBusy();
-        var psi = Start("minui-presenter", ["--message", Escape(text), "--timeout", "-1", .. MessageFont(text), .. MessageBackground()]);
+        string[] args = ["--message", Escape(text), "--timeout", "-1", .. MessageFont(text), .. MessageBackground()];
+        // the screen host shows it and answers: it stays up until the next screen
+        if (ScreenHost.Run("minui-presenter", args, showOnly: true, out _) is not null)
+            return;
+        var psi = Start("minui-presenter", args);
         try
         {
             _busy = ScreenTiming.Start(psi);
@@ -371,19 +379,7 @@ public sealed class MinUi : IUi
         return psi;
     }
 
-    private static int Run(string tool, params string[] args)
-    {
-        using var p = ScreenTiming.Start(Start(tool, args));
-        if (p is null)
-            return -1;
-        // Drain output so the tool never blocks on a full pipe; contents are informational only.
-        p.OutputDataReceived += static (_, _) => { };
-        p.ErrorDataReceived += static (_, _) => { };
-        p.BeginOutputReadLine();
-        p.BeginErrorReadLine();
-        p.WaitForExit();
-        return p.ExitCode;
-    }
+    private static int Run(string tool, params string[] args) => Screens.Run(tool, args, out _) ?? -1;
 
     private static string? FindOnPath(string name)
     {

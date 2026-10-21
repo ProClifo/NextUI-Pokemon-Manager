@@ -8,3 +8,5 @@ minui-list-*-nextui
 minui-list-trimuismart
 minui-presenter-src/
 minui-presenter-*-nextui
+pkmgr-host-*
+*.so

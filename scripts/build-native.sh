@@ -33,12 +33,12 @@ for platform in "${PLATFORMS[@]}"; do
         continue
     fi
     target="$platform-nextui"
-    echo "==> pkmgr-box and minui-list for $platform"
+    echo "==> pkmgr-box, minui-list, minui-presenter and the screen host for $platform"
     make -s -C "$NATIVE" PLATFORM="$target" nextui include/parson minui-list-src minui-presenter-src
     # PKMGR_KEEP_FRAME: no black frames between the pak's screens (scripts/patch-nextui-keep-frame.py)
     python3 "$ROOT/scripts/patch-nextui-keep-frame.py" "$NATIVE/nextui-$platform"
     if ! docker run --rm --platform linux/arm64 -v "$NATIVE":/root/workspace/repo "savant/minui-toolchain:$target" \
-        bash -c "source /root/.bashrc && make -C /root/workspace/repo PLATFORM=$target device minui-list minui-presenter"; then
+        bash -c "source /root/.bashrc && make -C /root/workspace/repo PLATFORM=$target device minui-list minui-presenter pkmgr-host hosted"; then
         echo "!! build failed for $platform" >&2
         status=1
     fi

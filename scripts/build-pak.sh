@@ -78,6 +78,7 @@ echo "==> PC box viewer, minui-list and minui-presenter"
 missing=()
 for platform in "${PLATFORMS[@]}"; do
     box="$ROOT/native/pkmgr-box-$platform-nextui" list="$ROOT/native/minui-list-$platform-nextui" presenter="$ROOT/native/minui-presenter-$platform-nextui"
+    host="$ROOT/native/pkmgr-host-$platform-nextui"
     stale=
     # rebuilt when a source is newer than the binary, so a pak never ships an old viewer
     for src in "$ROOT"/native/pkmgr-box*.c "$ROOT/native/desktop.h" "$ROOT/native/Makefile" "$ROOT/scripts/patch-nextui-keep-frame.py"; do
@@ -87,7 +88,13 @@ for platform in "${PLATFORMS[@]}"; do
         [ "$src" -nt "$list" ] && stale=1
     done
     [ "$ROOT/scripts/patch-nextui-keep-frame.py" -nt "$presenter" ] && stale=1
-    { [ -x "$box" ] && [ -x "$list" ] && [ -x "$presenter" ] && [ -z "$stale" ]; } || missing+=("$platform")
+    for src in "$ROOT"/native/pkmgr-*.c "$ROOT/native/desktop.h" "$ROOT/native/Makefile" "$ROOT/native/minui-list.patch" "$ROOT/scripts/patch-nextui-keep-frame.py"; do
+        [ "$src" -nt "$host" ] && stale=1
+    done
+    for so in pkmgr-box minui-list minui-presenter; do
+        [ -f "$ROOT/native/$so-$platform-nextui.so" ] || stale=1
+    done
+    { [ -x "$box" ] && [ -x "$list" ] && [ -x "$presenter" ] && [ -x "$host" ] && [ -z "$stale" ]; } || missing+=("$platform")
 done
 if [ ${#missing[@]} -ne 0 ]; then
     command -v docker >/dev/null 2>&1 || { echo "docker is required to build minui-list and the PC box viewer for ${missing[*]}" >&2; exit 1; }
@@ -97,6 +104,11 @@ for platform in "${PLATFORMS[@]}"; do
     cp "$ROOT/native/minui-list-$platform-nextui" "$PAK/bin/$platform/minui-list"
     cp "$ROOT/native/pkmgr-box-$platform-nextui" "$PAK/bin/$platform/pkmgr-box"
     cp "$ROOT/native/minui-presenter-$platform-nextui" "$PAK/bin/$platform/minui-presenter"
+    # the screen host and the screens it runs (native/pkmgr-host.c)
+    cp "$ROOT/native/pkmgr-host-$platform-nextui" "$PAK/bin/$platform/pkmgr-host"
+    for so in pkmgr-box minui-list minui-presenter; do
+        cp "$ROOT/native/$so-$platform-nextui.so" "$PAK/bin/$platform/$so.so"
+    done
 done
 
 echo "==> Event gallery (projectpokemon/EventsGallery ${EVENTSGALLERY_COMMIT:0:7}, Gen 1-5)"

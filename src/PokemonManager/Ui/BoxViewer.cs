@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using PKHeX.Core;
@@ -43,29 +42,8 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             return Outcome.Unavailable;
         }
 
-        int code;
-        try
-        {
-            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-            psi.ArgumentList.Add("--scene");
-            psi.ArgumentList.Add(scenePath);
-            psi.ArgumentList.Add("--write-location");
-            psi.ArgumentList.Add(outPath);
-            using var p = ScreenTiming.Start(psi);
-            if (p is null)
-                return Outcome.Unavailable;
-            p.OutputDataReceived += static (_, _) => { };
-            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
-            p.BeginOutputReadLine();
-            p.BeginErrorReadLine();
-            p.WaitForExit();
-            code = p.ExitCode;
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"pkmgr-box failed to start: {ex.Message}");
+        if (Screens.Run(Tool, ["--scene", scenePath, "--write-location", outPath], out _) is not { } code)
             return Outcome.Unavailable;
-        }
 
         switch (code)
         {
@@ -109,35 +87,15 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         try
         {
             File.Delete(outPath);
-            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-            psi.ArgumentList.Add("--clock");
-            psi.ArgumentList.Add($"{weekday},{hour},{minute}");
-            psi.ArgumentList.Add("--write-location");
-            psi.ArgumentList.Add(outPath);
+            List<string> args = ["--clock", $"{weekday},{hour},{minute}", "--write-location", outPath];
             if (fontPath is not null)
-            {
-                psi.ArgumentList.Add("--font");
-                psi.ArgumentList.Add(fontPath);
-            }
+                args.AddRange(["--font", fontPath]);
             if (background is not null)
-            {
-                psi.ArgumentList.Add("--background");
-                psi.ArgumentList.Add(background);
-            }
-            using var p = ScreenTiming.Start(psi);
-            if (p is null)
-            {
-                unavailable = true;
+                args.AddRange(["--background", background]);
+            int? code = Screens.Run(Tool, args, out _);
+            if (code is 2 or 3)
                 return null;
-            }
-            p.OutputDataReceived += static (_, _) => { };
-            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
-            p.BeginOutputReadLine();
-            p.BeginErrorReadLine();
-            p.WaitForExit();
-            if (p.ExitCode is 2 or 3)
-                return null;
-            if (p.ExitCode != 0 || !File.Exists(outPath))
+            if (code != 0 || !File.Exists(outPath))
             {
                 unavailable = true;
                 return null;
@@ -186,23 +144,13 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             Directory.CreateDirectory(tempDir);
             var output = Path.Combine(tempDir, "sprite-background.bmp");
             File.Delete(output);
-            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-            foreach (var arg in new[] { "--compose", output, "--sprite", sprite.Sheet, "--sprite-rect", $"{sprite.X},{sprite.Y},{sprite.W},{sprite.H}" })
-                psi.ArgumentList.Add(arg);
+            List<string> args = ["--compose", output, "--sprite", sprite.Sheet, "--sprite-rect", $"{sprite.X},{sprite.Y},{sprite.W},{sprite.H}"];
             if (background is not null && File.Exists(background))
-            {
-                psi.ArgumentList.Add("--background");
-                psi.ArgumentList.Add(background);
-            }
-            using var p = ScreenTiming.Start(psi);
-            if (p is null)
-                return null;
-            p.StandardOutput.ReadToEnd();
-            var error = p.StandardError.ReadToEnd();
-            p.WaitForExit();
-            if (p.ExitCode == 0 && File.Exists(output))
+                args.AddRange(["--background", background]);
+            int? code = Screens.Run(Tool, args, out _);
+            if (code == 0 && File.Exists(output))
                 return output;
-            Console.Error.WriteLine($"pkmgr-box --compose failed ({p.ExitCode}): {error.Trim()}");
+            Console.Error.WriteLine($"pkmgr-box --compose failed ({code})");
         }
         catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
         {
@@ -286,18 +234,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             var output = Path.Combine(tempDir, "options-out.json");
             File.WriteAllText(input, new System.Text.Json.Nodes.JsonObject { ["items"] = items, ["selected"] = selected }.ToJsonString());
             File.Delete(output);
-            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardError = true };
-            psi.ArgumentList.Add("--options");
-            psi.ArgumentList.Add(input);
-            psi.ArgumentList.Add("--write-location");
-            psi.ArgumentList.Add(output);
-            using var p = ScreenTiming.Start(psi);
-            if (p is null)
-                return null;
-            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
-            p.BeginErrorReadLine();
-            p.WaitForExit();
-            if (p.ExitCode is not (0 or 2) || !File.Exists(output))
+            if (Screens.Run(Tool, ["--options", input, "--write-location", output], out _) is not (0 or 2) || !File.Exists(output))
                 return null;
             using var doc = JsonDocument.Parse(File.ReadAllText(output));
             var result = doc.RootElement.GetProperty("values").EnumerateArray().Select(v => v.GetInt32()).ToArray();
@@ -326,16 +263,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             Directory.CreateDirectory(tempDir);
             var path = Path.Combine(tempDir, "text.json");
             File.WriteAllText(path, json.ToJsonString());
-            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardError = true };
-            psi.ArgumentList.Add(mode);
-            psi.ArgumentList.Add(path);
-            using var p = ScreenTiming.Start(psi);
-            if (p is null)
-                return null;
-            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
-            p.BeginErrorReadLine();
-            p.WaitForExit();
-            return p.ExitCode;
+            return Screens.Run(Tool, [mode, path], out _);
         }
         catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
         {
@@ -355,21 +283,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
             Directory.CreateDirectory(tempDir);
             var path = Path.Combine(tempDir, "dialog.json");
             File.WriteAllText(path, json.ToJsonString());
-            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-            psi.ArgumentList.Add("--dialog");
-            psi.ArgumentList.Add(path);
-            using var p = ScreenTiming.Start(psi);
-            if (p is null)
-                return null;
-            var stdout = new System.Text.StringBuilder();
-            p.OutputDataReceived += (_, e) => { if (e.Data is { } line) lock (stdout) stdout.AppendLine(line); };
-            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
-            p.BeginOutputReadLine();
-            p.BeginErrorReadLine();
-            p.WaitForExit();
-            lock (stdout)
-                output = stdout.ToString();
-            return p.ExitCode;
+            return Screens.Run(Tool, ["--dialog", path], out output);
         }
         catch (Exception ex) when (ex is IOException or System.ComponentModel.Win32Exception)
         {
@@ -394,18 +308,7 @@ public sealed class BoxViewer(BoxScene scene, string tempDir)
         try
         {
             File.WriteAllText(cardPath, TrainerCard.For(sav, skin, fontPath).ToJsonString());
-            var psi = new ProcessStartInfo(Tool) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
-            psi.ArgumentList.Add("--card");
-            psi.ArgumentList.Add(cardPath);
-            using var p = ScreenTiming.Start(psi);
-            if (p is null)
-                return false;
-            p.OutputDataReceived += static (_, _) => { };
-            p.ErrorDataReceived += static (_, e) => { if (e.Data is { } line) Console.Error.WriteLine($"pkmgr-box: {line}"); };
-            p.BeginOutputReadLine();
-            p.BeginErrorReadLine();
-            p.WaitForExit();
-            return p.ExitCode is 0 or 2 or 3;
+            return Screens.Run(Tool, ["--card", cardPath], out _) is 0 or 2 or 3;
         }
         catch (Exception ex)
         {

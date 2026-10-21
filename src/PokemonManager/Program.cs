@@ -56,7 +56,14 @@ int RunUi()
     }
     IUi ui = console ? new ConsoleUi() : new MinUi(paths.TempDir, paths.IconsDir,
         UiFont.Scale(Environment.GetEnvironmentVariable("PLATFORM"), Environment.GetEnvironmentVariable("DEVICE")), UiFont.Next(paths.SdRoot));
-    return new App(ui, paths).Run();
+    try
+    {
+        return new App(ui, paths).Run();
+    }
+    finally
+    {
+        ScreenHost.Stop();
+    }
 }
 
 // Quick on-device sanity check used by launch.sh: proves the runtime starts and PKHeX loads its data.
