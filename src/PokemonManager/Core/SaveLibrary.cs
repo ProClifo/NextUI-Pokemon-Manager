@@ -113,7 +113,9 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 32)
     }
 
     /// <summary>
-    /// Backs up the file currently on disk, then writes the in-memory save over it.
+    /// Backs up the file currently on disk, then writes the in-memory save over it and reads it back: when the card
+    /// doesn't give back what was written, or it isn't the same game's save any more, the backup is put back and an
+    /// <see cref="IOException"/> says so.
     /// </summary>
     /// <returns>The path of the backup that was made.</returns>
     public string Write(SaveEntry entry)
@@ -122,9 +124,42 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 32)
         var data = entry.Sav.Write();
         var tmp = entry.Path + ".pkmgr.tmp";
         // as it was: RetroArch reads either, but whoever turned compression on gets their saves compressed
-        File.WriteAllBytes(tmp, entry.Compressed ? Rzip.Compress(data.Span) : data.ToArray());
+        var bytes = entry.Compressed ? Rzip.Compress(data.Span) : data.ToArray();
+        File.WriteAllBytes(tmp, bytes);
         File.Move(tmp, entry.Path, overwrite: true);
+        AfterWriteForTests?.Invoke(entry.Path);
+        if (Unreadable(entry, bytes, backup) is { } problem)
+        {
+            Console.Error.WriteLine($"{entry.Path} didn't read back as written ({problem}); putting back {backup}");
+            File.Copy(backup, entry.Path, overwrite: true);
+            throw new IOException("it didn't read back correctly from the SD card, so its backup was put back");
+        }
         return backup;
+    }
+
+    /// <summary>Tests damage the file here, as a failing card would.</summary>
+    internal static Action<string>? AfterWriteForTests;
+
+    /// <summary>Why the save on the card isn't what was just written (null when it is).</summary>
+    private static string? Unreadable(SaveEntry entry, byte[] written, string backup)
+    {
+        byte[] onCard;
+        try
+        {
+            onCard = File.ReadAllBytes(entry.Path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return ex.Message;
+        }
+        if (!onCard.AsSpan().SequenceEqual(written))
+            return $"{onCard.Length} bytes differ from the {written.Length} written";
+        // a save PKHeX recognised before (every save on the lists) must still be one
+        if (!TryRead(entry.Path, out var again, out _))
+            return TryRead(backup, out _, out _) ? "not a save PKHeX recognises" : null;
+        if (again.GetType() != entry.Sav.GetType())
+            return $"read as {again.GetType().Name}, not {entry.Sav.GetType().Name}";
+        return null;
     }
 
     /// <summary>
