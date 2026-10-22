@@ -5,10 +5,13 @@ namespace PokemonManager.Core;
 /// <summary>
 /// A save file found on the SD card, along with the PKHeX object that parsed it.
 /// </summary>
-public sealed class SaveEntry(string path, SaveFile sav)
+public sealed class SaveEntry(string path, SaveFile sav, bool compressed = false)
 {
     public string Path { get; } = path;
     public SaveFile Sav { get; private set; } = sav;
+
+    /// <summary>RetroArch compressed it (<see cref="Rzip"/>): it's written back compressed.</summary>
+    public bool Compressed { get; private set; } = compressed;
 
     public string FileName => System.IO.Path.GetFileName(Path);
     public string Label => $"{Names.Game(Sav)} - {Sav.OT} ({FileName})";
@@ -16,9 +19,10 @@ public sealed class SaveEntry(string path, SaveFile sav)
     /// <summary>Re-reads the file from disk, discarding any unsaved in-memory changes.</summary>
     public bool Reload()
     {
-        if (!SaveUtil.TryGetSaveFile(Path, out var fresh))
+        if (!SaveLibrary.TryRead(Path, out var fresh, out var compressed))
             return false;
         Sav = fresh;
+        Compressed = compressed;
         return true;
     }
 }
@@ -69,8 +73,8 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 32)
                 var info = new FileInfo(file);
                 if (info.Length is 0 or > MaxSaveSize)
                     continue;
-                if (SaveUtil.TryGetSaveFile(file, out var sav))
-                    result.Add(new SaveEntry(file, sav));
+                if (TryRead(file, out var sav, out var compressed))
+                    result.Add(new SaveEntry(file, sav, compressed));
             }
         }
         result.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
@@ -78,7 +82,35 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 32)
     }
 
     public static SaveEntry? Load(string path)
-        => SaveUtil.TryGetSaveFile(path, out var sav) ? new SaveEntry(path, sav) : null;
+        => TryRead(path, out var sav, out var compressed) ? new SaveEntry(path, sav, compressed) : null;
+
+    /// <summary>A save file as PKHeX reads it, RetroArch's compressed saves unpacked first.</summary>
+    public static bool TryRead(string path, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SaveFile? sav, out bool compressed)
+    {
+        sav = null;
+        byte[] data;
+        try
+        {
+            data = File.ReadAllBytes(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            compressed = false;
+            return false;
+        }
+        compressed = Rzip.IsCompressed(data);
+        if (compressed && Rzip.Decompress(data) is { } unpacked)
+            data = unpacked;
+        else if (compressed)
+            return false;
+        if (!SaveUtil.TryGetSaveFile(data, out sav, path))
+            return false;
+        // what PKHeX's SaveUtil.TryGetSaveFile(path) does after reading: Gen 1-3 saves don't store their language
+        sav.Metadata.SetExtraInfo(path);
+        if (sav.Generation <= 3)
+            SaveLanguage.TryRevise(sav);
+        return true;
+    }
 
     /// <summary>
     /// Backs up the file currently on disk, then writes the in-memory save over it.
@@ -89,7 +121,8 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 32)
         var backup = Backup(entry.Path, FolderName(entry.Sav));
         var data = entry.Sav.Write();
         var tmp = entry.Path + ".pkmgr.tmp";
-        File.WriteAllBytes(tmp, data.ToArray());
+        // as it was: RetroArch reads either, but whoever turned compression on gets their saves compressed
+        File.WriteAllBytes(tmp, entry.Compressed ? Rzip.Compress(data.Span) : data.ToArray());
         File.Move(tmp, entry.Path, overwrite: true);
         return backup;
     }
