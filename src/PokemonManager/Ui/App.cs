@@ -12,10 +12,6 @@ public sealed class App
 {
     private const string Title = "Pokémon Manager";
 
-    private const string SaveStateWarning =
-        "Close the game before editing, and after editing start it fresh: don't resume from a save state, " +
-        "or the old state will overwrite these changes the next time you save in-game.";
-
     private readonly IUi _ui;
     private readonly AppPaths _paths;
     private readonly SaveLibrary _library;
@@ -589,7 +585,7 @@ public sealed class App
             _ui.Message("The decoration arrived, but this save couldn't be updated, so both games have it.");
             return;
         }
-        _ui.Message($"{result.Message}\n\n{SaveStateWarning}");
+        _ui.Message($"Sent {decoration.Name} to {dest.Sav.OT}!");
     }
 
     private static string SaveInfo(SaveEntry entry)
@@ -1896,7 +1892,5 @@ public sealed class App
         "\n" +
         "Each game's menu has Mystery Gift (every ticket the game has, like the Aurora Ticket, once the game's Mystery Gift is unlocked), Distributions (Pokémon " +
         "you can only get from an event; Red/Blue/Yellow have Mew instead) and the Events Gallery (every event file for that game and language, from Project " +
-        "Pokémon's EventsGallery). Items are marked Legal or Illegal. Info shows the save's details.\n" +
-        "\n" +
-        SaveStateWarning;
+        "Pokémon's EventsGallery). Items are marked Legal or Illegal. Info shows the save's details.";
 }
