@@ -72,13 +72,46 @@ public sealed class SaveLibrary(string backupDir, int backupsToKeep = 32)
                     continue;
                 var info = new FileInfo(file);
                 if (info.Length is 0 or > MaxSaveSize)
+                {
+                    LogUnrecognised(file, info.Length, "empty or too big");
                     continue;
+                }
                 if (TryRead(file, out var sav, out var compressed))
                     result.Add(new SaveEntry(file, sav, compressed));
+                else
+                    LogUnrecognised(file, info.Length, compressed ? Unpacked(file) : null);
             }
         }
         result.Sort((a, b) => string.Compare(a.Label, b.Label, StringComparison.OrdinalIgnoreCase));
         return result;
+    }
+
+    /// <summary>
+    /// A Pokémon game's save that isn't listed because PKHeX doesn't recognise it, in the log with its size, so a player
+    /// asking why their save is missing can send the log. Other games' saves sit in the same folders, so only files
+    /// named like a Pokémon game are logged.
+    /// </summary>
+    private static void LogUnrecognised(string path, long size, string? note)
+    {
+        var name = System.IO.Path.GetFileName(path);
+        if (!name.Contains("pok", StringComparison.OrdinalIgnoreCase))
+            return;
+        Console.Error.WriteLine($"not a save PKHeX recognises, so not listed: {path} ({size} bytes{(note is null ? "" : $", {note}")})");
+    }
+
+    /// <summary>For the log: what a RetroArch compressed save holds.</summary>
+    private static string Unpacked(string path)
+    {
+        try
+        {
+            return Rzip.Decompress(File.ReadAllBytes(path)) is { } data
+                ? $"RetroArch compressed, {data.Length} bytes unpacked"
+                : "RetroArch compressed, but damaged";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return ex.Message;
+        }
     }
 
     public static SaveEntry? Load(string path)

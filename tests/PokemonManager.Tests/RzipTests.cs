@@ -45,4 +45,29 @@ public class RzipTests
         var data = Rzip.Compress(new byte[128 * 1024]);
         Assert.Null(Rzip.Decompress(data.AsSpan(0, data.Length - 5)));
     }
+
+    [Fact]
+    public void UnrecognisedPokemonSavesAreLoggedAndOtherGamesAreNot()
+    {
+        var dir = Directory.CreateTempSubdirectory().FullName;
+        var log = new StringWriter();
+        var stderr = Console.Error;
+        try
+        {
+            File.WriteAllBytes(Path.Combine(dir, "Pokemon - Ruby Version (USA, Europe).srm"), new byte[139264]);
+            File.WriteAllBytes(Path.Combine(dir, "Pokemon - Sapphire Version (USA, Europe).srm"), Rzip.Compress(new byte[1000]));
+            File.WriteAllBytes(Path.Combine(dir, "Metroid Fusion (USA).srm"), new byte[8192]);
+            Console.SetError(log);
+            Assert.Empty(SaveLibrary.Scan([dir]));
+        }
+        finally
+        {
+            Console.SetError(stderr);
+            Directory.Delete(dir, true);
+        }
+        var text = log.ToString();
+        Assert.Contains("Pokemon - Ruby Version (USA, Europe).srm (139264 bytes)", text);
+        Assert.Contains("RetroArch compressed, 1000 bytes unpacked", text);
+        Assert.DoesNotContain("Metroid", text);
+    }
 }
