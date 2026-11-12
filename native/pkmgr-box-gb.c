@@ -399,10 +399,11 @@ static void gb_draw_gen2(SDL_Surface *dst, Scene *scene, const Layout *l, GbStat
     Box *box = &scene->boxes[scene->box];
     int count = gb_count(box);
 
-    // BillsPC_BoxName (with Move PKMN w/o Mail's box arrows, as Left/Right change the box)
+    // BillsPC_BoxName with box arrows, as Left/Right change the box: inside the frame (columns 9 and 18, either side of
+    // a name of up to 8 letters at 10) and pointing in, unlike Move PKMN w/o Mail's on the frame
     gb_box(dst, scene, l, 8, 0, 12, 3);
-    gb_print(dst, scene, l, "<BOXL>", 8, 1);
-    gb_print(dst, scene, l, "<BOXR>", 19, 1);
+    gb_print(dst, scene, l, "<BOXR>", 9, 1);
+    gb_print(dst, scene, l, "<BOXL>", 18, 1);
     gb_print(dst, scene, l, gb_box_name(scene, scene->box), 10, 1);
 
     // BillsPC_RefreshTextboxes: the list box joined to the box name's
