@@ -7,11 +7,11 @@
   "repo_url": "https://github.com/ProClifo/NextUI-Pokemon-Manager",
   "release_filename": "PokemonManager.pak.zip",
   "changelog": {
-    "v0.2.53": "Hidden setting for beta testers: add beta_updates=true to PokemonManager/settings.txt to be offered beta releases in Update.",
     "v0.2.54": "No more black flash between screens. settings.txt now lists every setting, including beta_updates=false.",
     "v0.2.55": "Screens switch instantly, like NextUI's own menus. The first save opens faster.",
     "v0.2.56": "Reads RetroArch's compressed saves. Each save is checked after writing; if it didn't save correctly, the backup is put back. Shorter decoration message.",
-    "v0.2.57": "Pokémon saves that can't be read are noted in the log, to help find out why a save is missing."
+    "v0.2.57": "Pokémon saves that can't be read are noted in the log, to help find out why a save is missing.",
+    "v0.2.58": "Gold/Silver/Crystal PC: the box arrows are inside the box name's frame, pointing out."
   },
   "screenshots": [
     ".github/resources/screenshots/main_menu.jpg",
